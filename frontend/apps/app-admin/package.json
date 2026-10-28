@@ -6,9 +6,11 @@
     "dev": "vite",
     "build": "tsr generate && tsc --noEmit && vite build",
     "preview": "vite preview",
-    "lint": "eslint && steiger ./src"
+    "lint": "eslint && steiger ./src",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@repo/ui": "workspace:*",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-router": "1.170.46",
     "react": "19.3.0",
