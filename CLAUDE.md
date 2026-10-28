@@ -14,6 +14,7 @@
 - 프론트엔드 디렉토리: frontend
 - 백엔드 디렉토리: backend
 - 도메인 뼈대: docs/domain.md (개발 시 참고)
+- API 규약: docs/api-convention.md (프론트엔드·백엔드 공통, 개발 시 반드시 따른다)
 
 ## 필수 사항
 
