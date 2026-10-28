@@ -12,7 +12,7 @@ import io.swagger.v3.oas.models.SpecVersion
 import io.swagger.v3.oas.models.media.Content
 import io.swagger.v3.oas.models.media.MediaType
 import io.swagger.v3.oas.models.media.Schema
-import org.springdoc.core.customizers.OpenApiCustomizer
+import org.springdoc.core.customizers.GlobalOpenApiCustomizer
 import org.springdoc.core.properties.SpringDocConfigProperties
 import org.springdoc.core.utils.SpringDocAnnotationsUtils
 import org.springframework.context.MessageSource
@@ -29,7 +29,7 @@ class CommonErrorResponseCustomizer(
 	private val messageSource: MessageSource,
 	private val jsonMapper: JsonMapper,
 	private val springDocConfigProperties: SpringDocConfigProperties,
-) : OpenApiCustomizer {
+) : GlobalOpenApiCustomizer {
 
 	override fun customise(openApi: OpenAPI) {
 		val components = openApi.components ?: Components().also { openApi.components = it }
