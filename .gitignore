@@ -1,0 +1,9 @@
+# Personal Claude Code configuration
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Local environment values; keep placeholder examples shareable
+.env
+.env.*
+!.env.example
+!.env.*.example
