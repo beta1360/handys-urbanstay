@@ -13,6 +13,7 @@
 
 - 프론트엔드 디렉토리: frontend
 - 백엔드 디렉토리: backend
+- 도메인 뼈대: docs/domain.md (개발 시 참고)
 
 ## 필수 사항
 
