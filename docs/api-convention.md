@@ -36,7 +36,7 @@
 | 필드 | 설명 |
 |---|---|
 | `success` | 요청 성공 여부 |
-| `data` | 성공 시 결과. 실패 시 `null` |
+| `data` | 성공 시 결과. 돌려줄 결과가 없는 성공(예: 로그아웃)과 실패 시 `null` |
 | `error` | 실패 시 에러 정보. 성공 시 `null` |
 | `error.code` | 에러 코드 |
 | `error.message` | 에러 메시지 |
@@ -81,6 +81,23 @@
   - CSRF 토큰이 없거나 틀리면 403 `INVALID_CSRF_TOKEN`
 - CSRF 검사가 로그인 확인보다 먼저다. 그래서 로그인하지 않고 토큰도 없는 변경 요청은 403 `INVALID_CSRF_TOKEN`을 받는다.
 - 게스트 앱의 로그인은 아직 정하지 않았다.
+
+### 로그인 흐름 (app-admin)
+
+| API | 설명 |
+|---|---|
+| `GET /api/v1/app-admin/auth/me` | 내 정보 조회. 로그인 필요 |
+| `POST /api/v1/app-admin/auth/login` | 로그인. 로그인 없이 호출하지만 CSRF 토큰은 필요 |
+| `POST /api/v1/app-admin/auth/logout` | 로그아웃. 로그인 필요 |
+
+1. 앱이 뜨면 내 정보 API로 로그인 상태를 확인한다. 로그인 전이면 401 `UNAUTHORIZED`와 함께 `XSRF-TOKEN` 쿠키를 받는다.
+2. 로그인은 받은 토큰을 `X-XSRF-TOKEN` 헤더에 넣어 보낸다.
+   - 성공하면 200과 내 정보(`id`, `loginId`, `name`)를 받는다.
+   - 성공하면 세션 쿠키와 `XSRF-TOKEN` 쿠키가 새로 바뀐다. 다음 요청부터는 새 쿠키 값을 보낸다.
+3. 로그인 API의 401은 `INVALID_CREDENTIALS`다. 아이디가 없을 때와 비밀번호가 틀렸을 때 같은 응답이다. 다른 API의 401(`UNAUTHORIZED`, 로그인 필요)과 구분해서 처리한다.
+4. 로그아웃하면 세션 쿠키와 `XSRF-TOKEN` 쿠키가 지워진다. 다시 로그인하기 전에는 1번처럼 토큰을 다시 받는다.
+
+- hotel-admin의 로그인은 호텔 계정을 만들 때 같은 방식으로 정한다.
 
 ## 프론트엔드 호출 방식
 
