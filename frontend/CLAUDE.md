@@ -1,6 +1,6 @@
 # 프론트엔드 작업 지침
 
-프론트엔드 두 앱에 공통으로 적용하는 규칙. 앱 전용 규칙은 각 앱의 CLAUDE.md에, 백엔드와 공통인 규칙은 docs/ 문서에 둔다.
+프론트엔드의 모든 앱에 공통으로 적용하는 규칙. 앱 전용 규칙은 각 앱의 CLAUDE.md에, 두 어드민 앱의 공통 규칙은 `frontend/docs/admin-app.md`에, 백엔드와 공통인 규칙은 저장소 루트의 docs/ 문서에 둔다.
 
 ## 참고 문서
 
@@ -16,12 +16,16 @@
 ```
 frontend/
 ├─ apps/
-│  ├─ web/    # 게스트 앱 (Next.js). 규칙: apps/web/CLAUDE.md
-│  └─ ops/    # 운영 백오피스 (Vite + React)
-└─ packages/  # 앱 간 공유 코드
+│  ├─ web/          # 게스트 앱 (Next.js). 규칙: apps/web/CLAUDE.md
+│  ├─ app-admin/    # 전체 어드민 앱 (Vite + React)
+│  └─ hotel-admin/  # 호텔 운영자 앱 (Vite + React)
+├─ docs/
+│  └─ admin-app.md  # 두 어드민 앱의 공통 규칙
+└─ packages/        # 앱 간 공유 코드. 예: ui/ (어드민 앱용 shadcn/ui)
 ```
 
-- 게스트 앱과 운영 앱은 정책이 다르므로 각자 전용 API만 쓴다. API 코드는 앱마다 orval로 따로 생성한다.
+- 세 앱은 정책이 다르므로 각자 전용 API만 쓴다. API 코드는 앱마다 orval로 따로 생성한다.
+- 어드민 앱(`app-admin`, `hotel-admin`)은 아직 만들지 않았다. 앱을 만들 때 각 앱의 CLAUDE.md를 두고 `docs/admin-app.md`를 인용한다.
 
 ## 구조 (FSD)
 
