@@ -23,8 +23,11 @@
 ## 구조
 
 - `src/` 아래를 FSD로 구성한다. 레이어 규칙은 `frontend/CLAUDE.md`를 따른다.
-- 라우트 파일은 FSD의 pages 레이어를 가져와 연결만 한다.
-- 라우트 폴더의 위치와 app·pages 레이어 폴더 이름은 첫 앱(app-admin)을 만들 때 Steiger 검사와 맞춰 정한다.
+- app·pages 레이어 폴더 이름은 `app`, `pages`를 그대로 쓴다.
+- 라우트 파일은 app 레이어의 `routes` 세그먼트(`src/app/routes`)에 두고, FSD의 pages 레이어를 가져와 연결만 한다. 라우트 파일도 app 레이어 안에 있으므로 Steiger가 import 규칙을 검사한다.
+- 라우터 생성 코드와 생성된 라우트 트리(`route-tree.gen.ts`)는 `src/app/router/`에, 진입점(`main.tsx`)은 `src/app/entrypoint/`에 둔다.
+- 라우트 생성 설정(`routesDirectory`, `generatedRouteTree` 등)은 앱의 `tsr.config.json`에만 둔다. Vite 플러그인과 `tsr generate`가 이 파일을 함께 읽는다.
+- 생성된 라우트 트리는 직접 수정하지 않고 커밋한다.
 - 로그인 확인은 로그인이 필요한 화면을 묶는 레이아웃 라우트의 `beforeLoad`에서 한다.
 
 ## 화면

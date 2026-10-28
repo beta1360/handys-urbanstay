@@ -1,0 +1,37 @@
+{
+  "name": "app-admin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsr generate && tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "lint": "eslint && steiger ./src"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/react-router": "1.170.46",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "tailwindcss": "^4.1.18"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9",
+    "@feature-sliced/steiger-plugin": "^0.8.0",
+    "@tanstack/eslint-plugin-router": "^1.162.0",
+    "@tanstack/router-cli": "^1.132.0",
+    "@tanstack/router-plugin": "1.168.48",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^9",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.13.0",
+    "steiger": "^0.8.0",
+    "typescript": "^5",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^8.0.0"
+  }
+}
