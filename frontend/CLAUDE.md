@@ -71,8 +71,17 @@ frontend/
 - 라이트 테마만 지원한다.
 - React Compiler는 쓰지 않는다. 메모이제이션이 필요하면 `useMemo`, `useCallback`, `memo`로 직접 한다.
 
+## 테스트
+
+- Vitest + React Testing Library로 테스트한다. 사용자 조작은 user-event, DOM 검증은 jest-dom 매처를 쓴다.
+- 테스트 파일은 대상 소스 옆에 `*.test.ts(x)`로 둔다. 예: `app-header.tsx` 옆의 `app-header.test.tsx`
+- 테스트 이름은 한국어 문장으로 쓴다. 예: `헤더에 앱 이름과 마이페이지 버튼을 보여준다`
+- 화면 문구 같은 기대값은 상수에서 읽는다. 운영 코드의 문구를 테스트에 복사하지 않는다.
+- async Server Component는 Vitest로 단위 테스트할 수 없다(Next.js 가이드).
+
 ## 명령어 (`frontend/`에서 실행)
 
-- 모든 앱: `pnpm dev`, `pnpm build`, `pnpm lint`(ESLint + Steiger), `pnpm codegen` (turbo로 실행)
+- 모든 앱: `pnpm dev`, `pnpm build`, `pnpm lint`(ESLint + Steiger), `pnpm test`(한 번 실행), `pnpm codegen` (turbo로 실행)
 - 특정 앱만: `pnpm --filter web dev`처럼 `--filter`로 지정한다.
+- 테스트 감시 모드: `pnpm --filter web test:watch`
 - API 코드 생성은 백엔드가 실행 중이어야 한다.
