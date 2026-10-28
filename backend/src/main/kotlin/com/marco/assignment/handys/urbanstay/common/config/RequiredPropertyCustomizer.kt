@@ -3,14 +3,14 @@ package com.marco.assignment.handys.urbanstay.common.config
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.Operation
 import io.swagger.v3.oas.models.media.Schema
-import org.springdoc.core.customizers.OpenApiCustomizer
+import org.springdoc.core.customizers.GlobalOpenApiCustomizer
 import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
 
 @Component
 @Order(Ordered.LOWEST_PRECEDENCE)
-class RequiredPropertyCustomizer : OpenApiCustomizer {
+class RequiredPropertyCustomizer : GlobalOpenApiCustomizer {
 
 	override fun customise(openApi: OpenAPI) {
 		val schemas = openApi.components?.schemas ?: return
