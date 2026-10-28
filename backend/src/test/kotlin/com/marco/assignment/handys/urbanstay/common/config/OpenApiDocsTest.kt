@@ -24,6 +24,7 @@ import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -170,6 +171,34 @@ class OpenApiDocsTest {
 	}
 
 	@ParameterizedTest
+	@EnumSource(DocGroup::class, names = ["APP_ADMIN", "HOTEL_ADMIN"])
+	fun `어드민 그룹의 모든 operation에 401·403 에러 응답이 붙고 상태를 바꾸는 operation의 403에는 CSRF 예시도 붙는다`(group: DocGroup) {
+		val operations = operations(apiDocs(group))
+
+		assertThat(operations.map { it.method }).contains("get", "delete")
+		operations.forEach { operation ->
+			val unauthorized = errorMediaType(operation, HttpStatus.UNAUTHORIZED)
+			val forbidden = errorMediaType(operation, HttpStatus.FORBIDDEN)
+			assertThat(listOf(unauthorized["schema"], forbidden["schema"])).describedAs(operation.name)
+				.containsOnly(json("""{"$REF":"$ERROR_SCHEMA_REF"}"""))
+			assertThat(unauthorized["example"]).describedAs(operation.name).isEqualTo(expectedExample(CommonErrorCode.UNAUTHORIZED))
+			if (operation.method in CSRF_PROTECTED_METHODS) {
+				assertThat(forbidden["examples"]).describedAs(operation.name)
+					.isEqualTo(expectedExamples(CommonErrorCode.FORBIDDEN, CommonErrorCode.INVALID_CSRF_TOKEN))
+			} else {
+				assertThat(forbidden["example"]).describedAs(operation.name).isEqualTo(expectedExample(CommonErrorCode.FORBIDDEN))
+			}
+		}
+	}
+
+	@Test
+	fun `게스트 그룹 operation에는 401·403 에러 응답이 붙지 않는다`() {
+		val statuses = operations(apiDocs(DocGroup.APP)).flatMap { it.node["responses"].propertyNames() }
+
+		assertThat(statuses).isNotEmpty().doesNotContain("401", "403")
+	}
+
+	@ParameterizedTest
 	@EnumSource(DocGroup::class)
 	fun `operation은 성공 응답과 공통 에러 응답만 가진다`(group: DocGroup) {
 		val responses = sampleOperations(apiDocs(group), group)
@@ -264,6 +293,12 @@ class OpenApiDocsTest {
 	private fun expectedExample(errorCode: ErrorCode): JsonNode =
 		json("""{"success":false,"data":null,"error":{"code":"${errorCode.code}","message":"${message(errorCode.messageKey)}","fieldErrors":[]}}""")
 
+	private fun expectedExamples(vararg errorCodes: ErrorCode): JsonNode =
+		json(errorCodes.joinToString(",", "{", "}") { """"${it.code}":{"value":${expectedExample(it)}}""" })
+
+	private fun errorMediaType(operation: DocOperation, status: HttpStatus): JsonNode =
+		operation.node.path("responses").path(status.value().toString()).path("content").path(JSON)
+
 	private fun required(schema: JsonNode): List<String> = schema.path("required").values().map { it.stringValue() }
 
 	private fun nullableFields(schema: JsonNode): List<String> =
@@ -314,14 +349,14 @@ class OpenApiDocsTest {
 			"app-admin",
 			ApiPaths.APP_ADMIN,
 			"SampleAppAdminResponse",
-			mapOf("getSample" to setOf("200", "400", "500")),
+			mapOf("getSample" to setOf("200", "400", "401", "403", "500"), "deleteSample" to setOf("200", "400", "401", "403", "500")),
 			emptySet(),
 		),
 		HOTEL_ADMIN(
 			"hotel-admin",
 			ApiPaths.HOTEL_ADMIN,
 			"SampleHotelAdminResponse",
-			mapOf("getSample" to setOf("200", "400", "500")),
+			mapOf("getSample" to setOf("200", "400", "401", "403", "500"), "deleteSample" to setOf("200", "400", "401", "403", "500")),
 			emptySet(),
 		),
 		;
@@ -386,6 +421,11 @@ class OpenApiDocsTest {
 		@GetMapping("/{id}")
 		fun getSample(@PathVariable id: Long): ApiResponse<SampleAppAdminResponse> =
 			ApiResponse.success(SampleAppAdminResponse(id, null))
+
+		@Operation(summary = "openapi.app-admin.operation.deleteSample.summary")
+		@DeleteMapping("/{id}")
+		fun deleteSample(@PathVariable id: Long): ApiResponse<SampleAppAdminResponse> =
+			ApiResponse.success(SampleAppAdminResponse(id, null))
 	}
 
 	@Tag(name = "sample", description = "openapi.hotel-admin.tag.sample")
@@ -396,6 +436,11 @@ class OpenApiDocsTest {
 		@Operation(summary = "openapi.hotel-admin.operation.getSample.summary")
 		@GetMapping("/{id}")
 		fun getSample(@PathVariable id: Long): ApiResponse<SampleHotelAdminResponse> =
+			ApiResponse.success(SampleHotelAdminResponse(id, null))
+
+		@Operation(summary = "openapi.hotel-admin.operation.deleteSample.summary")
+		@DeleteMapping("/{id}")
+		fun deleteSample(@PathVariable id: Long): ApiResponse<SampleHotelAdminResponse> =
 			ApiResponse.success(SampleHotelAdminResponse(id, null))
 	}
 
@@ -409,6 +454,7 @@ class OpenApiDocsTest {
 		private val BASE_PACKAGE = UrbanstayApplication::class.java.packageName
 		private val COMMON_ERRORS = listOf(CommonErrorCode.INVALID_INPUT, CommonErrorCode.INTERNAL_SERVER_ERROR)
 		private val HTTP_METHODS = HttpMethod.values().map { it.name().lowercase() }
+		private val CSRF_PROTECTED_METHODS = setOf("post", "put", "patch", "delete")
 		private val DUPLICATE_SUFFIX = Regex("_\\d+$")
 	}
 }
