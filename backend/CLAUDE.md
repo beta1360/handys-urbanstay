@@ -56,6 +56,8 @@ urbanstay/
 
 - JPA 테스트 전용 엔티티는 기본 패키지 밖인 `com.marco.assignment.handys.fixture`에 두고, 테스트에서 `@EntityScan`으로 지정한다. 기본 패키지 안에 두면 `@SpringBootTest`가 테스트 엔티티까지 스키마 검증 대상으로 잡는다.
 - 테스트 전용 마이그레이션은 `src/test/resources/db/test-migration/`에 두고, 운영 버전(V1, V2…)과 겹치지 않게 `V0_1`처럼 0.x 버전을 쓴다. 필요한 테스트에서만 `spring.flyway.locations`로 등록한다.
+- 테스트 전용 메시지(에러 코드, 문서 키)는 `src/test/resources/test-messages.properties`에 두고, `spring.messages.basename=messages,test-messages`로 등록한다.
+- 테스트용 컨트롤러는 테스트 클래스 안에 중첩하고 `@Import`로 등록한다.
 
 ## DB 마이그레이션 (Flyway)
 
@@ -71,6 +73,17 @@ urbanstay/
 
 - 프론트엔드가 문서만 보고 API를 쓸 수 있도록 작성한다.
 - 엔드포인트마다 설명, 요청·응답 필드 설명, 예시, 발생할 수 있는 에러 응답을 적는다.
+- 태그 이름은 도메인 패키지 이름(영문 소문자)을 쓴다. 예: `hotel`
+- operationId는 컨트롤러 메서드 이름이다. API 전체에서 유일하게 짓는다. 예: `getHotel`, `createRoom`
+- 설명 문구는 어노테이션에 직접 쓰지 않고 `messages.properties`의 키로 쓴다. 키는 `openapi.`로 시작한다.
+  - 문서 설명: `openapi.info.description`
+  - 태그: `openapi.tag.{tag}`
+  - 오퍼레이션: `openapi.operation.{operationId}.summary` (필요하면 `.description`)
+  - 스키마 필드: `openapi.schema.{SchemaName}.{field}`
+- 400·500 공통 에러 응답은 모든 API에 자동으로 붙는다. 에러 응답 스키마는 `ErrorApiResponse`다.
+- 생성 응답(201)은 `@ResponseStatus(HttpStatus.CREATED)`를 붙이고 `ApiResponse<T>`를 반환한다.
+- 요청 DTO와 응답 DTO는 분리한다. 응답 스키마는 모든 필드가 required(nullable 필드는 `| null`)로, 요청 스키마는 non-null 필드만 required로 문서화된다.
+- 응답 media type은 `application/json`이다.
 
 ## 로컬 실행
 
