@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AppShell } from "@/_app";
+import { AppLayout } from "@/_app";
 import { APP_INFO } from "@/shared/config";
 import "@/_app/styles/globals.css";
 
@@ -12,7 +12,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ko" className="antialiased">
       <body className="bg-gray-100">
-        <AppShell>{children}</AppShell>
+        <AppLayout>{children}</AppLayout>
       </body>
     </html>
   );

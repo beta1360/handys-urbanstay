@@ -1,1 +1,3 @@
-export { AppShell } from "./ui/app-shell";
+import { AppLayout } from "@/widgets/app-layout";
+
+export { AppLayout };

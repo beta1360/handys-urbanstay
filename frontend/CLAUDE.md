@@ -40,6 +40,10 @@ frontend/
 - 레이어는 위에서 아래로만 import한다: app → pages → widgets → features → entities → shared
 - 같은 레이어의 다른 slice는 import하지 않는다.
 - slice는 `index.ts`(public API)로만 외부에 내보내고, 다른 slice는 public API로만 가져온다.
+- 다른 slice를 `export { X } from "..."`로 재수출하지 않는다. 필요하면 import한 뒤 export한다. Steiger가 재수출은 검사하지 않기 때문이다. slice 자기 내부를 `index.ts`에서 재수출하는 것은 괜찮다.
+- app 레이어에는 UI 컴포넌트를 두지 않는다. 앱 틀(레이아웃) 같은 UI는 widgets에 둔다.
+- 세그먼트 이름은 역할이 아니라 목적으로 짓는다. `components`, `hooks`, `providers` 같은 이름은 쓰지 않는다.
+- FSD 규칙은 Steiger(FSD 공식 린터)로 검사한다. 설정은 각 앱의 `steiger.config.mjs`이고, `pnpm lint`에 포함된다.
 
 ## 이름과 export
 
@@ -67,6 +71,6 @@ frontend/
 
 ## 명령어 (`frontend/`에서 실행)
 
-- 모든 앱: `pnpm dev`, `pnpm build`, `pnpm lint`, `pnpm codegen` (turbo로 실행)
+- 모든 앱: `pnpm dev`, `pnpm build`, `pnpm lint`(ESLint + Steiger), `pnpm codegen` (turbo로 실행)
 - 특정 앱만: `pnpm --filter web dev`처럼 `--filter`로 지정한다.
 - API 코드 생성은 백엔드가 실행 중이어야 한다.
