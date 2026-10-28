@@ -25,7 +25,7 @@ frontend/
 ```
 
 - 세 앱은 정책이 다르므로 각자 전용 API만 쓴다. API 코드는 앱마다 orval로 따로 생성한다.
-- 어드민 앱(`app-admin`, `hotel-admin`)은 아직 만들지 않았다. 앱을 만들 때 각 앱의 CLAUDE.md를 두고 `docs/admin-app.md`를 인용한다.
+- 어드민 앱 중 `app-admin`은 만들었다(규칙: `apps/app-admin/CLAUDE.md`). `hotel-admin`은 아직 만들지 않았다. 앱을 만들 때 각 앱의 CLAUDE.md를 두고 `docs/admin-app.md`를 인용한다.
 
 ## 구조 (FSD)
 
