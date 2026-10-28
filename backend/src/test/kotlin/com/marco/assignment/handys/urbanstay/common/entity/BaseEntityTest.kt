@@ -17,7 +17,7 @@ import org.springframework.data.auditing.CurrentDateTimeProvider
 import java.time.Instant
 import java.util.Optional
 
-@DataJpaTest(properties = ["spring.flyway.locations=classpath:db/migration,classpath:db/test-migration"])
+@DataJpaTest
 @Import(TestcontainersConfiguration::class, JpaAuditingConfig::class)
 @EntityScan(basePackageClasses = [AuditingTestEntity::class])
 class BaseEntityTest {

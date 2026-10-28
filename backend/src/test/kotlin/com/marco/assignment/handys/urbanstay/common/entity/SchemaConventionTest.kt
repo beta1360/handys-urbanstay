@@ -11,7 +11,7 @@ import org.springframework.boot.persistence.autoconfigure.EntityScan
 import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 
-@DataJpaTest(properties = ["spring.flyway.locations=classpath:db/migration,classpath:db/test-migration"])
+@DataJpaTest
 @Import(TestcontainersConfiguration::class, JpaAuditingConfig::class)
 @EntityScan(basePackageClasses = [AuditingTestEntity::class])
 class SchemaConventionTest {
