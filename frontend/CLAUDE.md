@@ -21,7 +21,8 @@ frontend/
 │  └─ hotel-admin/  # 호텔 운영자 앱 (Vite + React)
 ├─ docs/
 │  └─ admin-app.md  # 두 어드민 앱의 공통 규칙
-└─ packages/        # 앱 간 공유 코드. 예: ui/ (두 어드민 앱이 함께 쓰는 화면 컴포넌트)
+└─ packages/        # 앱 간 공유 코드
+   └─ ui/           # 두 어드민 앱이 함께 쓰는 화면 컴포넌트 (@repo/ui). 규칙: packages/ui/CLAUDE.md
 ```
 
 - 세 앱은 정책이 다르므로 각자 전용 API만 쓴다. API 코드는 앱마다 orval로 따로 생성한다.
@@ -86,6 +87,7 @@ frontend/
 ## 명령어 (`frontend/`에서 실행)
 
 - 모든 앱: `pnpm dev`, `pnpm build`, `pnpm lint`(ESLint + Steiger), `pnpm test`(한 번 실행), `pnpm codegen` (turbo로 실행)
-- 특정 앱만: `pnpm --filter web dev`처럼 `--filter`로 지정한다.
+- 타입 검사: `pnpm typecheck` (`tsc --noEmit`). `typecheck` 스크립트가 있는 `app-admin`과 `@repo/ui`에서 실행한다. web은 `next build`가 타입을 검사한다.
+- 특정 앱만: `pnpm --filter web dev`처럼 `--filter`로 지정한다. 패키지는 `pnpm --filter @repo/ui test`처럼 패키지 이름으로 지정한다.
 - 테스트 감시 모드: `pnpm --filter web test:watch`
 - API 코드 생성은 백엔드가 실행 중이어야 한다.

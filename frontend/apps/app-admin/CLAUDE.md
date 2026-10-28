@@ -51,4 +51,5 @@ TanStack Router 파일 기반 라우팅이 정한 이름은 kebab-case 규칙의
 - 개발 서버: `pnpm --filter app-admin dev`
 - 빌드: `pnpm --filter app-admin build` (`tsr generate` → `tsc --noEmit` → `vite build`)
 - 린트: `pnpm --filter app-admin lint` (ESLint + Steiger)
+- 타입 검사: `pnpm --filter app-admin typecheck` (`tsc --noEmit`)
 - 라우트 트리만 다시 만들기: `pnpm --filter app-admin exec tsr generate`. 개발 서버와 빌드는 라우트 트리를 자동으로 다시 만든다.
