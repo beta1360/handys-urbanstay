@@ -70,6 +70,7 @@
 
 - backend: 백엔드 파트이기에 backend 디렉토리 내에서 CLAUDE를 활용한다.
 - frontend: 프론트엔드 파트이기에 frontend 디렉토리 내에서 CLAUDE를 활용한다.
+  - 개발 플로우: docs/frontend-flow.md (개발 시 반드시 따른다)
 - 위의 부분들을 해결하기 위해 서브에이전트를 거쳐서 해결하자. PR이후에는 메인 에이전트로 넘어가서 다시 계획을 잡는다.
 
 ## Claude code의 규칙
