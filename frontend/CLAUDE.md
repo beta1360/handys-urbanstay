@@ -21,7 +21,7 @@ frontend/
 │  └─ hotel-admin/  # 호텔 운영자 앱 (Vite + React)
 ├─ docs/
 │  └─ admin-app.md  # 두 어드민 앱의 공통 규칙
-└─ packages/        # 앱 간 공유 코드. 예: ui/ (어드민 앱용 shadcn/ui)
+└─ packages/        # 앱 간 공유 코드. 예: ui/ (두 어드민 앱이 함께 쓰는 화면 컴포넌트)
 ```
 
 - 세 앱은 정책이 다르므로 각자 전용 API만 쓴다. API 코드는 앱마다 orval로 따로 생성한다.
