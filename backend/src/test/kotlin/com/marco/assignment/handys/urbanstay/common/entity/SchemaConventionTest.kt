@@ -2,6 +2,7 @@ package com.marco.assignment.handys.urbanstay.common.entity
 
 import com.marco.assignment.handys.fixture.AuditingTestEntity
 import com.marco.assignment.handys.urbanstay.TestcontainersConfiguration
+import com.marco.assignment.handys.urbanstay.UrbanstayApplication
 import com.marco.assignment.handys.urbanstay.common.config.JpaAuditingConfig
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -13,7 +14,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 
 @DataJpaTest
 @Import(TestcontainersConfiguration::class, JpaAuditingConfig::class)
-@EntityScan(basePackageClasses = [AuditingTestEntity::class])
+@EntityScan(basePackageClasses = [UrbanstayApplication::class, AuditingTestEntity::class])
 class SchemaConventionTest {
 
 	@Autowired
