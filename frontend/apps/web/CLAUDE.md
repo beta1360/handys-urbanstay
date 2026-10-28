@@ -16,6 +16,7 @@
 - Next.js 라우팅은 `app/`에, FSD 레이어는 `src/`에 둔다.
 - `app/`의 라우트 파일은 `src/_pages`의 페이지를 가져와 내보내기만 한다.
 - Next.js 라우트 파일(page, layout 등)만 default export를 쓴다.
+- Steiger의 `fsd/typo-in-layer-name`은 `_app`·`_pages`에서만 끈다. 접두어가 붙은 레이어를 오타로 잘못 잡는 Steiger 버그(feature-sliced/steiger#282) 때문이며, 수정되면 예외를 없앤다.
 
 ```
 apps/web/
