@@ -1,13 +1,12 @@
 package com.marco.assignment.handys.urbanstay.common.exception
 
 import com.marco.assignment.handys.urbanstay.common.response.ApiResponse
-import com.marco.assignment.handys.urbanstay.common.response.ErrorResponse
 import com.marco.assignment.handys.urbanstay.common.response.FieldErrorResponse
 import org.slf4j.LoggerFactory
-import org.springframework.context.MessageSource
-import org.springframework.context.i18n.LocaleContextHolder
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.security.access.AccessDeniedException
+import org.springframework.security.core.AuthenticationException
 import org.springframework.web.HttpMediaTypeNotSupportedException
 import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.MethodArgumentNotValidException
@@ -20,7 +19,7 @@ import org.springframework.web.servlet.NoHandlerFoundException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 
 @RestControllerAdvice
-class GlobalExceptionHandler(private val messageSource: MessageSource) {
+class GlobalExceptionHandler(private val errorResponseFactory: ErrorResponseFactory) {
 
 	private val log = LoggerFactory.getLogger(javaClass)
 
@@ -62,6 +61,9 @@ class GlobalExceptionHandler(private val messageSource: MessageSource) {
 	fun handleNotFound(): ResponseEntity<ApiResponse<Nothing>> =
 		respond(CommonErrorCode.NOT_FOUND)
 
+	@ExceptionHandler(AccessDeniedException::class, AuthenticationException::class)
+	fun rethrowSecurityException(e: Exception): Nothing = throw e
+
 	@ExceptionHandler(Exception::class)
 	fun handleUnexpected(e: Exception): ResponseEntity<ApiResponse<Nothing>> {
 		log.error("Unhandled exception", e)
@@ -71,10 +73,6 @@ class GlobalExceptionHandler(private val messageSource: MessageSource) {
 	private fun respond(
 		errorCode: ErrorCode,
 		fieldErrors: List<FieldErrorResponse> = emptyList(),
-	): ResponseEntity<ApiResponse<Nothing>> {
-		val message = messageSource.getMessage(errorCode.messageKey, null, LocaleContextHolder.getLocale())
-		return ResponseEntity
-			.status(errorCode.status)
-			.body(ApiResponse.failure(ErrorResponse(errorCode.code, message, fieldErrors)))
-	}
+	): ResponseEntity<ApiResponse<Nothing>> =
+		ResponseEntity.status(errorCode.status).body(errorResponseFactory.create(errorCode, fieldErrors))
 }
