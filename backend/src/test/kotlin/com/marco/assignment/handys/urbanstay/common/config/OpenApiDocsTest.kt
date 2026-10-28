@@ -39,7 +39,12 @@ import java.util.Locale
 
 @SpringBootTest(properties = ["spring.messages.basename=messages,test-messages"])
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration::class, OpenApiDocsTest.SampleAppController::class, OpenApiDocsTest.SampleOpsController::class)
+@Import(
+	TestcontainersConfiguration::class,
+	OpenApiDocsTest.SampleAppController::class,
+	OpenApiDocsTest.SampleAppAdminController::class,
+	OpenApiDocsTest.SampleHotelAdminController::class,
+)
 class OpenApiDocsTest {
 
 	@Autowired
@@ -55,13 +60,14 @@ class OpenApiDocsTest {
 	private lateinit var handlerMappings: List<RequestMappingInfoHandlerMapping>
 
 	@Test
-	fun `앱의 모든 API는 app 또는 ops 경로 아래에 있다`() {
+	fun `앱의 모든 API는 app, app-admin, hotel-admin 경로 아래에 있다`() {
 		val handlers = handlerMappings.flatMap { it.handlerMethods.entries }
 			.filter { (_, handler) -> handler.beanType.packageName.startsWith(BASE_PACKAGE) }
 		val outside = handlers.flatMap { (mapping, _) -> mapping.patternValues }
 			.filterNot { path -> DocGroup.entries.any { path.startsWith("${it.prefix}/") } }
 
-		assertThat(handlers.map { it.value.beanType }).contains(SampleAppController::class.java, SampleOpsController::class.java)
+		assertThat(handlers.map { it.value.beanType })
+			.contains(SampleAppController::class.java, SampleAppAdminController::class.java, SampleHotelAdminController::class.java)
 		assertThat(outside).isEmpty()
 	}
 
@@ -71,7 +77,7 @@ class OpenApiDocsTest {
 	}
 
 	@Test
-	fun `Swagger UI는 두 그룹 문서를 메시지 파일의 이름으로 보여준다`() {
+	fun `Swagger UI는 세 그룹 문서를 메시지 파일의 이름으로 보여준다`() {
 		val urls = json(content("/v3/api-docs/swagger-config"))["urls"]
 
 		assertThat(urls.values().map { it["url"].stringValue() to it["name"].stringValue() })
@@ -84,6 +90,16 @@ class OpenApiDocsTest {
 		val paths = apiDocs(group)["paths"].propertyNames()
 
 		assertThat(paths).isNotEmpty().allSatisfy { assertThat(it).startsWith("${group.prefix}/") }
+	}
+
+	@ParameterizedTest
+	@EnumSource(DocGroup::class)
+	fun `그룹 문서에는 다른 그룹의 API가 섞이지 않는다`(group: DocGroup) {
+		val paths = apiDocs(group)["paths"].propertyNames()
+		val otherPaths = (DocGroup.entries - group).flatMap { apiDocs(it)["paths"].propertyNames() }
+
+		assertThat(otherPaths).isNotEmpty()
+		assertThat(paths).isNotEmpty().doesNotContainAnyElementsOf(otherPaths)
 	}
 
 	@ParameterizedTest
@@ -294,10 +310,17 @@ class OpenApiDocsTest {
 			mapOf("getSample" to setOf("200", "400", "500"), "createSample" to setOf("201", "400", "500")),
 			setOf("SampleAppRequest"),
 		),
-		OPS(
-			"ops",
-			ApiPaths.OPS,
-			"SampleOpsResponse",
+		APP_ADMIN(
+			"app-admin",
+			ApiPaths.APP_ADMIN,
+			"SampleAppAdminResponse",
+			mapOf("getSample" to setOf("200", "400", "500")),
+			emptySet(),
+		),
+		HOTEL_ADMIN(
+			"hotel-admin",
+			ApiPaths.HOTEL_ADMIN,
+			"SampleHotelAdminResponse",
 			mapOf("getSample" to setOf("200", "400", "500")),
 			emptySet(),
 		),
@@ -323,10 +346,17 @@ class OpenApiDocsTest {
 		val memo: String?,
 	)
 
-	data class SampleOpsResponse(
-		@Schema(description = "openapi.schema.SampleOpsResponse.id")
+	data class SampleAppAdminResponse(
+		@Schema(description = "openapi.schema.SampleAppAdminResponse.id")
 		val id: Long,
-		@Schema(description = "openapi.schema.SampleOpsResponse.memo")
+		@Schema(description = "openapi.schema.SampleAppAdminResponse.memo")
+		val memo: String?,
+	)
+
+	data class SampleHotelAdminResponse(
+		@Schema(description = "openapi.schema.SampleHotelAdminResponse.id")
+		val id: Long,
+		@Schema(description = "openapi.schema.SampleHotelAdminResponse.memo")
 		val memo: String?,
 	)
 
@@ -347,15 +377,26 @@ class OpenApiDocsTest {
 			ApiResponse.success(SampleAppResponse(1, request.name, request.memo))
 	}
 
-	@Tag(name = "sample", description = "openapi.ops.tag.sample")
+	@Tag(name = "sample", description = "openapi.app-admin.tag.sample")
 	@RestController
-	@RequestMapping(ApiPaths.OPS + SAMPLES)
-	class SampleOpsController {
+	@RequestMapping(ApiPaths.APP_ADMIN + SAMPLES)
+	class SampleAppAdminController {
 
-		@Operation(summary = "openapi.ops.operation.getSample.summary")
+		@Operation(summary = "openapi.app-admin.operation.getSample.summary")
 		@GetMapping("/{id}")
-		fun getSample(@PathVariable id: Long): ApiResponse<SampleOpsResponse> =
-			ApiResponse.success(SampleOpsResponse(id, null))
+		fun getSample(@PathVariable id: Long): ApiResponse<SampleAppAdminResponse> =
+			ApiResponse.success(SampleAppAdminResponse(id, null))
+	}
+
+	@Tag(name = "sample", description = "openapi.hotel-admin.tag.sample")
+	@RestController
+	@RequestMapping(ApiPaths.HOTEL_ADMIN + SAMPLES)
+	class SampleHotelAdminController {
+
+		@Operation(summary = "openapi.hotel-admin.operation.getSample.summary")
+		@GetMapping("/{id}")
+		fun getSample(@PathVariable id: Long): ApiResponse<SampleHotelAdminResponse> =
+			ApiResponse.success(SampleHotelAdminResponse(id, null))
 	}
 
 	companion object {

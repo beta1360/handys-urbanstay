@@ -19,17 +19,19 @@ urbanstay/
 ├─ common/
 └─ {domain}/
    ├─ controller/
-   │  ├─ app/    # 게스트 앱 API ({Domain}AppController)
-   │  └─ ops/    # 운영 앱 API ({Domain}OpsController)
+   │  ├─ app/          # 게스트 앱 API ({Domain}AppController)
+   │  ├─ appadmin/     # 전체 어드민 앱 API ({Domain}AppAdminController)
+   │  └─ hoteladmin/   # 호텔 운영자 앱 API ({Domain}HotelAdminController)
    ├─ dto/
-   │  ├─ app/    # 예: HotelAppResponse
-   │  └─ ops/    # 예: HotelOpsResponse
+   │  ├─ app/          # 예: HotelAppResponse
+   │  ├─ appadmin/     # 예: HotelAppAdminResponse
+   │  └─ hoteladmin/   # 예: HotelHotelAdminResponse
    ├─ service/
    ├─ repository/
    └─ entity/
 ```
 
-- 게스트 앱 API와 운영 앱 API는 정책이 다르므로 컨트롤러와 DTO를 앱별로 나눈다. 클래스 이름에도 `App`/`Ops`를 넣는다.
+- 게스트 앱, 전체 어드민 앱, 호텔 운영자 앱의 API는 정책이 다르므로 컨트롤러와 DTO를 앱별로 나눈다. 클래스 이름은 도메인 이름 뒤에 `App`/`AppAdmin`/`HotelAdmin`을 넣는다. 예: `HotelAppController`, `HotelAppAdminController`, `HotelHotelAdminController`, `RoomHotelAdminController`, `HotelHotelAdminResponse`
 - 엔티티와 리포지토리는 공유한다. 서비스는 앱별 정책이 다를 때만 나눈다.
 - API 경로는 `common/ApiPaths`의 상수로 시작한다. 예: `@RequestMapping(ApiPaths.APP + "/hotels")`. 경로 리터럴을 직접 쓰지 않는다.
 
@@ -87,8 +89,8 @@ urbanstay/
 - 프론트엔드가 문서만 보고 API를 쓸 수 있도록 작성한다.
 - 엔드포인트마다 설명, 요청·응답 필드 설명, 예시, 발생할 수 있는 에러 응답을 적는다.
 - 태그 이름은 도메인 패키지 이름(영문 소문자)을 쓴다. 예: `hotel`
-- 문서는 앱별 그룹(`app`, `ops`)으로만 제공한다. 통합 문서(`/v3/api-docs`)는 끈다.
-- operationId는 컨트롤러 메서드 이름이다. 그룹 안에서 유일하게 짓는다. app과 ops에 같은 이름(예: `getHotel`)이 있어도 된다.
+- 문서는 앱별 그룹(`app`, `app-admin`, `hotel-admin`)으로만 제공한다. 통합 문서(`/v3/api-docs`)는 끈다.
+- operationId는 컨트롤러 메서드 이름이다. 그룹 안에서 유일하게 짓는다. 서로 다른 그룹에는 같은 이름(예: `getHotel`)이 있어도 된다.
 - 설명 문구는 어노테이션에 직접 쓰지 않고 `messages.properties`의 키로 쓴다. 키는 `openapi.`로 시작한다.
   - 문서 설명: `openapi.info.description`
   - 그룹 이름: `openapi.group.{group}`
@@ -110,4 +112,4 @@ urbanstay/
   - 재사용하려면 `~/.testcontainers.properties`에 `testcontainers.reuse.enable=true`가 있어야 한다. 없으면 매번 새로 만든다.
   - 테스트 컨테이너를 새로 만들려면 `docker rm -f $(docker ps -aq --filter label=org.testcontainers.hash --filter ancestor=postgres:18)`를 실행한다.
 - Gradle configuration cache가 켜져 있다(`gradle.properties`).
-- Swagger UI는 `http://localhost:8080/swagger-ui.html`, 문서는 `http://localhost:8080/v3/api-docs/app`과 `http://localhost:8080/v3/api-docs/ops`다.
+- Swagger UI는 `http://localhost:8080/swagger-ui.html`, 문서는 `http://localhost:8080/v3/api-docs/app`, `http://localhost:8080/v3/api-docs/app-admin`, `http://localhost:8080/v3/api-docs/hotel-admin`이다.

@@ -27,7 +27,10 @@ class OpenApiConfig {
 	fun appGroup(messageSource: MessageSource): GroupedOpenApi = group(APP_GROUP, ApiPaths.APP, messageSource)
 
 	@Bean
-	fun opsGroup(messageSource: MessageSource): GroupedOpenApi = group(OPS_GROUP, ApiPaths.OPS, messageSource)
+	fun appAdminGroup(messageSource: MessageSource): GroupedOpenApi = group(APP_ADMIN_GROUP, ApiPaths.APP_ADMIN, messageSource)
+
+	@Bean
+	fun hotelAdminGroup(messageSource: MessageSource): GroupedOpenApi = group(HOTEL_ADMIN_GROUP, ApiPaths.HOTEL_ADMIN, messageSource)
 
 	private fun group(name: String, path: String, messageSource: MessageSource): GroupedOpenApi =
 		GroupedOpenApi.builder()
@@ -40,6 +43,7 @@ class OpenApiConfig {
 		const val DESCRIPTION_KEY = "openapi.info.description"
 		private const val GROUP_KEY_PREFIX = "openapi.group."
 		private const val APP_GROUP = "app"
-		private const val OPS_GROUP = "ops"
+		private const val APP_ADMIN_GROUP = "app-admin"
+		private const val HOTEL_ADMIN_GROUP = "hotel-admin"
 	}
 }
