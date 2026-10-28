@@ -55,7 +55,12 @@ urbanstay/
 ## 테스트
 
 - JPA 테스트 전용 엔티티는 기본 패키지 밖인 `com.marco.assignment.handys.fixture`에 두고, 테스트에서 `@EntityScan`으로 지정한다. 기본 패키지 안에 두면 `@SpringBootTest`가 테스트 엔티티까지 스키마 검증 대상으로 잡는다.
-- 테스트 전용 마이그레이션은 `src/test/resources/db/test-migration/`에 두고, 운영 버전(V1, V2…)과 겹치지 않게 `V0_1`처럼 0.x 버전을 쓴다. 필요한 테스트에서만 `spring.flyway.locations`로 등록한다.
+- 테스트 전용 마이그레이션은 `src/test/resources/db/test-migration/`에 두고, 운영 버전(V1, V2…)과 겹치지 않게 `V0_1`처럼 0.x 버전을 쓴다.
+- DB가 필요한 테스트는 `TestcontainersConfiguration`을 쓴다. 테스트용 PostgreSQL 컨테이너는 실행 사이에 재사용하고, 운영·테스트 마이그레이션을 함께 등록하며, 테스트 실행(JVM)마다 처음 한 번 DB를 초기화한다.
+- 테스트 데이터
+  - 저장소(JPA) 테스트는 트랜잭션 롤백을 기본으로 한다. 제약을 검증할 때는 `flush()`를 명시한다.
+  - 트랜잭션 동작(경계, 커밋 시 제약, 지연 로딩, 동시성)을 검증하는 Service·API 테스트는 테스트 트랜잭션 없이 커밋하고, 끝난 뒤 직접 정리한다.
+  - 빈 테이블, 특정 id 값, 테스트 실행 순서를 가정하지 않는다.
 - 테스트 전용 메시지(에러 코드, 문서 키)는 `src/test/resources/test-messages.properties`에 두고, `spring.messages.basename=messages,test-messages`로 등록한다.
 - 테스트용 컨트롤러는 테스트 클래스 안에 중첩하고 `@Import`로 등록한다.
 
@@ -87,6 +92,11 @@ urbanstay/
 
 ## 로컬 실행
 
-- Docker Desktop을 실행한 뒤 `./gradlew bootRun`을 실행한다. Docker Compose로 PostgreSQL 18이 자동으로 뜬다.
-- 테스트는 `./gradlew test`로 실행한다. Testcontainers로 PostgreSQL 18을 띄운다.
+- Docker Desktop을 실행한 뒤 `./gradlew bootRun`을 실행한다. Docker Compose로 PostgreSQL 18이 자동으로 뜨고, 앱을 종료해도 계속 실행된다(`start-only`).
+  - `compose.yaml`을 바꿨다면 `docker compose up -d`로 반영한다. 이미 떠 있으면 Spring이 기동을 건너뛰기 때문이다.
+  - 개발 DB 정지는 `docker compose stop`, 데이터까지 삭제는 `docker compose down -v`다(`backend/`에서 실행).
+- 테스트는 `./gradlew test`로 실행한다. 테스트용 PostgreSQL 18 컨테이너를 재사용한다.
+  - 재사용하려면 `~/.testcontainers.properties`에 `testcontainers.reuse.enable=true`가 있어야 한다. 없으면 매번 새로 만든다.
+  - 테스트 컨테이너를 새로 만들려면 `docker rm -f $(docker ps -aq --filter label=org.testcontainers.hash --filter ancestor=postgres:18)`를 실행한다.
+- Gradle configuration cache가 켜져 있다(`gradle.properties`).
 - Swagger UI는 `http://localhost:8080/swagger-ui.html`, 문서는 `http://localhost:8080/v3/api-docs`이다.
