@@ -28,10 +28,12 @@ urbanstay/
    │  └─ hoteladmin/   # 예: HotelHotelAdminResponse
    ├─ service/
    ├─ repository/
-   └─ entity/
+   ├─ entity/
+   └─ exception/       # 도메인 에러 코드 ({Domain}ErrorCode)와 문서용 어노테이션 ({Domain}ApiErrors)
 ```
 
 - 게스트 앱, 전체 어드민 앱, 호텔 운영자 앱의 API는 정책이 다르므로 컨트롤러와 DTO를 앱별로 나눈다. 클래스 이름은 도메인 이름 뒤에 `App`/`AppAdmin`/`HotelAdmin`을 넣는다. 예: `HotelAppController`, `HotelAppAdminController`, `HotelHotelAdminController`, `RoomHotelAdminController`, `HotelHotelAdminResponse`
+- DTO 이름은 `{Domain}{Purpose}{App}{Request|Response}`다. 도메인의 대표 응답에는 목적을 넣지 않는다. 예: `AccountLoginAppAdminRequest`(로그인 요청), `AccountAppAdminResponse`(전체 어드민 계정 응답)
 - 엔티티와 리포지토리는 공유한다. 서비스는 앱별 정책이 다를 때만 나눈다.
 - API 경로는 `common/ApiPaths`의 상수로 시작한다. 예: `@RequestMapping(ApiPaths.APP + "/hotels")`. 경로 리터럴을 직접 쓰지 않는다.
 
@@ -48,6 +50,7 @@ urbanstay/
 - 경로별 접근 규칙은 `common/config/SecurityConfig`에 둔다. 필터 체인은 어드민 경로용과 그 밖의 경로용 두 개다.
   - `ApiPaths.APP`: 로그인 없이 쓴다.
   - `ApiPaths.APP_ADMIN`: `Role.APP_ADMIN`만, `ApiPaths.HOTEL_ADMIN`: `Role.HOTEL_ADMIN`만 쓴다.
+  - 로그인 없이 여는 어드민 API는 `SecurityConfig.PUBLIC_ADMIN_APIS`(HTTP 메서드 + 경로)에만 적는다. 접근 규칙(permitAll)과 API 문서(401·403 자동 에러 제외)가 이 목록 하나를 함께 쓴다. 지금은 전체 어드민 로그인뿐이다. 열린 API에도 CSRF는 걸린다.
   - Swagger UI와 API 문서(`/swagger-ui.html`, `/swagger-ui/**`, `/v3/api-docs/**`): 로그인 없이 연다.
   - 그 밖의 경로(actuator 포함)는 막는다. 에러 디스패치는 원래 상태 코드를 유지하도록 연다.
   - 기본 폼 로그인, HTTP Basic, 기본 로그아웃은 끈다.
@@ -63,6 +66,18 @@ urbanstay/
   - CSRF 토큰은 어드민 API 응답의 `XSRF-TOKEN` 쿠키를 받아 `cookie(xsrf)`와 `header("X-XSRF-TOKEN", xsrf.value)`로 보낸다. `csrf()` post-processor는 쓰지 않는다. 캐시된 컨텍스트의 CsrfFilter 저장소를 세션 저장소로 바꿔 다른 테스트에 영향을 준다.
   - `@WebMvcTest`는 `SecurityConfig`를 읽지 않으므로 `SecurityConfig`, `SecurityErrorHandler`, `ErrorResponseFactory`를 `@Import`한다. 테스트용 컨트롤러는 열린 경로나 검증할 앱 경로 아래에 둔다.
   - 세션 쿠키 속성과 에러 디스패치는 서블릿 컨테이너 동작이라 MockMvc로 확인할 수 없다. `RANDOM_PORT`로 띄운 서버에 HTTP로 요청한다.
+  - 로그인·로그아웃 API는 가짜 사용자 없이 `RANDOM_PORT` 서버에 실제 세션·`XSRF-TOKEN` 쿠키를 주고받으며 확인한다.
+
+## 인증
+
+- 로그인·로그아웃·내 정보 경로는 `{앱 경로}/auth/login`, `/auth/logout`, `/auth/me`다(`ApiPaths.AUTH`, `ApiPaths.LOGIN`).
+- 인증은 앱마다 따로 만든다. 앱의 인증 서비스(예: `AppAdminAuthService`)가 그 앱의 `UserDetailsService`와 `PasswordEncoder`로 `DaoAuthenticationProvider`를 만들어 자기 `ProviderManager`에 넣는다. 다른 앱의 계정으로는 인증되지 않는다.
+  - Spring Boot의 전역 `AuthenticationManager`는 쓰지 않는다. 앱별 매니저를 `AuthenticationManager` 타입 빈으로 만들지 않는다. 그런 빈이 둘 이상이고 `UserDetailsService` 빈도 둘 이상이면 전역 매니저를 만들다가 시작에 실패한다.
+  - 없는 아이디와 틀린 비밀번호는 `DaoAuthenticationProvider`가 같은 예외로, 처리 시간 차이를 줄여 처리한다. 서비스는 이를 도메인 에러(`INVALID_CREDENTIALS`, 401)로 바꾼다. 계정 조회 중 오류는 로그인 실패가 아니라 500으로 응답한다.
+- 세션 처리는 `common/security/LoginSessionHandler`가 Spring Security 구현체로 한다. `SecurityConfig`가 어드민 필터 체인과 같은 CSRF 토큰 저장소·SecurityContext 저장소를 넘겨 만든다.
+  - 로그인: 세션이 이미 있으면 세션 ID를 바꾸고(`ChangeSessionIdAuthenticationStrategy`), CSRF 토큰을 새로 만들어 응답에 새 `XSRF-TOKEN` 쿠키를 싣고(`CsrfAuthenticationStrategy`), SecurityContext를 세션에 저장한다.
+  - 로그아웃: CSRF 쿠키를 지우고(`CsrfLogoutHandler`), 세션 쿠키를 만료시키고(`CookieClearingLogoutHandler`, 이름은 `server.servlet.session.cookie.name`), 세션을 무효화하고 SecurityContext를 비운다(`SecurityContextLogoutHandler`).
+  - CSRF 토큰 저장소는 쿠키다. 서버는 토큰을 기억하지 않으므로, 로그인 후 이전 토큰이 거절되는 것은 쿠키가 새 값으로 바뀌어 이전 헤더 값과 맞지 않기 때문이다.
 
 ## 계정
 
@@ -83,6 +98,10 @@ urbanstay/
 - 응답 메시지는 `src/main/resources/messages.properties`에 두고 MessageSource로 읽는다.
 - 에러 코드는 별도 문자열 없이 enum 이름을 쓴다. 메시지 키는 `ErrorCode.messageKey`(`error.{CODE}`)다.
 - 도메인 ErrorCode enum을 추가하면 `messages.properties`에 키를 추가하고, `ErrorCodeMessageTest`의 목록에 등록한다.
+- 입력 검증 메시지는 제약마다 하나인 공용 키(`validation.{제약}`)를 `messages.properties`에 두고 어노테이션에서 `{키}`로 쓴다. 예: `@NotBlank(message = "{validation.required}")`
+  - 키 이름: `validation.required`(필수), `validation.email`(이메일 형식), `validation.max-length`(최대 길이, 문구에 `{max}`를 넣는다)
+  - Spring Boot의 MessageSource 기반 interpolator가 키를 풀고, `{max}` 같은 제약 속성은 Hibernate Validator가 채운다. 응답의 `fieldErrors[].message`에 풀린 문구가 들어간다.
+  - 실제로 쓰는 키만 추가한다.
 - 설정값은 `application.properties`에 둔다.
 
 ## 엔티티
@@ -132,7 +151,11 @@ urbanstay/
   - 태그: `openapi.{group}.tag.{tag}`
   - 오퍼레이션: `openapi.{group}.operation.{operationId}.summary` (필요하면 `.description`)
   - 스키마 필드: `openapi.schema.{SchemaName}.{field}`
-- 400·500 공통 에러 응답은 모든 API에 자동으로 붙는다. 어드민 그룹에는 401·403도 붙고, 상태를 바꾸는 operation(POST·PUT·PATCH·DELETE)의 403에는 `INVALID_CSRF_TOKEN` 예시가 함께 붙는다. 에러 응답 스키마는 `ErrorApiResponse`다.
+- 400·500 공통 에러 응답은 모든 API에 자동으로 붙는다. 어드민 그룹에는 401·403도 붙고(`SecurityConfig.PUBLIC_ADMIN_APIS`의 열린 API는 빼고), 상태를 바꾸는 operation(POST·PUT·PATCH·DELETE)의 403에는 `INVALID_CSRF_TOKEN` 예시가 함께 붙는다. 에러 응답 스키마는 `ErrorApiResponse`다.
+- operation이 내는 도메인 에러는 도메인 어노테이션으로 적는다. 예: `@AccountApiErrors(AccountErrorCode.INVALID_CREDENTIALS)`. 자동 에러와 합쳐 상태 코드별로 예시가 붙는다.
+  - 도메인마다 `{Domain}ErrorCode` 옆(`exception/`)에 `@ApiErrors`를 붙인 `annotation class {Domain}ApiErrors(vararg val value: {Domain}ErrorCode)`를 둔다(대상 FUNCTION, 유지 RUNTIME).
+  - `CommonErrorResponseCustomizer`가 `@ApiErrors`가 붙은 어노테이션을 찾아 `value`를 읽는다. `value`가 ErrorCode enum 배열이 아니면 문서 생성이 실패한다.
+- 돌려줄 data가 없으면 `ApiResponse<Nothing?>`를 반환하고 `ApiResponse.success(null)`로 응답한다. 문서에는 data가 null인 `EmptyApiResponse`로 나온다.
 - 문서 전체에 적용하는 처리는 `GlobalOpenApiCustomizer`로 만든다. `OpenApiCustomizer`는 그룹 문서에 적용되지 않는다.
 - 생성 응답(201)은 `@ResponseStatus(HttpStatus.CREATED)`를 붙이고 `ApiResponse<T>`를 반환한다.
 - 요청 DTO와 응답 DTO는 분리한다. 응답 스키마는 모든 필드가 required(nullable 필드는 `| null`)로, 요청 스키마는 non-null 필드만 required로 문서화된다.
