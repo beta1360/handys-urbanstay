@@ -3,7 +3,7 @@ import { defineConfig } from "orval";
 export default defineConfig({
   urbanstay: {
     input: {
-      target: "http://localhost:8080/v3/api-docs",
+      target: "http://localhost:8080/v3/api-docs/app",
     },
     output: {
       mode: "tags-split",
