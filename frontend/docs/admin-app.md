@@ -39,8 +39,39 @@
 ## UI 컴포넌트와 공유 코드
 
 - 두 앱이 함께 쓰는 화면 컴포넌트(버튼, 입력창, 사이드바 등)는 처음부터 `packages/ui`(`@repo/ui`)에 둔다. Tailwind 기본 class로 직접 만든다.
-- `packages/ui`는 app-admin을 만든 바로 다음에 만들어 app-admin에 연결한다. 패키지 구성(소스로 쓸지 빌드할지 등)은 그때 정한다.
 - 그 밖의 코드는 지금은 공유하지 않는다. axios 설정, 로그인 만료 처리 등은 각 앱의 `shared`에 둔다. 실제로 중복이 생기면 그때 `packages/`로 옮긴다.
+
+### packages/ui를 쓰는 법
+
+- 빌드하지 않고 소스(`.tsx`, `.css`)를 그대로 내보낸다(Just-in-Time 패키지). 쓰는 앱의 Vite가 함께 컴파일하고, 앱의 `tsc`가 함께 타입 검사한다.
+- 스타일은 앱의 `src/app/styles/index.css`에서 `@import "@repo/ui/styles.css";`로 가져온다.
+  - 이 파일 하나가 Tailwind, Pretendard, `--font-sans`를 함께 들여온다. 앱에서 `tailwindcss`를 따로 import하지 않는다.
+  - 패키지 컴포넌트의 class는 `styles.css`의 `@source`로 찾는다. 테스트 파일은 제외한다. 앱의 class는 Tailwind가 앱 폴더에서 자동으로 찾는다.
+  - 앱 전용 스타일이 생기면 앱의 `index.css`에 이어서 적는다.
+- 컴포넌트는 `@repo/ui/button`처럼 파일 단위로 바로 import한다. `shared/ui`에 다시 감싸지 않는다. import할 수 있는 경로는 패키지 `package.json`의 `exports`에 적은 것뿐이다.
+
+| 경로 | 컴포넌트 | 내용 |
+|---|---|---|
+| `@repo/ui/button` | `Button` | variant `primary`·`secondary`·`ghost`. `loading`이면 비활성화하고 `aria-busy`를 붙인다 |
+| `@repo/ui/text-field` | `TextField` | label·입력창·오류 문구를 묶는다. `error`가 있으면 입력창에 `aria-invalid`와 오류 문구를 가리키는 `aria-describedby`를 붙인다 |
+| `@repo/ui/card` | `Card` | 테두리가 있는 흰색 상자. 선택 `header` 영역 |
+| `@repo/ui/sidebar` | `Sidebar`, `SidebarItem` | 왼쪽 메뉴. `Sidebar`는 `aria-label`이 필수인 `nav`다 |
+
+### packages/ui에 둘 것과 앱에 둘 것
+
+- 패키지에는 도메인 규칙과 화면 문구가 없는 표현용 컴포넌트만 둔다. 문구는 모두 props·children으로 받는다.
+- 메뉴 구성, 라우터 링크, 로그인 상태처럼 앱마다 다른 것은 각 앱의 widgets에 둔다.
+- 패키지는 라우터(`@tanstack/react-router`)에 의존하지 않는다.
+  - `SidebarItem`은 자식 링크를 꾸미기만 한다. 현재 메뉴는 링크의 `aria-current="page"`로 표시하고, 활성 스타일도 이 속성을 따른다.
+  - TanStack Router의 `Link`는 활성일 때 `aria-current="page"`를 스스로 붙인다. `/`처럼 다른 경로의 앞부분이 되는 메뉴는 `activeOptions={{ exact: true }}`를 준다.
+- `className`은 위치·크기(여백, 너비, 배치)를 덧붙일 때만 쓴다. 색·테두리·안쪽 여백처럼 컴포넌트가 정한 스타일은 `className`으로 덮지 않는다. class를 합치는 도구(tailwind-merge)를 쓰지 않으므로 같은 속성의 class가 겹치면 어느 쪽이 이길지 장담할 수 없다. 다른 모양이 필요하면 패키지에 variant를 추가한다.
+- 입력 오류는 Tailwind 기본 `red-600`으로 표시한다. 그 밖의 색은 `neutral` 계열을 쓴다.
+
+### 컴포넌트 추가
+
+1. `packages/ui/src/`에 kebab-case 파일(`<이름>.tsx`, named export)과 옆에 테스트(`<이름>.test.tsx`)를 만든다.
+2. 패키지 `package.json`의 `exports`에 `"./<이름>": "./src/<이름>.tsx"`를 추가한다.
+3. `frontend/`에서 `pnpm --filter @repo/ui test`, `lint`, `typecheck`로 확인한다.
 
 ## API 호출
 
