@@ -16,7 +16,7 @@
 - Vite + React + TypeScript
 - 라우팅: TanStack Router (파일 기반)
 - 서버 상태: TanStack Query, HTTP 요청: axios
-- 스타일: Tailwind CSS 기본값. UI 컴포넌트는 shadcn/ui
+- 스타일: Tailwind CSS 기본값. 게스트 앱과 같은 규칙으로, 별도 디자인 토큰을 두지 않는다. UI 라이브러리 없이 화면 컴포넌트를 직접 만든다.
 - 테스트: Vitest + React Testing Library (`frontend/CLAUDE.md`의 테스트 규칙을 따른다)
 - 앱은 TanStack Router 공식 CLI(`@tanstack/cli create --router-only`)로 만들고, 생성된 예제 파일은 걷어낸다.
 
@@ -35,7 +35,8 @@
 
 ## UI 컴포넌트와 공유 코드
 
-- shadcn/ui 컴포넌트는 `packages/ui`(`@repo/ui`)에 두고 두 앱이 함께 쓴다. 컴포넌트는 shadcn CLI로 추가한다.
+- 두 앱이 함께 쓰는 화면 컴포넌트(버튼, 입력창, 사이드바 등)는 처음부터 `packages/ui`(`@repo/ui`)에 둔다. Tailwind 기본 class로 직접 만든다.
+- `packages/ui`는 app-admin을 만든 바로 다음에 만들어 app-admin에 연결한다. 패키지 구성(소스로 쓸지 빌드할지 등)은 그때 정한다.
 - 그 밖의 코드는 지금은 공유하지 않는다. axios 설정, 로그인 만료 처리 등은 각 앱의 `shared`에 둔다. 실제로 중복이 생기면 그때 `packages/`로 옮긴다.
 
 ## API 호출
@@ -60,6 +61,7 @@
 게스트 앱과 같은 수준으로 갖춘다.
 
 - ESLint + Steiger (`pnpm lint`)
+- 공유 컴포넌트 패키지 `packages/ui` 연결
 - 사이드바 레이아웃과 로그인 화면 뼈대
 - TanStack Query Provider
 - `.env.local`, Vite proxy, `*.localhost` 접속
