@@ -12,6 +12,12 @@ export default defineConfig({
       client: "react-query",
       httpClient: "fetch",
       clean: true,
+      override: {
+        mutator: {
+          path: "./src/shared/api/http.ts",
+          name: "http",
+        },
+      },
     },
   },
 });
