@@ -58,6 +58,8 @@ frontend/
 ## Provider
 
 - Provider는 역할별로 잘게 나눠 컴포넌트로 만들고 app 레이어에 둔다.
+- 각 Provider는 목적 이름의 세그먼트에 둔다. 예: `query/query-provider.tsx`. `providers` 세그먼트는 쓰지 않는다.
+- 모든 Provider는 `entrypoint/app-providers.tsx`에서 조합하고, 루트 레이아웃은 이 조합 하나만 감싼다.
 
 ## API 코드
 
