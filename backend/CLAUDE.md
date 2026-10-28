@@ -64,6 +64,20 @@ urbanstay/
   - `@WebMvcTest`는 `SecurityConfig`를 읽지 않으므로 `SecurityConfig`, `SecurityErrorHandler`, `ErrorResponseFactory`를 `@Import`한다. 테스트용 컨트롤러는 열린 경로나 검증할 앱 경로 아래에 둔다.
   - 세션 쿠키 속성과 에러 디스패치는 서블릿 컨테이너 동작이라 MockMvc로 확인할 수 없다. `RANDOM_PORT`로 띄운 서버에 HTTP로 요청한다.
 
+## 계정
+
+- 계정은 `account` 도메인에 둔다. 전체 어드민은 `app_admin` 테이블(`AppAdmin`)에 저장한다.
+- 로그인 아이디는 이메일이다. 저장하거나 조회하기 전에 `LoginId.normalize`로 앞뒤 공백을 지우고 소문자로 바꾼다. DB도 CHECK 제약으로 정규화된 로그인 아이디와 공백이 아닌 이름만 받는다.
+- 비밀번호는 `PasswordEncoder` 빈(`common/config/PasswordEncoderConfig`, `PasswordEncoderFactories.createDelegatingPasswordEncoder()`, bcrypt)으로 해시해 저장한다.
+- `AppAdminUserDetailsService`가 로그인 아이디로 전체 어드민을 읽고 `Role.APP_ADMIN`을 준다. 이 빈이 있어서 Spring Boot의 기본 사용자(`user`, 생성 비밀번호)는 만들어지지 않는다.
+- 첫 전체 어드민은 백엔드가 뜰 때(`account/config/InitialAdminConfig`의 `ApplicationRunner`) `urbanstay.initial-admin.*`(`login-id`, `password`, `name`) 설정값으로 만든다.
+  - 전체 어드민이 하나도 없을 때만 만들고, 하나라도 있으면 아무것도 하지 않는다. 기존 계정은 바꾸지 않는다.
+  - 설정값은 `application.properties`에 있고, 과제 제출용으로 커밋한다.
+  - 설정값은 시작할 때 검증한다(이메일 형식, 빈 값 금지, 로그인 아이디 254자·이름 50자 이하). 올바르지 않으면 앱이 뜨지 않는다.
+  - 로컬 단일 인스턴스로 실행하는 과제라 시작 시 경합은 그대로 둔다. 두 인스턴스가 동시에 뜨면 같은 아이디는 유일 제약으로 늦은 쪽이 시작에 실패하고, Tomcat이 뜬 뒤 첫 어드민이 만들어지기 전 잠깐(약 1초)은 어드민이 없다.
+- 테스트
+  - `@SpringBootTest` 컨텍스트가 뜰 때도 첫 어드민 생성이 실행되므로 테스트 DB에 어드민이 남아 있을 수 있다. 어드민이 없는 상태가 필요하면 테스트 트랜잭션 안에서 지우고 롤백한다.
+
 ## 상수
 
 - 응답 메시지는 `src/main/resources/messages.properties`에 두고 MessageSource로 읽는다.
@@ -85,7 +99,7 @@ urbanstay/
 
 ## 테스트
 
-- JPA 테스트 전용 엔티티는 기본 패키지 밖인 `com.marco.assignment.handys.fixture`에 두고, 테스트에서 `@EntityScan`으로 지정한다. 기본 패키지 안에 두면 `@SpringBootTest`가 테스트 엔티티까지 스키마 검증 대상으로 잡는다.
+- JPA 테스트 전용 엔티티는 기본 패키지 밖인 `com.marco.assignment.handys.fixture`에 두고, 테스트에서 `@EntityScan`으로 기본 패키지와 함께 지정한다. 기본 패키지 안에 두면 `@SpringBootTest`가 테스트 엔티티까지 스키마 검증 대상으로 잡는다. 기본 패키지를 빼면 운영 리포지토리의 엔티티를 찾지 못해 컨텍스트가 뜨지 않는다.
 - 테스트 전용 마이그레이션은 `src/test/resources/db/test-migration/`에 두고, 운영 버전(V1, V2…)과 겹치지 않게 `V0_1`처럼 0.x 버전을 쓴다.
 - DB가 필요한 테스트는 `TestcontainersConfiguration`을 쓴다. 테스트용 PostgreSQL 컨테이너는 실행 사이에 재사용하고, 운영·테스트 마이그레이션을 함께 등록하며, 테스트 실행(JVM)마다 처음 한 번 DB를 초기화한다.
 - 테스트 데이터
