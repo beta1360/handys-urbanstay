@@ -1,6 +1,8 @@
 package com.marco.assignment.handys.urbanstay.common.config
 
 import com.marco.assignment.handys.urbanstay.TestcontainersConfiguration
+import com.marco.assignment.handys.urbanstay.UrbanstayApplication
+import com.marco.assignment.handys.urbanstay.common.ApiPaths
 import com.marco.assignment.handys.urbanstay.common.exception.CommonErrorCode
 import com.marco.assignment.handys.urbanstay.common.exception.ErrorCode
 import com.marco.assignment.handys.urbanstay.common.response.ApiResponse
@@ -11,6 +13,8 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -27,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMapping
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import java.nio.charset.StandardCharsets
@@ -34,7 +39,7 @@ import java.util.Locale
 
 @SpringBootTest(properties = ["spring.messages.basename=messages,test-messages"])
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration::class, OpenApiDocsTest.SampleController::class)
+@Import(TestcontainersConfiguration::class, OpenApiDocsTest.SampleAppController::class, OpenApiDocsTest.SampleOpsController::class)
 class OpenApiDocsTest {
 
 	@Autowired
@@ -46,45 +51,96 @@ class OpenApiDocsTest {
 	@Autowired
 	private lateinit var messageSource: MessageSource
 
+	@Autowired
+	private lateinit var handlerMappings: List<RequestMappingInfoHandlerMapping>
+
 	@Test
-	fun `문서 정보는 설정 파일의 제목과 버전, 메시지 파일의 설명을 쓴다`() {
-		val info = apiDocs()["info"]
+	fun `앱의 모든 API는 app 또는 ops 경로 아래에 있다`() {
+		val handlers = handlerMappings.flatMap { it.handlerMethods.entries }
+			.filter { (_, handler) -> handler.beanType.packageName.startsWith(BASE_PACKAGE) }
+		val outside = handlers.flatMap { (mapping, _) -> mapping.patternValues }
+			.filterNot { path -> DocGroup.entries.any { path.startsWith("${it.prefix}/") } }
+
+		assertThat(handlers.map { it.value.beanType }).contains(SampleAppController::class.java, SampleOpsController::class.java)
+		assertThat(outside).isEmpty()
+	}
+
+	@Test
+	fun `그룹 없는 통합 문서는 제공하지 않는다`() {
+		mockMvc.get("/v3/api-docs").andExpect { status { isNotFound() } }
+	}
+
+	@Test
+	fun `Swagger UI는 두 그룹 문서를 메시지 파일의 이름으로 보여준다`() {
+		val urls = json(content("/v3/api-docs/swagger-config"))["urls"]
+
+		assertThat(urls.values().map { it["url"].stringValue() to it["name"].stringValue() })
+			.containsExactlyInAnyOrderElementsOf(DocGroup.entries.map { it.docsPath to message("openapi.group.${it.id}") })
+	}
+
+	@ParameterizedTest
+	@EnumSource(DocGroup::class)
+	fun `그룹 문서에는 그 그룹 경로의 API만 있다`(group: DocGroup) {
+		val paths = apiDocs(group)["paths"].propertyNames()
+
+		assertThat(paths).isNotEmpty().allSatisfy { assertThat(it).startsWith("${group.prefix}/") }
+	}
+
+	@ParameterizedTest
+	@EnumSource(DocGroup::class)
+	fun `문서 정보는 설정 파일의 제목과 버전, 메시지 파일의 설명을 쓴다`(group: DocGroup) {
+		val info = apiDocs(group)["info"]
 
 		assertThat(info["title"].stringValue()).isEqualTo("Urbanstay API")
 		assertThat(info["description"].stringValue()).isEqualTo(message(OpenApiConfig.DESCRIPTION_KEY))
 		assertThat(info["version"].stringValue()).isEqualTo("v1")
 	}
 
-	@Test
-	fun `태그는 도메인 이름과 메시지 파일의 설명으로 노출된다`() {
-		val docs = apiDocs()
+	@ParameterizedTest
+	@EnumSource(DocGroup::class)
+	fun `태그와 operation 요약은 그룹별 메시지 키의 문구로 노출된다`(group: DocGroup) {
+		val docs = apiDocs(group)
+		val operations = sampleOperations(docs, group)
 
-		assertThat(docs["tags"].values().map { it["name"].stringValue() to it["description"].stringValue() })
-			.contains("sample" to message("openapi.tag.sample"))
-		assertThat(sampleOperations(docs).map { operation -> operation.node["tags"].values().map { it.stringValue() } })
+		assertThat(tagDescriptions(docs)).containsEntry("sample", message("openapi.${group.id}.tag.sample"))
+		assertThat(operations.map { operation -> operation.node["tags"].values().map { it.stringValue() } })
 			.isNotEmpty()
 			.allSatisfy { assertThat(it).containsExactly("sample") }
+		assertThat(operations.associate { it.operationId to it.node["summary"].stringValue() })
+			.containsExactlyInAnyOrderEntriesOf(group.responses.keys.associateWith { message("openapi.${group.id}.operation.$it.summary") })
 	}
 
 	@Test
-	fun `설명과 요약에 해석되지 않은 문서 메시지 키가 없다`() {
-		val texts = texts(apiDocs(), setOf("description", "summary"))
+	fun `같은 태그와 operationId라도 그룹마다 다른 문구로 노출된다`() {
+		val docs = DocGroup.entries.associateWith { apiDocs(it) }
+
+		assertThat(docs.map { (_, doc) -> tagDescriptions(doc)["sample"] }).doesNotHaveDuplicates()
+		assertThat(docs.map { (group, doc) -> sampleOperations(doc, group).single { it.operationId == "getSample" }.node["summary"] })
+			.doesNotHaveDuplicates()
+	}
+
+	@ParameterizedTest
+	@EnumSource(DocGroup::class)
+	fun `설명과 요약에 해석되지 않은 문서 메시지 키가 없다`(group: DocGroup) {
+		val texts = texts(apiDocs(group), setOf("description", "summary"))
 
 		assertThat(texts).isNotEmpty().noneMatch { it.startsWith(DOC_KEY_PREFIX) }
 	}
 
-	@Test
-	fun `모든 응답은 application_json이다`() {
-		val contentTypes = operations(apiDocs())
+	@ParameterizedTest
+	@EnumSource(DocGroup::class)
+	fun `모든 응답은 application_json이다`(group: DocGroup) {
+		val contentTypes = operations(apiDocs(group))
 			.flatMap { it.node["responses"].values() }
 			.flatMap { it.path("content").propertyNames() }
 
 		assertThat(contentTypes).isNotEmpty().containsOnly(JSON)
 	}
 
-	@Test
-	fun `모든 operation에 공통 에러 응답이 에러 형식과 예시로 붙는다`() {
-		val operations = operations(apiDocs())
+	@ParameterizedTest
+	@EnumSource(DocGroup::class)
+	fun `모든 operation에 공통 에러 응답이 에러 형식과 예시로 붙는다`(group: DocGroup) {
+		val operations = operations(apiDocs(group))
 
 		assertThat(operations).isNotEmpty()
 		operations.forEach { operation ->
@@ -97,22 +153,19 @@ class OpenApiDocsTest {
 		}
 	}
 
-	@Test
-	fun `operation은 성공 응답과 공통 에러 응답만 가진다`() {
-		val responses = sampleOperations(apiDocs())
+	@ParameterizedTest
+	@EnumSource(DocGroup::class)
+	fun `operation은 성공 응답과 공통 에러 응답만 가진다`(group: DocGroup) {
+		val responses = sampleOperations(apiDocs(group), group)
 			.associate { it.operationId to it.node["responses"].propertyNames().toSet() }
 
-		assertThat(responses).containsExactlyInAnyOrderEntriesOf(
-			mapOf(
-				"getSample" to setOf("200", "400", "500"),
-				"createSample" to setOf("201", "400", "500"),
-			),
-		)
+		assertThat(responses).containsExactlyInAnyOrderEntriesOf(group.responses)
 	}
 
-	@Test
-	fun `에러 형식은 문서 전용 ErrorApiResponse이고 원시 ApiResponse 스키마는 없다`() {
-		val schemas = apiDocs()["components"]["schemas"]
+	@ParameterizedTest
+	@EnumSource(DocGroup::class)
+	fun `에러 형식은 문서 전용 ErrorApiResponse이고 원시 ApiResponse 스키마는 없다`(group: DocGroup) {
+		val schemas = apiDocs(group)["components"]["schemas"]
 		val envelope = schemas[ERROR_SCHEMA_REF.substringAfterLast("/")]
 
 		assertThat(schemas.propertyNames()).doesNotContain("ApiResponse")
@@ -122,25 +175,29 @@ class OpenApiDocsTest {
 		assertThat(required(schemas["ErrorResponse"])).containsExactlyInAnyOrder("code", "message", "fieldErrors")
 	}
 
-	@Test
-	fun `응답 스키마는 모든 필드가 필수이고 nullable 필드는 null을 허용한다`() {
-		val wrapper = apiDocs()["components"]["schemas"]["ApiResponseSampleResponse"]
+	@ParameterizedTest
+	@EnumSource(DocGroup::class)
+	fun `응답 스키마는 모든 필드가 필수이고 nullable 필드는 null을 허용한다`(group: DocGroup) {
+		val schemas = apiDocs(group)["components"]["schemas"]
+		val wrapper = schemas["ApiResponse${group.responseSchema}"]
 
 		assertThat(required(wrapper)).containsExactlyInAnyOrder("success", "data", "error")
 		assertThat(nullableFields(wrapper)).containsExactlyInAnyOrder("data", "error")
+		assertThat(nullableFields(schemas[group.responseSchema])).containsExactly("memo")
 	}
 
 	@Test
 	fun `요청 스키마는 non-null 필드만 필수이고 nullable 필드는 선택이다`() {
-		val request = apiDocs()["components"]["schemas"]["SampleRequest"]
+		val request = apiDocs(DocGroup.APP)["components"]["schemas"]["SampleAppRequest"]
 
 		assertThat(required(request)).containsExactly("name")
 		assertThat(nullableFields(request)).containsExactly("memo")
 	}
 
-	@Test
-	fun `모든 스키마는 요청·응답 규칙대로 필수 필드를 가진다`() {
-		val docs = apiDocs()
+	@ParameterizedTest
+	@EnumSource(DocGroup::class)
+	fun `모든 스키마는 요청·응답 규칙대로 필수 필드를 가진다`(group: DocGroup) {
+		val docs = apiDocs(group)
 		val schemas = docs["components"]["schemas"]
 		val operations = operations(docs)
 		val responseSchemas = reachable(schemas, operations.map { it.node.path("responses") })
@@ -148,8 +205,8 @@ class OpenApiDocsTest {
 		val conflicts = (responseSchemas intersect requestSchemas).filter { nullableFields(schemas[it]).isNotEmpty() }
 
 		assertThat(conflicts).describedAs("요청과 응답이 함께 쓰는 스키마에 nullable 필드가 있습니다. 요청/응답 DTO를 분리하세요").isEmpty()
-		assertThat(responseSchemas).contains("ApiResponseSampleResponse", "ErrorApiResponse", "ErrorResponse", "FieldErrorResponse")
-		assertThat(requestSchemas).contains("SampleRequest")
+		assertThat(responseSchemas).contains("ApiResponse${group.responseSchema}", "ErrorApiResponse", "ErrorResponse", "FieldErrorResponse")
+		assertThat(requestSchemas).containsAll(group.requestSchemas)
 		(responseSchemas + requestSchemas).forEach { name ->
 			val properties = schemas[name].path("properties").propertyNames()
 			val expected = if (name in requestSchemas) properties - nullableFields(schemas[name]) else properties
@@ -157,18 +214,21 @@ class OpenApiDocsTest {
 		}
 	}
 
-	@Test
-	fun `operationId는 springdoc 중복 접미사 없이 유일하다`() {
-		val operationIds = operations(apiDocs()).map { it.operationId }
+	@ParameterizedTest
+	@EnumSource(DocGroup::class)
+	fun `operationId는 그룹 안에서 springdoc 중복 접미사 없이 유일하다`(group: DocGroup) {
+		val operationIds = operations(apiDocs(group)).map { it.operationId }
 
 		assertThat(operationIds)
-			.isNotEmpty()
+			.contains("getSample")
 			.doesNotHaveDuplicates()
 			.noneMatch { DUPLICATE_SUFFIX.containsMatchIn(it) }
 	}
 
-	private fun apiDocs(): JsonNode =
-		json(mockMvc.get("/v3/api-docs").andReturn().response.getContentAsString(StandardCharsets.UTF_8))
+	private fun apiDocs(group: DocGroup): JsonNode = json(content(group.docsPath))
+
+	private fun content(path: String): String =
+		mockMvc.get(path).andExpect { status { isOk() } }.andReturn().response.getContentAsString(StandardCharsets.UTF_8)
 
 	private fun json(content: String): JsonNode = jsonMapper.readTree(content)
 
@@ -179,8 +239,11 @@ class OpenApiDocsTest {
 			HTTP_METHODS.mapNotNull { method -> item[method]?.let { DocOperation(path, method, it) } }
 		}
 
-	private fun sampleOperations(docs: JsonNode): List<DocOperation> =
-		operations(docs).filter { it.path.startsWith(SAMPLE_PATH) }
+	private fun sampleOperations(docs: JsonNode, group: DocGroup): List<DocOperation> =
+		operations(docs).filter { it.path.startsWith(group.prefix + SAMPLES) }
+
+	private fun tagDescriptions(docs: JsonNode): Map<String, String> =
+		docs["tags"].values().associate { it["name"].stringValue() to it["description"].stringValue() }
 
 	private fun expectedExample(errorCode: ErrorCode): JsonNode =
 		json("""{"success":false,"data":null,"error":{"code":"${errorCode.code}","message":"${message(errorCode.messageKey)}","fieldErrors":[]}}""")
@@ -217,47 +280,92 @@ class OpenApiDocsTest {
 		val operationId: String get() = node["operationId"].stringValue()
 	}
 
-	data class SampleRequest(
+	enum class DocGroup(
+		val id: String,
+		val prefix: String,
+		val responseSchema: String,
+		val responses: Map<String, Set<String>>,
+		val requestSchemas: Set<String>,
+	) {
+		APP(
+			"app",
+			ApiPaths.APP,
+			"SampleAppResponse",
+			mapOf("getSample" to setOf("200", "400", "500"), "createSample" to setOf("201", "400", "500")),
+			setOf("SampleAppRequest"),
+		),
+		OPS(
+			"ops",
+			ApiPaths.OPS,
+			"SampleOpsResponse",
+			mapOf("getSample" to setOf("200", "400", "500")),
+			emptySet(),
+		),
+		;
+
+		val docsPath: String get() = "/v3/api-docs/$id"
+	}
+
+	data class SampleAppRequest(
 		@NotBlank
-		@Schema(description = "openapi.schema.SampleRequest.name")
+		@Schema(description = "openapi.schema.SampleAppRequest.name")
 		val name: String,
-		@Schema(description = "openapi.schema.SampleRequest.memo")
+		@Schema(description = "openapi.schema.SampleAppRequest.memo")
 		val memo: String?,
 	)
 
-	data class SampleResponse(
-		@Schema(description = "openapi.schema.SampleResponse.id")
+	data class SampleAppResponse(
+		@Schema(description = "openapi.schema.SampleAppResponse.id")
 		val id: Long,
-		@Schema(description = "openapi.schema.SampleResponse.name")
+		@Schema(description = "openapi.schema.SampleAppResponse.name")
 		val name: String,
-		@Schema(description = "openapi.schema.SampleResponse.memo")
+		@Schema(description = "openapi.schema.SampleAppResponse.memo")
 		val memo: String?,
 	)
 
-	@Tag(name = "sample", description = "openapi.tag.sample")
+	data class SampleOpsResponse(
+		@Schema(description = "openapi.schema.SampleOpsResponse.id")
+		val id: Long,
+		@Schema(description = "openapi.schema.SampleOpsResponse.memo")
+		val memo: String?,
+	)
+
+	@Tag(name = "sample", description = "openapi.app.tag.sample")
 	@RestController
-	@RequestMapping(SAMPLE_PATH)
-	class SampleController {
+	@RequestMapping(ApiPaths.APP + SAMPLES)
+	class SampleAppController {
 
-		@Operation(summary = "openapi.operation.getSample.summary")
+		@Operation(summary = "openapi.app.operation.getSample.summary")
 		@GetMapping("/{id}")
-		fun getSample(@PathVariable id: Long): ApiResponse<SampleResponse> =
-			ApiResponse.success(SampleResponse(id, "sample", null))
+		fun getSample(@PathVariable id: Long): ApiResponse<SampleAppResponse> =
+			ApiResponse.success(SampleAppResponse(id, "sample", null))
 
-		@Operation(summary = "openapi.operation.createSample.summary")
+		@Operation(summary = "openapi.app.operation.createSample.summary")
 		@PostMapping
 		@ResponseStatus(HttpStatus.CREATED)
-		fun createSample(@Valid @RequestBody request: SampleRequest): ApiResponse<SampleResponse> =
-			ApiResponse.success(SampleResponse(1, request.name, request.memo))
+		fun createSample(@Valid @RequestBody request: SampleAppRequest): ApiResponse<SampleAppResponse> =
+			ApiResponse.success(SampleAppResponse(1, request.name, request.memo))
+	}
+
+	@Tag(name = "sample", description = "openapi.ops.tag.sample")
+	@RestController
+	@RequestMapping(ApiPaths.OPS + SAMPLES)
+	class SampleOpsController {
+
+		@Operation(summary = "openapi.ops.operation.getSample.summary")
+		@GetMapping("/{id}")
+		fun getSample(@PathVariable id: Long): ApiResponse<SampleOpsResponse> =
+			ApiResponse.success(SampleOpsResponse(id, null))
 	}
 
 	companion object {
-		private const val SAMPLE_PATH = "/api/v1/samples"
+		private const val SAMPLES = "/samples"
 		private const val ERROR_SCHEMA_REF = "#/components/schemas/ErrorApiResponse"
 		private const val DOC_KEY_PREFIX = "openapi."
 		private const val JSON = "application/json"
 		private const val REF = "\$ref"
 		private const val NULL_TYPE = "null"
+		private val BASE_PACKAGE = UrbanstayApplication::class.java.packageName
 		private val COMMON_ERRORS = listOf(CommonErrorCode.INVALID_INPUT, CommonErrorCode.INTERNAL_SERVER_ERROR)
 		private val HTTP_METHODS = HttpMethod.values().map { it.name().lowercase() }
 		private val DUPLICATE_SUFFIX = Regex("_\\d+$")
