@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint && steiger ./src",
     "codegen": "orval"
   },
   "dependencies": {
@@ -17,6 +17,7 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@feature-sliced/steiger-plugin": "^0.8.0",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -24,6 +25,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "orval": "^8.45.0",
+    "steiger": "^0.8.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   },
