@@ -43,6 +43,27 @@ urbanstay/
 - 모든 응답은 API 규약의 공통 형식(`success / data / error`)으로 감싼다. 에러도 같은 형식이다.
 - 예외는 전역에서 처리해 공통 에러 형식으로 바꾼다.
 
+## 보안
+
+- 경로별 접근 규칙은 `common/config/SecurityConfig`에 둔다. 필터 체인은 어드민 경로용과 그 밖의 경로용 두 개다.
+  - `ApiPaths.APP`: 로그인 없이 쓴다.
+  - `ApiPaths.APP_ADMIN`: `Role.APP_ADMIN`만, `ApiPaths.HOTEL_ADMIN`: `Role.HOTEL_ADMIN`만 쓴다.
+  - Swagger UI와 API 문서(`/swagger-ui.html`, `/swagger-ui/**`, `/v3/api-docs/**`): 로그인 없이 연다.
+  - 그 밖의 경로(actuator 포함)는 막는다. 에러 디스패치는 원래 상태 코드를 유지하도록 연다.
+  - 기본 폼 로그인, HTTP Basic, 기본 로그아웃은 끈다.
+- CSRF는 어드민 API에만 SPA 모드(`csrf.spa()`)로 건다. 쿠키 없이 들어온 어드민 API 요청의 응답(401 포함)에 `XSRF-TOKEN` 쿠키(스크립트에서 읽을 수 있음)가 발급되고, 상태를 바꾸는 요청은 같은 값을 `X-XSRF-TOKEN` 헤더로 보낸다. 게스트 API에는 CSRF 필터가 없다.
+- 보안 에러는 `SecurityErrorHandler`가 공통 형식으로 응답한다.
+  - 로그인 안 함: 401 `UNAUTHORIZED`
+  - 권한 없음: 403 `FORBIDDEN`
+  - CSRF 토큰 없음·불일치: 403 `INVALID_CSRF_TOKEN`. CSRF 검사가 인가보다 먼저라서 로그인하지 않고 토큰 없이 보낸 상태 변경 요청도 이 코드다.
+- 컨트롤러에서 발생한 `AccessDeniedException`, `AuthenticationException`은 `GlobalExceptionHandler`가 다시 던져 Spring Security가 401·403으로 응답한다.
+- 세션은 서버 메모리에 두고 8시간 유지한다. 세션 쿠키는 HttpOnly, SameSite=Lax다(`application.properties`). 게스트 API는 세션을 만들지 않는다.
+- 테스트
+  - 로그인 사용자는 `with(user("tester").roles(Role.APP_ADMIN.name))`로 만든다.
+  - CSRF 토큰은 어드민 API 응답의 `XSRF-TOKEN` 쿠키를 받아 `cookie(xsrf)`와 `header("X-XSRF-TOKEN", xsrf.value)`로 보낸다. `csrf()` post-processor는 쓰지 않는다. 캐시된 컨텍스트의 CsrfFilter 저장소를 세션 저장소로 바꿔 다른 테스트에 영향을 준다.
+  - `@WebMvcTest`는 `SecurityConfig`를 읽지 않으므로 `SecurityConfig`, `SecurityErrorHandler`, `ErrorResponseFactory`를 `@Import`한다. 테스트용 컨트롤러는 열린 경로나 검증할 앱 경로 아래에 둔다.
+  - 세션 쿠키 속성과 에러 디스패치는 서블릿 컨테이너 동작이라 MockMvc로 확인할 수 없다. `RANDOM_PORT`로 띄운 서버에 HTTP로 요청한다.
+
 ## 상수
 
 - 응답 메시지는 `src/main/resources/messages.properties`에 두고 MessageSource로 읽는다.
@@ -97,7 +118,7 @@ urbanstay/
   - 태그: `openapi.{group}.tag.{tag}`
   - 오퍼레이션: `openapi.{group}.operation.{operationId}.summary` (필요하면 `.description`)
   - 스키마 필드: `openapi.schema.{SchemaName}.{field}`
-- 400·500 공통 에러 응답은 모든 API에 자동으로 붙는다. 에러 응답 스키마는 `ErrorApiResponse`다.
+- 400·500 공통 에러 응답은 모든 API에 자동으로 붙는다. 어드민 그룹에는 401·403도 붙고, 상태를 바꾸는 operation(POST·PUT·PATCH·DELETE)의 403에는 `INVALID_CSRF_TOKEN` 예시가 함께 붙는다. 에러 응답 스키마는 `ErrorApiResponse`다.
 - 문서 전체에 적용하는 처리는 `GlobalOpenApiCustomizer`로 만든다. `OpenApiCustomizer`는 그룹 문서에 적용되지 않는다.
 - 생성 응답(201)은 `@ResponseStatus(HttpStatus.CREATED)`를 붙이고 `ApiResponse<T>`를 반환한다.
 - 요청 DTO와 응답 DTO는 분리한다. 응답 스키마는 모든 필드가 required(nullable 필드는 `| null`)로, 요청 스키마는 non-null 필드만 required로 문서화된다.
