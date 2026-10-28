@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AppLayout } from "@/_app";
+import { AppLayout, AppProviders } from "@/_app";
 import { APP_INFO } from "@/shared/config";
 import "@/_app/styles/globals.css";
 
@@ -12,7 +12,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ko" className="antialiased">
       <body className="bg-gray-100">
-        <AppLayout>{children}</AppLayout>
+        <AppProviders>
+          <AppLayout>{children}</AppLayout>
+        </AppProviders>
       </body>
     </html>
   );
