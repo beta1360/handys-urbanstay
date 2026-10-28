@@ -34,8 +34,10 @@ apps/web/
 
 - 앱 전용 API(`/api/v1/app/**`)만 쓴다.
 - 대부분의 API 호출은 서버 사이드에서 한다. 사용자 인터랙션에 따른 호출만 브라우저에서 Next rewrites를 거친다.
-- API 코드는 orval이 TanStack Query 훅과 fetch 함수로 생성한다.
-- 백엔드 주소는 `.env`에서 읽는다.
+- API 코드는 orval이 TanStack Query 훅과 fetch 함수로 생성한다. 요청은 mutator인 `shared/api/http.ts`를 거친다.
+- 백엔드 주소는 `.env.local`의 `API_BASE_URL`에서 읽는다. 서버 전용 변수라 `NEXT_PUBLIC_`을 붙이지 않는다. `.env.local`은 과제 제출용으로 커밋한다.
+- 서버에서는 `API_BASE_URL`을 붙인 절대 주소로, 브라우저에서는 상대 경로로 요청해 rewrites를 거친다.
+- 2xx가 아닌 응답의 처리는 첫 도메인을 개발할 때 정한다.
 
 ## 렌더링
 
