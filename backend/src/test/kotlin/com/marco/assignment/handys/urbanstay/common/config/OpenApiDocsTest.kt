@@ -2,6 +2,7 @@ package com.marco.assignment.handys.urbanstay.common.config
 
 import com.marco.assignment.handys.urbanstay.TestcontainersConfiguration
 import com.marco.assignment.handys.urbanstay.UrbanstayApplication
+import com.marco.assignment.handys.urbanstay.account.exception.AccountErrorCode
 import com.marco.assignment.handys.urbanstay.common.ApiPaths
 import com.marco.assignment.handys.urbanstay.common.exception.CommonErrorCode
 import com.marco.assignment.handys.urbanstay.common.exception.ErrorCode
@@ -9,9 +10,13 @@ import com.marco.assignment.handys.urbanstay.common.response.ApiResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
+import io.swagger.v3.oas.models.OpenAPI
+import io.swagger.v3.oas.models.PathItem
+import io.swagger.v3.oas.models.responses.ApiResponses
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
@@ -32,11 +37,13 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.method.HandlerMethod
 import org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMapping
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import java.nio.charset.StandardCharsets
 import java.util.Locale
+import io.swagger.v3.oas.models.Operation as OperationModel
 
 @SpringBootTest(properties = ["spring.messages.basename=messages,test-messages"])
 @AutoConfigureMockMvc
@@ -59,6 +66,9 @@ class OpenApiDocsTest {
 
 	@Autowired
 	private lateinit var handlerMappings: List<RequestMappingInfoHandlerMapping>
+
+	@Autowired
+	private lateinit var commonErrorResponseCustomizer: CommonErrorResponseCustomizer
 
 	@Test
 	fun `앱의 모든 API는 app, app-admin, hotel-admin 경로 아래에 있다`() {
@@ -172,8 +182,8 @@ class OpenApiDocsTest {
 
 	@ParameterizedTest
 	@EnumSource(DocGroup::class, names = ["APP_ADMIN", "HOTEL_ADMIN"])
-	fun `어드민 그룹의 모든 operation에 401·403 에러 응답이 붙고 상태를 바꾸는 operation의 403에는 CSRF 예시도 붙는다`(group: DocGroup) {
-		val operations = operations(apiDocs(group))
+	fun `열린 API를 뺀 어드민 그룹의 모든 operation에 401·403 에러 응답이 붙고 상태를 바꾸는 operation의 403에는 CSRF 예시도 붙는다`(group: DocGroup) {
+		val operations = operations(apiDocs(group)).filterNot { SecurityConfig.isPublicAdminApi(it.method.uppercase(), it.path) }
 
 		assertThat(operations.map { it.method }).contains("get", "delete")
 		operations.forEach { operation ->
@@ -189,6 +199,62 @@ class OpenApiDocsTest {
 				assertThat(forbidden["example"]).describedAs(operation.name).isEqualTo(expectedExample(CommonErrorCode.FORBIDDEN))
 			}
 		}
+	}
+
+	@Test
+	fun `로그인처럼 열린 어드민 operation은 401·403 자동 에러 대신 선언한 에러와 CSRF 에러만 가진다`() {
+		val login = operations(apiDocs(DocGroup.APP_ADMIN)).single { it.name == "post $APP_ADMIN_LOGIN" }
+
+		assertThat(SecurityConfig.PUBLIC_ADMIN_APIS.map { "${it.method.name().lowercase()} ${it.path}" }).contains(login.name)
+		assertThat(login.node["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "403", "500")
+		assertThat(errorMediaType(login, HttpStatus.BAD_REQUEST)["example"]).isEqualTo(expectedExample(CommonErrorCode.INVALID_INPUT))
+		assertThat(errorMediaType(login, HttpStatus.UNAUTHORIZED)["example"]).isEqualTo(expectedExample(AccountErrorCode.INVALID_CREDENTIALS))
+		assertThat(errorMediaType(login, HttpStatus.FORBIDDEN)["example"]).isEqualTo(expectedExample(CommonErrorCode.INVALID_CSRF_TOKEN))
+	}
+
+	@Test
+	fun `로그인이 필요한 내 정보 조회와 로그아웃은 자동 401·403 에러 응답을 유지한다`() {
+		val operations = operations(apiDocs(DocGroup.APP_ADMIN)).associateBy { it.operationId }
+		val getMe = operations.getValue("getMe")
+		val logout = operations.getValue("logout")
+
+		assertThat(listOf(getMe, logout).map { errorMediaType(it, HttpStatus.UNAUTHORIZED)["example"] })
+			.containsOnly(expectedExample(CommonErrorCode.UNAUTHORIZED))
+		assertThat(errorMediaType(getMe, HttpStatus.FORBIDDEN)["example"]).isEqualTo(expectedExample(CommonErrorCode.FORBIDDEN))
+		assertThat(errorMediaType(logout, HttpStatus.FORBIDDEN)["examples"])
+			.isEqualTo(expectedExamples(CommonErrorCode.FORBIDDEN, CommonErrorCode.INVALID_CSRF_TOKEN))
+	}
+
+	@Test
+	fun `도메인 에러 어노테이션의 에러는 같은 상태 코드의 자동 에러와 함께 예시로 붙고 임시 필드는 남지 않는다`() {
+		val operation = OperationModel().responses(ApiResponses())
+		val openApi = OpenAPI().path(ApiPaths.APP + SAMPLES, PathItem().post(operation))
+
+		commonErrorResponseCustomizer.customize(operation, sampleErrorHandler("declaredErrors"))
+		commonErrorResponseCustomizer.customise(openApi)
+
+		assertThat(operation.responses["400"]?.content?.get(JSON)?.examples?.keys)
+			.containsExactly(CommonErrorCode.INVALID_INPUT.code, SampleErrorCode.SAMPLE_INVALID.code)
+		assertThat(operation.extensions).isNull()
+	}
+
+	@Test
+	fun `ErrorCode enum 배열인 value가 없는 도메인 에러 어노테이션은 문서 생성을 실패시킨다`() {
+		assertThatThrownBy { commonErrorResponseCustomizer.customize(OperationModel(), sampleErrorHandler("invalidDeclaration")) }
+			.isInstanceOf(IllegalArgumentException::class.java)
+			.hasMessageContaining(InvalidApiErrors::class.java.simpleName)
+	}
+
+	@Test
+	fun `data가 없는 응답은 data가 null인 EmptyApiResponse로 문서화한다`() {
+		val docs = apiDocs(DocGroup.APP_ADMIN)
+		val logout = operations(docs).single { it.operationId == "logout" }
+		val schema = docs["components"]["schemas"]["EmptyApiResponse"]
+
+		assertThat(logout.node["responses"]["200"]["content"][JSON]["schema"]).isEqualTo(json("""{"$REF":"#/components/schemas/EmptyApiResponse"}"""))
+		assertThat(required(schema)).containsExactlyInAnyOrder("success", "data", "error")
+		assertThat(schema["properties"]["data"]).isEqualTo(json("""{"type":"null"}"""))
+		assertThat(nullableFields(schema)).containsExactlyInAnyOrder("data", "error")
 	}
 
 	@Test
@@ -269,6 +335,9 @@ class OpenApiDocsTest {
 			.doesNotHaveDuplicates()
 			.noneMatch { DUPLICATE_SUFFIX.containsMatchIn(it) }
 	}
+
+	private fun sampleErrorHandler(name: String): HandlerMethod =
+		HandlerMethod(SampleErrorHandlers(), SampleErrorHandlers::class.java.getMethod(name))
 
 	private fun apiDocs(group: DocGroup): JsonNode = json(content(group.docsPath))
 
@@ -395,6 +464,29 @@ class OpenApiDocsTest {
 		val memo: String?,
 	)
 
+	enum class SampleErrorCode(override val status: HttpStatus) : ErrorCode {
+		SAMPLE_INVALID(HttpStatus.BAD_REQUEST),
+	}
+
+	@ApiErrors
+	@Target(AnnotationTarget.FUNCTION)
+	@Retention(AnnotationRetention.RUNTIME)
+	annotation class SampleApiErrors(vararg val value: SampleErrorCode)
+
+	@ApiErrors
+	@Target(AnnotationTarget.FUNCTION)
+	@Retention(AnnotationRetention.RUNTIME)
+	annotation class InvalidApiErrors(val value: String)
+
+	class SampleErrorHandlers {
+
+		@SampleApiErrors(SampleErrorCode.SAMPLE_INVALID)
+		fun declaredErrors() = Unit
+
+		@InvalidApiErrors("SAMPLE_INVALID")
+		fun invalidDeclaration() = Unit
+	}
+
 	@Tag(name = "sample", description = "openapi.app.tag.sample")
 	@RestController
 	@RequestMapping(ApiPaths.APP + SAMPLES)
@@ -446,6 +538,7 @@ class OpenApiDocsTest {
 
 	companion object {
 		private const val SAMPLES = "/samples"
+		private const val APP_ADMIN_LOGIN = ApiPaths.APP_ADMIN + ApiPaths.AUTH + ApiPaths.LOGIN
 		private const val ERROR_SCHEMA_REF = "#/components/schemas/ErrorApiResponse"
 		private const val DOC_KEY_PREFIX = "openapi."
 		private const val JSON = "application/json"
