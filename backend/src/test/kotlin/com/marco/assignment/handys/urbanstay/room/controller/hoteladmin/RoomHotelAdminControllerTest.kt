@@ -134,7 +134,7 @@ class RoomHotelAdminControllerTest {
 
 	@ParameterizedTest
 	@EnumSource(HotelAdminRole::class)
-	fun `마스터와 운영자 모두 자기 호텔의 객실을 조회하면 시각은 HH 콜론 mm 문자열로, 수정에 쓸 version과 함께 200으로 응답한다`(role: HotelAdminRole) {
+	fun `마스터와 운영자 모두 자기 호텔의 객실을 조회하면 시각은 시와 분 두 자리씩의 문자열로, 수정에 쓸 version과 함께 200으로 응답한다`(role: HotelAdminRole) {
 		val room = saveRoom(hotel, NAME, description = DESCRIPTION, checkInTime = LocalTime.of(9, 5), checkOutTime = LocalTime.of(0, 0))
 
 		val data = getRoom(checkNotNull(room.id), principals.getValue(role)).andExpectSuccess(HttpStatus.OK)
@@ -292,10 +292,116 @@ class RoomHotelAdminControllerTest {
 		}
 	}
 
+	@ParameterizedTest
+	@EnumSource(HotelAdminRole::class)
+	fun `마스터와 운영자 모두 목록을 기본값 page 0, size 10으로 자기 호텔 객실만 이름 오름차순으로 조회한다`(role: HotelAdminRole) {
+		val names = listOf("301", "99", "1001", "999", "101", "202", "102", "201", "103", "105", "104")
+		names.forEach { saveRoom(hotel, it) }
+		saveRoom(otherHotel, "100")
+
+		val data = getRooms(principal = principals.getValue(role)).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(itemNames(data)).containsExactly("99", "101", "102", "103", "104", "105", "201", "202", "301", "999")
+		assertThat(pageInfo(data)).containsExactly(0, 10, 11, 2)
+		val first = data["items"][0]
+		assertThat(first).isEqualTo(roomJson(first["id"].longValue(), "99", ROOM_TYPE, CAPACITY, FLOOR, null, CHECK_IN, CHECK_OUT, 0))
+		assertThat(itemNames(getRooms("page" to "1", principal = principals.getValue(role)).andExpectSuccess(HttpStatus.OK))).containsExactly("1001")
+	}
+
+	@Test
+	fun `page와 size로 원하는 페이지를 조회한다`() {
+		(1..7).forEach { saveRoom(hotel, "10$it") }
+
+		val data = getRooms("page" to "1", "size" to "3").andExpectSuccess(HttpStatus.OK)
+
+		assertThat(itemNames(data)).containsExactly("104", "105", "106")
+		assertThat(pageInfo(data)).containsExactly(1, 3, 7, 3)
+	}
+
+	@Test
+	fun `목록의 이름순은 이름 속 숫자를 숫자로 비교해 숫자, 영문, 한글 순이고 대소문자만 다르면 소문자가 먼저다`() {
+		listOf("Deluxe", "스위트 A", "1001", "deluxe", "B동 101", "B동 99", "201", "101").forEach { saveRoom(hotel, it) }
+
+		assertThat(itemNames(getRooms().andExpectSuccess(HttpStatus.OK)))
+			.containsExactly("101", "201", "1001", "B동 99", "B동 101", "deluxe", "Deluxe", "스위트 A")
+	}
+
+	@ParameterizedTest
+	@CsvSource("page, 99", "page, 0", "size, 100", "size, 1")
+	fun `page와 size는 범위의 끝 값까지 받는다`(parameter: String, value: String) {
+		saveRoom(hotel, NAME)
+
+		val data = getRooms(parameter to value).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data[parameter].asString()).isEqualTo(value)
+	}
+
+	@ParameterizedTest
+	@CsvSource(
+		"page, -1, validation.min, 0",
+		"page, 100, validation.max, 99",
+		"size, 0, validation.min, 1",
+		"size, 101, validation.max, 100",
+	)
+	fun `범위를 벗어난 page와 size는 파라미터 이름과 범위 메시지로 400 응답한다`(parameter: String, value: String, messageKey: String, bound: String) {
+		getRooms(parameter to value).andExpectError(CommonErrorCode.INVALID_INPUT, parameter to message(messageKey).replace("{value}", bound))
+	}
+
+	@Test
+	fun `검색어가 이름에 들어 있는 자기 호텔 객실만 앞뒤 공백을 지우고 대소문자 구분 없이 이름 오름차순으로 조회한다`() {
+		listOf("suite C", "디럭스 1", "SUITE A", "Suite B").forEach { saveRoom(hotel, it) }
+		saveRoom(otherHotel, "Suite Z")
+
+		val found = getRooms("keyword" to " sUiTe ").andExpectSuccess(HttpStatus.OK)
+		val notFound = getRooms("keyword" to "없는 객실").andExpectSuccess(HttpStatus.OK)
+
+		assertThat(itemNames(found)).containsExactly("SUITE A", "Suite B", "suite C")
+		assertThat(pageInfo(found)).containsExactly(0, 10, 3, 1)
+		assertThat(itemNames(notFound)).isEmpty()
+		assertThat(pageInfo(notFound)).containsExactly(0, 10, 0, 0)
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["", "   ", "　"])
+	fun `검색어가 비어 있거나 공백만 있으면 거르지 않고 전체 목록을 조회한다`(keyword: String) {
+		listOf("102", "101", "103").forEach { saveRoom(hotel, it) }
+
+		assertThat(itemNames(getRooms("keyword" to keyword).andExpectSuccess(HttpStatus.OK))).containsExactly("101", "102", "103")
+	}
+
+	@ParameterizedTest
+	@CsvSource("'50%', '50원'", "'a_b', 'axb'", "'c\\d', 'cd'")
+	fun `검색어의 퍼센트, 밑줄, 역슬래시는 와일드카드가 아니라 글자 그대로 찾는다`(literal: String, decoy: String) {
+		saveRoom(hotel, "객실 $literal")
+		saveRoom(hotel, "객실 $decoy")
+
+		assertThat(itemNames(getRooms("keyword" to literal).andExpectSuccess(HttpStatus.OK))).containsExactly("객실 $literal")
+	}
+
+	@Test
+	fun `검색어는 앞뒤 공백을 지운 길이로 세어 100자를 넘으면 최대 길이 메시지로 400 응답한다`() {
+		val max = RoomHotelAdminController.KEYWORD_MAX_LENGTH
+
+		getRooms("keyword" to " ${"가".repeat(max)} ").andExpectSuccess(HttpStatus.OK)
+		getRooms("keyword" to "가".repeat(max + 1)).andExpectError(CommonErrorCode.INVALID_INPUT, "keyword" to maxLength(max))
+	}
+
+	@Test
+	fun `검색 결과도 page와 size로 나눠 조회하고 전체 수와 페이지 수는 검색 결과 기준이다`() {
+		(1..5).forEach { saveRoom(hotel, "스위트 $it") }
+		(1..3).forEach { saveRoom(hotel, "디럭스 $it") }
+
+		val data = getRooms("keyword" to "스위트", "page" to "1", "size" to "2").andExpectSuccess(HttpStatus.OK)
+
+		assertThat(itemNames(data)).containsExactly("스위트 3", "스위트 4")
+		assertThat(pageInfo(data)).containsExactly(1, 2, 5, 3)
+	}
+
 	@Test
 	fun `로그인하지 않으면 객실 API는 401 UNAUTHORIZED로 응답하고 등록하지 않는다`() {
 		val room = saveRoom(hotel, NAME)
 
+		mockMvc.get(ROOMS).andExpectError(CommonErrorCode.UNAUTHORIZED)
 		mockMvc.get("$ROOMS/${room.id}").andExpectError(CommonErrorCode.UNAUTHORIZED)
 		mockMvc.post(ROOMS) { withCsrf(); jsonBody(createBody("name" to "102")) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
 		assertThat(roomNames(hotel)).containsExactly(NAME)
@@ -306,6 +412,7 @@ class RoomHotelAdminControllerTest {
 		val room = saveRoom(hotel, NAME)
 		val appAdmin = User.withUsername(USERNAME).password(PASSWORD_HASH).roles(Role.APP_ADMIN.name).build()
 
+		getRooms(principal = appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
 		getRoom(checkNotNull(room.id), appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
 		create(createBody("name" to "102"), appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
 		assertThat(roomNames(hotel)).containsExactly(NAME)
@@ -323,9 +430,9 @@ class RoomHotelAdminControllerTest {
 		val docs = apiDocs()
 		val rooms = docs["paths"][ROOMS]
 		val room = docs["paths"]["$ROOMS/{roomId}"]
-		val operations = listOf(rooms["post"], room["get"])
+		val operations = listOf(rooms["post"], rooms["get"], room["get"])
 
-		assertThat(operations.map { it["operationId"].stringValue() }).containsExactly("createRoom", "getRoom")
+		assertThat(operations.map { it["operationId"].stringValue() }).containsExactly("createRoom", "getRooms", "getRoom")
 		assertThat(operations.map { op -> op["tags"].values().map { it.stringValue() } }).containsOnly(listOf("room"))
 		assertThat(docs["tags"].values().single { it["name"].stringValue() == "room" }["description"].stringValue())
 			.isEqualTo(message("openapi.hotel-admin.tag.room"))
@@ -336,9 +443,31 @@ class RoomHotelAdminControllerTest {
 		assertThat(rooms["post"]["responses"].propertyNames()).containsExactlyInAnyOrder("201", "400", "401", "403", "409", "500")
 		assertThat(errorCodes(rooms["post"], HttpStatus.CONFLICT)).containsExactly(RoomErrorCode.ROOM_DUPLICATED.code)
 		assertThat(rooms["post"]["responses"]["201"]["content"][JSON]["schema"]).isEqualTo(schemaRef("ApiResponseRoomHotelAdminResponse"))
+		assertThat(rooms["get"]["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "403", "500")
 		assertThat(room["get"]["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "403", "404", "500")
 		assertThat(errorCodes(room["get"], HttpStatus.NOT_FOUND)).containsExactly(RoomErrorCode.ROOM_NOT_FOUND.code)
 		assertThat(room["get"]["parameters"].values().map { it["name"].stringValue() }).containsExactly("roomId")
+	}
+
+	@Test
+	fun `객실 목록 문서는 검색어, page·size 파라미터와 모든 필드가 필수인 페이지 응답 스키마를 보여준다`() {
+		val docs = apiDocs()
+		val getRooms = docs["paths"][ROOMS]["get"]
+		val parameters = getRooms["parameters"].values().associateBy { it["name"].stringValue() }
+		val page = docs["components"]["schemas"]["PageResponseRoomHotelAdminResponse"]
+
+		assertThat(parameters.keys).containsExactly("keyword", "page", "size")
+		assertThat(parameters.values.map { it["description"].stringValue() })
+			.containsExactlyElementsOf(parameters.keys.map { message("openapi.hotel-admin.operation.getRooms.parameter.$it") })
+		assertThat(parameters.values.map { it["required"].booleanValue() }).containsOnly(false)
+		assertThat(parameters.getValue("keyword")["schema"]).isEqualTo(json("""{"type":"string","maxLength":100,"minLength":0}"""))
+		assertThat(parameters.getValue("page")["schema"])
+			.isEqualTo(json("""{"type":"integer","format":"int32","default":0,"minimum":0,"maximum":99}"""))
+		assertThat(parameters.getValue("size")["schema"])
+			.isEqualTo(json("""{"type":"integer","format":"int32","default":10,"minimum":1,"maximum":100}"""))
+		assertThat(getRooms["responses"]["200"]["content"][JSON]["schema"]).isEqualTo(schemaRef("ApiResponsePageResponseRoomHotelAdminResponse"))
+		assertThat(required(page)).containsExactlyInAnyOrder("items", "page", "size", "totalElements", "totalPages")
+		assertThat(page["properties"]["items"]["items"]).isEqualTo(schemaRef("RoomHotelAdminResponse"))
 	}
 
 	@Test
@@ -390,6 +519,12 @@ class RoomHotelAdminControllerTest {
 			with(user(principal))
 			withCsrf()
 			jsonBody(body)
+		}
+
+	private fun getRooms(vararg params: Pair<String, String>, principal: UserDetails = masterPrincipal): ResultActionsDsl =
+		mockMvc.get(ROOMS) {
+			with(user(principal))
+			params.forEach { (name, value) -> param(name, value) }
 		}
 
 	private fun getRoom(id: Long, principal: UserDetails = masterPrincipal): ResultActionsDsl =
@@ -493,6 +628,10 @@ class RoomHotelAdminControllerTest {
 				),
 			),
 		)
+
+	private fun itemNames(data: JsonNode): List<String> = data["items"].values().map { it["name"].stringValue() }
+
+	private fun pageInfo(data: JsonNode): List<Long> = listOf("page", "size", "totalElements", "totalPages").map { data[it].longValue() }
 
 	private fun apiDocs(): JsonNode =
 		json(mockMvc.get(HOTEL_ADMIN_DOCS).andExpect { status { isOk() } }.andReturn().response.getContentAsString(StandardCharsets.UTF_8))

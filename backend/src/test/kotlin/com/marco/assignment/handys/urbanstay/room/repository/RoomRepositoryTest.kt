@@ -16,6 +16,8 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.context.annotation.Import
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.jdbc.core.JdbcTemplate
 import java.time.LocalTime
 import java.util.UUID
@@ -173,6 +175,44 @@ class RoomRepositoryTest {
 		)
 	}
 
+	@Test
+	fun `호텔별 목록은 그 호텔의 객실만 이름 오름차순으로 찾고 숫자 이름은 숫자 크기 순이다`() {
+		listOf("1001", "201", "99", "101").forEach { roomRepository.saveAndFlush(room(hotel, it)) }
+		roomRepository.saveAndFlush(room(otherHotel, "100"))
+
+		assertThat(roomRepository.findByHotelId(checkNotNull(hotel.id), FIRST_PAGE_BY_NAME).content.map { it.name })
+			.containsExactly("99", "101", "201", "1001")
+	}
+
+	@Test
+	fun `숫자, 영문, 한글이 섞인 이름은 이름 속 숫자를 숫자로 비교해 숫자, 영문, 한글 순이고 대소문자만 다르면 소문자가 먼저다`() {
+		listOf("Deluxe", "스위트 A", "1001", "deluxe", "B동 101", "B동 99", "201", "101").forEach { roomRepository.saveAndFlush(room(hotel, it)) }
+
+		assertThat(roomRepository.findByHotelId(checkNotNull(hotel.id), FIRST_PAGE_BY_NAME).content.map { it.name })
+			.containsExactly("101", "201", "1001", "B동 99", "B동 101", "deluxe", "Deluxe", "스위트 A")
+	}
+
+	@Test
+	fun `검색어가 이름에 들어 있는 그 호텔의 객실을 대소문자 구분 없이 이름 오름차순으로 찾는다`() {
+		listOf("suite C", "디럭스", "SUITE A", "Suite B").forEach { roomRepository.saveAndFlush(room(hotel, it)) }
+		roomRepository.saveAndFlush(room(otherHotel, "Suite Z"))
+
+		assertThat(search("sUiTe")).containsExactly("SUITE A", "Suite B", "suite C")
+		assertThat(search("없는 검색어")).isEmpty()
+	}
+
+	@ParameterizedTest
+	@CsvSource("'50%', '50원'", "'a_b', 'axb'", "'c\\d', 'cd'")
+	fun `검색어의 퍼센트, 밑줄, 역슬래시는 와일드카드가 아니라 글자 그대로 찾는다`(literal: String, decoy: String) {
+		roomRepository.saveAndFlush(room(hotel, "객실 $literal"))
+		roomRepository.saveAndFlush(room(hotel, "객실 $decoy"))
+
+		assertThat(search(literal)).containsExactly("객실 $literal")
+	}
+
+	private fun search(keyword: String): List<String> =
+		roomRepository.findByHotelIdAndNameContainingIgnoreCase(checkNotNull(hotel.id), keyword, FIRST_PAGE_BY_NAME).content.map { it.name }
+
 	private fun room(hotel: Hotel, name: String): Room = Room(hotel, name, TYPE, 2, null, null, CHECK_IN, CHECK_OUT)
 
 	private fun insertWithoutEntity(overrides: Map<String, Any?>) {
@@ -206,6 +246,7 @@ class RoomRepositoryTest {
 		private const val DESCRIPTION = "창이 큰 객실"
 		private val CHECK_IN: LocalTime = LocalTime.of(15, 0)
 		private val CHECK_OUT: LocalTime = LocalTime.of(11, 0)
+		private val FIRST_PAGE_BY_NAME = PageRequest.of(0, 100, Sort.by("name", "id"))
 		private const val INSERT_ROOM = """
 			insert into room (hotel_id, name, type, capacity, floor, description, check_in_time, check_out_time, version, created_at, updated_at)
 			values (?, ?, ?, cast(? as integer), cast(? as integer), ?, cast(? as time), cast(? as time), 0, now(), now())
