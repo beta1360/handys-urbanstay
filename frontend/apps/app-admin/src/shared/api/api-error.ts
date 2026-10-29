@@ -5,6 +5,10 @@ import { reportResponseIssues } from "./validate";
 
 export type ApiError = ErrorResponseOutput;
 
+export const API_ERROR_CODES = {
+  unauthorized: "UNAUTHORIZED",
+} as const;
+
 export function getApiError(error: unknown): ApiError | undefined {
   if (!isAxiosError(error) || error.response === undefined) {
     return undefined;
