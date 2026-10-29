@@ -8,7 +8,7 @@ export default defineConfig({
     output: {
       mode: "tags-split",
       target: "./src/shared/api/generated",
-      schemas: "./src/shared/api/generated/model",
+      schemas: "./src/shared/api/generated/schemas",
       client: "react-query",
       httpClient: "fetch",
       clean: true,
