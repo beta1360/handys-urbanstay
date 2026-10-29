@@ -146,7 +146,30 @@
 3. 로그인 API의 401은 `INVALID_CREDENTIALS`다. 아이디가 없을 때와 비밀번호가 틀렸을 때 같은 응답이다. 다른 API의 401(`UNAUTHORIZED`, 로그인 필요)과 구분해서 처리한다.
 4. 로그아웃하면 세션 쿠키와 `XSRF-TOKEN` 쿠키가 지워진다. 다시 로그인하기 전에는 1번처럼 토큰을 다시 받는다.
 
-- hotel-admin의 로그인은 호텔 계정을 만들 때 같은 방식으로 정한다.
+### 로그인 흐름 (hotel-admin)
+
+app-admin과 같은 흐름이고, 경로만 다르다.
+
+| API | 설명 |
+|---|---|
+| `GET /api/v1/hotel-admin/auth/me` | 내 정보 조회. 로그인 필요 |
+| `POST /api/v1/hotel-admin/auth/login` | 로그인. 로그인 없이 호출하지만 CSRF 토큰은 필요 |
+| `POST /api/v1/hotel-admin/auth/logout` | 로그아웃. 로그인 필요 |
+
+- 로그인과 내 정보의 `data`는 아래와 같다. `role`은 `MASTER`(마스터) 또는 `OPERATOR`(운영자)다.
+
+```json
+{
+  "id": 1,
+  "loginId": "master@example.com",
+  "name": "홍길동",
+  "role": "MASTER",
+  "hotel": { "id": 1, "name": "어반스테이 강남" }
+}
+```
+
+- 비활성 계정의 로그인도 401 `INVALID_CREDENTIALS`다. 아이디가 없거나 비밀번호가 틀렸을 때와 구분하지 않는다.
+- 서버는 요청마다 계정을 다시 확인한다. 로그인한 뒤 계정이 비활성화되거나, 비밀번호가 재설정되거나, 아이디가 바뀌면 그 세션의 다음 요청은 401 `UNAUTHORIZED`이고 세션은 끊긴다. 다시 로그인해야 한다.
 
 ## 프론트엔드 호출 방식
 
