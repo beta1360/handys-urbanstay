@@ -1,5 +1,7 @@
 package com.marco.assignment.handys.urbanstay.hotel.controller.appadmin
 
+import com.marco.assignment.handys.urbanstay.account.exception.AccountApiErrors
+import com.marco.assignment.handys.urbanstay.account.exception.AccountErrorCode
 import com.marco.assignment.handys.urbanstay.common.ApiPaths
 import com.marco.assignment.handys.urbanstay.common.request.PageParams
 import com.marco.assignment.handys.urbanstay.common.request.TrimmedStringEditor
@@ -41,10 +43,19 @@ class HotelAppAdminController(
 
 	@Operation(summary = "openapi.app-admin.operation.createHotel.summary", description = "openapi.app-admin.operation.createHotel.description")
 	@HotelApiErrors(HotelErrorCode.HOTEL_DUPLICATED)
+	@AccountApiErrors(AccountErrorCode.LOGIN_ID_DUPLICATED)
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	fun createHotel(@Valid @RequestBody request: HotelCreateAppAdminRequest): ApiResponse<HotelAppAdminResponse> {
-		val hotel = hotelService.create(request.name, request.address, request.phone, request.description)
+		val hotel = hotelService.create(
+			name = request.name,
+			address = request.address,
+			phone = request.phone,
+			description = request.description,
+			masterLoginId = request.master.loginId,
+			masterName = request.master.name,
+			masterPassword = request.master.password,
+		)
 		return ApiResponse.success(HotelAppAdminResponse.from(hotel))
 	}
 

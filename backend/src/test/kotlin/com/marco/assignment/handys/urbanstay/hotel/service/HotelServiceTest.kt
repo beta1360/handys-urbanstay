@@ -1,7 +1,9 @@
 package com.marco.assignment.handys.urbanstay.hotel.service
 
 import com.marco.assignment.handys.urbanstay.TestcontainersConfiguration
+import com.marco.assignment.handys.urbanstay.account.exception.AccountErrorCode
 import com.marco.assignment.handys.urbanstay.common.exception.BusinessException
+import com.marco.assignment.handys.urbanstay.common.exception.ErrorCode
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelErrorCode
 import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRepository
@@ -53,27 +55,48 @@ class HotelServiceTest {
 	@AfterEach
 	fun deleteCreatedHotels() {
 		executor.shutdownNow()
-		hotelRepository.deleteAllByIdInBatch(hotelIds() - existingIds)
+		val createdIds = hotelIds() - existingIds
+		createdIds.forEach { jdbcTemplate.update(DELETE_HOTEL_ADMINS, it) }
+		hotelRepository.deleteAllByIdInBatch(createdIds)
 	}
 
 	@Test
 	fun `먼저 온 등록이 커밋되기 전이라 중복 확인을 통과한 등록도 DB 유일 제약에 막혀 HOTEL_DUPLICATED로 거절된다`() {
 		val second = runSecondWhileFirstUncommitted(
-			first = { hotelService.create(name, address, PHONE, null) },
-			second = { hotelService.create(name, address, OTHER_PHONE, null) },
+			first = { create(name, PHONE, masterLoginId("first")) },
+			second = { create(name, OTHER_PHONE, masterLoginId("second")) },
+			lockedTable = "hotel",
 		)
 
 		assertErrorCode(second, HotelErrorCode.HOTEL_DUPLICATED)
 		assertThat(hotelsNamed(name).map { it.phone }).containsExactly(PHONE)
+		assertThat(masterLoginIds()).containsExactly(masterLoginId("first"))
+	}
+
+	@Test
+	fun `먼저 온 등록이 커밋되기 전이라 아이디 중복 확인을 통과한 다른 호텔 등록도 DB 유일 제약에 막혀 LOGIN_ID_DUPLICATED로 거절되고 호텔도 남지 않는다`() {
+		val otherName = "다른 호텔 $suffix"
+
+		val second = runSecondWhileFirstUncommitted(
+			first = { create(name, PHONE, masterLoginId("same")) },
+			second = { create(otherName, PHONE, " ${masterLoginId("same").uppercase()} ") },
+			lockedTable = "hotel_admin",
+		)
+
+		assertErrorCode(second, AccountErrorCode.LOGIN_ID_DUPLICATED)
+		assertThat(hotelsNamed(name)).hasSize(1)
+		assertThat(hotelsNamed(otherName)).isEmpty()
+		assertThat(masterLoginIds()).containsExactly(masterLoginId("same"))
 	}
 
 	@Test
 	fun `먼저 온 수정이 커밋되기 전이라 version 확인을 통과한 수정도 JPA 버전 검사에 막혀 HOTEL_MODIFIED로 거절된다`() {
-		val hotelId = checkNotNull(hotelService.create(name, address, PHONE, null).id)
+		val hotelId = checkNotNull(create(name, PHONE, masterLoginId("master")).id)
 
 		val second = runSecondWhileFirstUncommitted(
 			first = { hotelService.update(hotelId, 0, name, address, PHONE, FIRST_DESCRIPTION) },
 			second = { hotelService.update(hotelId, 0, name, address, PHONE, SECOND_DESCRIPTION) },
+			lockedTable = "hotel",
 		)
 
 		assertErrorCode(second, HotelErrorCode.HOTEL_MODIFIED)
@@ -84,12 +107,13 @@ class HotelServiceTest {
 
 	@Test
 	fun `등록이 커밋되기 전이라 중복 확인을 통과한 수정도 DB 유일 제약에 막혀 HOTEL_DUPLICATED로 거절된다`() {
-		val other = hotelService.create("다른 호텔 $suffix", address, PHONE, null)
+		val other = create("다른 호텔 $suffix", PHONE, masterLoginId("other"))
 		val otherId = checkNotNull(other.id)
 
 		val second = runSecondWhileFirstUncommitted(
-			first = { hotelService.create(name, address, PHONE, null) },
+			first = { create(name, PHONE, masterLoginId("first")) },
 			second = { hotelService.update(otherId, other.version, name, address, OTHER_PHONE, null) },
+			lockedTable = "hotel",
 		)
 
 		assertErrorCode(second, HotelErrorCode.HOTEL_DUPLICATED)
@@ -98,7 +122,18 @@ class HotelServiceTest {
 		assertThat(hotelsNamed(name)).hasSize(1)
 	}
 
-	private fun <T> runSecondWhileFirstUncommitted(first: () -> Unit, second: () -> T): Result<T> {
+	private fun create(name: String, phone: String, masterLoginId: String): Hotel =
+		hotelService.create(
+			name = name,
+			address = address,
+			phone = phone,
+			description = null,
+			masterLoginId = masterLoginId,
+			masterName = MASTER_NAME,
+			masterPassword = MASTER_PASSWORD,
+		)
+
+	private fun <T> runSecondWhileFirstUncommitted(first: () -> Unit, second: () -> T, lockedTable: String): Result<T> {
 		val firstApplied = CountDownLatch(1)
 		val commitFirst = CountDownLatch(1)
 		val firstTransaction = executor.submit {
@@ -110,24 +145,29 @@ class HotelServiceTest {
 		}
 		check(firstApplied.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) { "first transaction did not apply its change" }
 		val secondResult = executor.submit(Callable { runCatching(second) })
-		awaitHotelLockWait()
+		awaitLockWait(lockedTable)
 		commitFirst.countDown()
 		firstTransaction.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
 		return secondResult.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
 	}
 
-	private fun awaitHotelLockWait() {
+	private fun awaitLockWait(table: String) {
 		val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS)
-		while (jdbcTemplate.queryForObject(HOTEL_LOCK_WAITS, Int::class.java) == 0) {
-			check(System.nanoTime() < deadline) { "second transaction never waited for the first one's lock on hotel" }
+		while (jdbcTemplate.queryForObject(LOCK_WAITS, Int::class.java, "%$table %") == 0) {
+			check(System.nanoTime() < deadline) { "second transaction never waited for the first one's lock on $table" }
 			Thread.sleep(POLL_INTERVAL_MILLIS)
 		}
 	}
 
-	private fun assertErrorCode(result: Result<*>, errorCode: HotelErrorCode) {
+	private fun assertErrorCode(result: Result<*>, errorCode: ErrorCode) {
 		assertThat(result.exceptionOrNull())
 			.isInstanceOfSatisfying(BusinessException::class.java) { assertThat(it.errorCode).isEqualTo(errorCode) }
 	}
+
+	private fun masterLoginId(name: String): String = "$name-$suffix@test.local"
+
+	private fun masterLoginIds(): List<String> =
+		jdbcTemplate.queryForList(MASTER_LOGIN_IDS, String::class.java, "%-$suffix@test.local").filterNotNull()
 
 	private fun hotelsNamed(name: String): List<Hotel> = hotelRepository.findAll().filter { it.name == name }
 
@@ -138,11 +178,15 @@ class HotelServiceTest {
 		private const val OTHER_PHONE = "02-8765-4321"
 		private const val FIRST_DESCRIPTION = "먼저 수정한 소개"
 		private const val SECOND_DESCRIPTION = "나중에 수정한 소개"
+		private const val MASTER_NAME = "마스터"
+		private const val MASTER_PASSWORD = "master-password-1"
 		private const val TIMEOUT_SECONDS = 10L
 		private const val POLL_INTERVAL_MILLIS = 20L
-		private const val HOTEL_LOCK_WAITS = """
+		private const val DELETE_HOTEL_ADMINS = "delete from hotel_admin where hotel_id = ?"
+		private const val MASTER_LOGIN_IDS = "select login_id from hotel_admin where role = 'MASTER' and login_id like ?"
+		private const val LOCK_WAITS = """
 			select count(*) from pg_stat_activity
-			where datname = current_database() and wait_event_type = 'Lock' and query ilike '%hotel%'
+			where datname = current_database() and wait_event_type = 'Lock' and query ilike ?
 		"""
 	}
 }
