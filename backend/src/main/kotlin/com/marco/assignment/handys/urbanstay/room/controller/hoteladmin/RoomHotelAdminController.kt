@@ -8,6 +8,7 @@ import com.marco.assignment.handys.urbanstay.common.response.ApiResponse
 import com.marco.assignment.handys.urbanstay.common.response.PageResponse
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomCreateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomHotelAdminResponse
+import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomUpdateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.room.exception.RoomApiErrors
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import com.marco.assignment.handys.urbanstay.room.service.RoomService
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.InitBinder
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -93,6 +95,29 @@ class RoomHotelAdminController(
 		@PathVariable roomId: Long,
 	): ApiResponse<RoomHotelAdminResponse> =
 		ApiResponse.success(RoomHotelAdminResponse.from(roomService.getRoom(hotelAdmin.hotelId, roomId)))
+
+	@Operation(summary = "openapi.hotel-admin.operation.updateRoom.summary", description = "openapi.hotel-admin.operation.updateRoom.description")
+	@RoomApiErrors(RoomErrorCode.ROOM_NOT_FOUND, RoomErrorCode.ROOM_DUPLICATED, RoomErrorCode.ROOM_MODIFIED)
+	@PutMapping("/{roomId}")
+	fun updateRoom(
+		@AuthenticationPrincipal hotelAdmin: HotelAdminPrincipal,
+		@PathVariable roomId: Long,
+		@Valid @RequestBody request: RoomUpdateHotelAdminRequest,
+	): ApiResponse<RoomHotelAdminResponse> {
+		val room = roomService.update(
+			hotelId = hotelAdmin.hotelId,
+			roomId = roomId,
+			version = request.version,
+			name = request.name,
+			type = request.type,
+			capacity = request.capacity,
+			floor = request.floor,
+			description = request.description,
+			checkInTime = request.checkInTime,
+			checkOutTime = request.checkOutTime,
+		)
+		return ApiResponse.success(RoomHotelAdminResponse.from(room))
+	}
 
 	companion object {
 		const val KEYWORD_MAX_LENGTH = 100

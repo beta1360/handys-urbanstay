@@ -9,6 +9,8 @@ interface RoomRepository : JpaRepository<Room, Long> {
 
 	fun existsByHotelIdAndName(hotelId: Long, name: String): Boolean
 
+	fun existsByHotelIdAndNameAndIdNot(hotelId: Long, name: String, id: Long): Boolean
+
 	fun findByIdAndHotelId(id: Long, hotelId: Long): Room?
 
 	fun findByHotelId(hotelId: Long, pageable: Pageable): Page<Room>

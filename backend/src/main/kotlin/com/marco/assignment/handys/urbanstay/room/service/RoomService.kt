@@ -7,6 +7,7 @@ import com.marco.assignment.handys.urbanstay.room.entity.Room
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import com.marco.assignment.handys.urbanstay.room.repository.RoomRepository
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.dao.OptimisticLockingFailureException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
@@ -32,7 +33,7 @@ class RoomService(
 		checkOutTime: LocalTime,
 	): Room {
 		val hotel = hotelService.getHotel(hotelId)
-		checkNotDuplicated(hotelId, name)
+		checkNotDuplicated(hotelId, name, null)
 		return translateConflicts {
 			roomRepository.saveAndFlush(Room(hotel, name, type, capacity, floor, description, checkInTime, checkOutTime))
 		}
@@ -48,11 +49,39 @@ class RoomService(
 	@Transactional(readOnly = true)
 	fun getRoom(hotelId: Long, roomId: Long): Room = findRoom(hotelId, roomId)
 
+	@Transactional
+	fun update(
+		hotelId: Long,
+		roomId: Long,
+		version: Long,
+		name: String,
+		type: String,
+		capacity: Int,
+		floor: Int?,
+		description: String?,
+		checkInTime: LocalTime,
+		checkOutTime: LocalTime,
+	): Room {
+		val room = findRoom(hotelId, roomId)
+		if (room.version != version) {
+			throw BusinessException(RoomErrorCode.ROOM_MODIFIED)
+		}
+		checkNotDuplicated(hotelId, name, roomId)
+		room.update(name, type, capacity, floor, description, checkInTime, checkOutTime)
+		return translateConflicts { roomRepository.saveAndFlush(room) }
+	}
+
 	private fun findRoom(hotelId: Long, roomId: Long): Room =
 		roomRepository.findByIdAndHotelId(roomId, hotelId) ?: throw BusinessException(RoomErrorCode.ROOM_NOT_FOUND)
 
-	private fun checkNotDuplicated(hotelId: Long, name: String) {
-		if (roomRepository.existsByHotelIdAndName(hotelId, Room.normalize(name))) {
+	private fun checkNotDuplicated(hotelId: Long, name: String, roomId: Long?) {
+		val normalizedName = Room.normalize(name)
+		val duplicated = if (roomId == null) {
+			roomRepository.existsByHotelIdAndName(hotelId, normalizedName)
+		} else {
+			roomRepository.existsByHotelIdAndNameAndIdNot(hotelId, normalizedName, roomId)
+		}
+		if (duplicated) {
 			throw BusinessException(RoomErrorCode.ROOM_DUPLICATED)
 		}
 	}
@@ -62,6 +91,8 @@ class RoomService(
 			save()
 		} catch (e: DataIntegrityViolationException) {
 			throw if (e.violates(Room.HOTEL_NAME_UNIQUE_CONSTRAINT)) BusinessException(RoomErrorCode.ROOM_DUPLICATED) else e
+		} catch (e: OptimisticLockingFailureException) {
+			throw BusinessException(RoomErrorCode.ROOM_MODIFIED)
 		}
 
 	companion object {

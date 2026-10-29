@@ -6,4 +6,5 @@ import org.springframework.http.HttpStatus
 enum class RoomErrorCode(override val status: HttpStatus) : ErrorCode {
 	ROOM_NOT_FOUND(HttpStatus.NOT_FOUND),
 	ROOM_DUPLICATED(HttpStatus.CONFLICT),
+	ROOM_MODIFIED(HttpStatus.CONFLICT),
 }
