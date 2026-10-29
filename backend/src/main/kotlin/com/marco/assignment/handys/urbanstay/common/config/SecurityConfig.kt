@@ -4,7 +4,10 @@ import com.marco.assignment.handys.urbanstay.common.ApiPaths
 import com.marco.assignment.handys.urbanstay.common.exception.SecurityErrorHandler
 import com.marco.assignment.handys.urbanstay.common.security.LoginSessionHandler
 import com.marco.assignment.handys.urbanstay.common.security.Role
+import com.marco.assignment.handys.urbanstay.common.security.SessionAuthenticationVerifier
+import com.marco.assignment.handys.urbanstay.common.security.VerifyingSecurityContextRepository
 import jakarta.servlet.DispatcherType
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -19,12 +22,17 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository
 import org.springframework.security.web.savedrequest.NullRequestCache
 
 @Configuration(proxyBeanMethods = false)
-class SecurityConfig(private val securityErrorHandler: SecurityErrorHandler) {
+class SecurityConfig(
+	private val securityErrorHandler: SecurityErrorHandler,
+	sessionAuthenticationVerifiers: ObjectProvider<SessionAuthenticationVerifier>,
+) {
 
 	private val adminCsrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse()
 
-	private val adminSecurityContextRepository =
-		DelegatingSecurityContextRepository(RequestAttributeSecurityContextRepository(), HttpSessionSecurityContextRepository())
+	private val adminSecurityContextRepository = VerifyingSecurityContextRepository(
+		DelegatingSecurityContextRepository(RequestAttributeSecurityContextRepository(), HttpSessionSecurityContextRepository()),
+		sessionAuthenticationVerifiers,
+	)
 
 	@Bean
 	@Order(1)

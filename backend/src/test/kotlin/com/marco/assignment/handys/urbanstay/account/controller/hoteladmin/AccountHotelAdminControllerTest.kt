@@ -256,6 +256,81 @@ class AccountHotelAdminControllerTest {
 	}
 
 	@Test
+	fun `로그인한 뒤 계정이 비활성화되면 다음 요청은 401 UNAUTHORIZED이고 세션이 끊겨 다시 활성화돼도 그 세션은 쓸 수 없다`() {
+		val browser = loggedIn(operatorLoginId)
+
+		jdbcTemplate.update(DEACTIVATE, operator.id)
+		assertError(browser.get(ME), CommonErrorCode.UNAUTHORIZED)
+
+		jdbcTemplate.update("update hotel_admin set active = true where id = ?", operator.id)
+		assertError(browser.get(ME), CommonErrorCode.UNAUTHORIZED)
+		assertSuccess(browser.post(LOGIN, loginBody(operatorLoginId, PASSWORD)), hotelAdminJson(operator, "OPERATOR"))
+		assertSuccess(browser.get(ME), hotelAdminJson(operator, "OPERATOR"))
+	}
+
+	@Test
+	fun `로그인한 뒤 로그인 정보 버전이 바뀌면 다음 요청은 401 UNAUTHORIZED이고 다시 로그인하면 새 버전으로 쓸 수 있다`() {
+		val browser = loggedIn(masterLoginId)
+
+		jdbcTemplate.update(INCREASE_CREDENTIAL_VERSION, master.id)
+		assertError(browser.get(ME), CommonErrorCode.UNAUTHORIZED)
+
+		assertSuccess(browser.post(LOGIN, loginBody(masterLoginId, PASSWORD)), hotelAdminJson(master, "MASTER"))
+		assertSuccess(browser.get(ME), hotelAdminJson(master, "MASTER"))
+	}
+
+	@Test
+	fun `로그인한 계정이 없어지면 다음 요청은 401 UNAUTHORIZED로 응답한다`() {
+		val browser = loggedIn(operatorLoginId)
+
+		jdbcTemplate.update("delete from hotel_admin where id = ?", operator.id)
+
+		assertError(browser.get(ME), CommonErrorCode.UNAUTHORIZED)
+	}
+
+	@Test
+	fun `이름만 바뀌면 세션을 유지하고 내 정보에 새 이름을 준다`() {
+		val browser = loggedIn(masterLoginId)
+
+		jdbcTemplate.update("update hotel_admin set name = ? where id = ?", "바뀐 이름", master.id)
+
+		repeat(2) { assertThat(json(browser.get(ME).body())["data"]["name"].stringValue()).isEqualTo("바뀐 이름") }
+		assertSuccess(browser.post(LOGOUT), "null")
+	}
+
+	@Test
+	fun `정상 계정의 세션은 요청마다 확인해도 계속 쓸 수 있고 다른 계정이 비활성화돼도 영향을 받지 않는다`() {
+		val masterBrowser = loggedIn(masterLoginId)
+		val operatorBrowser = loggedIn(operatorLoginId)
+
+		jdbcTemplate.update(DEACTIVATE, operator.id)
+
+		repeat(3) { assertSuccess(masterBrowser.get(ME), hotelAdminJson(master, "MASTER")) }
+		assertError(operatorBrowser.get(ME), CommonErrorCode.UNAUTHORIZED)
+	}
+
+	@Test
+	fun `끊긴 세션의 로그아웃은 CSRF 토큰이 맞으면 401 UNAUTHORIZED, 없으면 CSRF 검사가 먼저라 403 INVALID_CSRF_TOKEN이다`() {
+		val browser = loggedIn(operatorLoginId)
+
+		jdbcTemplate.update(DEACTIVATE, operator.id)
+
+		assertError(browser.post(LOGOUT, xsrfHeader = null), CommonErrorCode.INVALID_CSRF_TOKEN)
+		assertError(browser.post(LOGOUT), CommonErrorCode.UNAUTHORIZED)
+	}
+
+	@Test
+	fun `끊긴 세션 쿠키만 보낸 요청의 401 응답은 로그인하지 않은 요청처럼 XSRF-TOKEN 쿠키를 발급하고 세션 쿠키는 만들지 않는다`() {
+		val session = checkNotNull(loggedIn(operatorLoginId).cookie(SESSION_COOKIE))
+		jdbcTemplate.update(DEACTIVATE, operator.id)
+
+		val response = Browser(SESSION_COOKIE to session).get(ME)
+
+		assertError(response, CommonErrorCode.UNAUTHORIZED)
+		assertThat(setCookies(response).map { it.name }).containsExactly(XSRF_COOKIE)
+	}
+
+	@Test
 	fun `API 문서는 hotel-admin 그룹의 account 태그에 로그인·로그아웃·내 정보를 열린 로그인과 함께 보여준다`() {
 		val docs = json(Browser().get(HOTEL_ADMIN_DOCS).body())
 		val auth = listOf(LOGIN to "post", LOGOUT to "post", ME to "get").associate { (path, method) -> path to docs["paths"][path][method] }
@@ -382,5 +457,6 @@ class AccountHotelAdminControllerTest {
 		private const val JSON = "application/json"
 		private const val DELETE_HOTEL_ADMINS = "delete from hotel_admin where hotel_id = ?"
 		private const val DEACTIVATE = "update hotel_admin set active = false where id = ?"
+		private const val INCREASE_CREDENTIAL_VERSION = "update hotel_admin set credential_version = credential_version + 1 where id = ?"
 	}
 }
