@@ -16,9 +16,7 @@ export function AdminSidebar() {
       >
         {ADMIN_MENU_ITEMS.map((item) => (
           <SidebarItem key={item.to}>
-            <Link to={item.to} activeOptions={{ exact: item.exact }}>
-              {item.label}
-            </Link>
+            <Link to={item.to}>{item.label}</Link>
           </SidebarItem>
         ))}
       </Sidebar>

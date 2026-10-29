@@ -66,7 +66,10 @@
 - 메뉴 구성, 라우터 링크, 로그인 상태처럼 앱마다 다른 것은 각 앱의 widgets에 둔다.
 - 패키지는 라우터(`@tanstack/react-router`)에 의존하지 않는다.
   - `SidebarItem`은 자식 링크를 꾸미기만 한다. 현재 메뉴는 링크의 `aria-current="page"`로 표시하고, 활성 스타일도 이 속성을 따른다.
-  - TanStack Router의 `Link`는 활성일 때 `aria-current="page"`를 스스로 붙인다. `/`처럼 다른 경로의 앞부분이 되는 메뉴는 `activeOptions={{ exact: true }}`를 준다.
+  - TanStack Router의 `Link`는 활성일 때 `aria-current="page"`를 스스로 붙인다. 활성 여부는 경로를 `/` 단위(세그먼트)로 비교한다.
+    - `/` 메뉴는 `/hotels` 같은 다른 경로에서 활성이 되지 않는다.
+    - 상위 메뉴(`/hotels`)는 하위 경로(`/hotels/new`)에서도 활성이다.
+    - 하위 경로에서 활성으로 보이면 안 되는 메뉴가 생기면 그때 그 메뉴에 `activeOptions={{ exact: true }}`를 준다.
 - `className`은 위치·크기(여백, 너비, 배치)를 덧붙일 때만 쓴다. 색·테두리·안쪽 여백처럼 컴포넌트가 정한 스타일은 `className`으로 덮지 않는다. class를 합치는 도구(tailwind-merge)를 쓰지 않으므로 같은 속성의 class가 겹치면 어느 쪽이 이길지 장담할 수 없다. 다른 모양이 필요하면 패키지에 variant를 추가한다.
 - 입력 오류는 Tailwind 기본 `red-600`으로 표시한다. 그 밖의 색은 `neutral` 계열을 쓴다.
 
