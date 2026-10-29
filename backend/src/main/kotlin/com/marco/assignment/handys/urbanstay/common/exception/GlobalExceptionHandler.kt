@@ -17,6 +17,11 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.servlet.NoHandlerFoundException
 import org.springframework.web.servlet.resource.NoResourceFoundException
+import tools.jackson.core.JacksonException
+import tools.jackson.core.JsonToken
+import tools.jackson.databind.exc.InvalidNullException
+import tools.jackson.databind.exc.MismatchedInputException
+import tools.jackson.databind.exc.UnrecognizedPropertyException
 
 @RestControllerAdvice
 class GlobalExceptionHandler(private val errorResponseFactory: ErrorResponseFactory) {
@@ -44,12 +49,19 @@ class GlobalExceptionHandler(private val errorResponseFactory: ErrorResponseFact
 			},
 		)
 
-	@ExceptionHandler(
-		HttpMessageNotReadableException::class,
-		MethodArgumentTypeMismatchException::class,
-		MissingServletRequestParameterException::class,
-		HttpMediaTypeNotSupportedException::class,
-	)
+	@ExceptionHandler(HttpMessageNotReadableException::class)
+	fun handleHttpMessageNotReadable(e: HttpMessageNotReadableException): ResponseEntity<ApiResponse<Nothing>> =
+		respond(CommonErrorCode.INVALID_INPUT, listOfNotNull(bodyFieldError(e.cause)))
+
+	@ExceptionHandler(MethodArgumentTypeMismatchException::class)
+	fun handleMethodArgumentTypeMismatch(e: MethodArgumentTypeMismatchException): ResponseEntity<ApiResponse<Nothing>> =
+		respond(CommonErrorCode.INVALID_INPUT, listOf(errorResponseFactory.fieldError(e.name, TYPE_MESSAGE_KEY)))
+
+	@ExceptionHandler(MissingServletRequestParameterException::class)
+	fun handleMissingServletRequestParameter(e: MissingServletRequestParameterException): ResponseEntity<ApiResponse<Nothing>> =
+		respond(CommonErrorCode.INVALID_INPUT, listOf(errorResponseFactory.fieldError(e.parameterName, REQUIRED_MESSAGE_KEY)))
+
+	@ExceptionHandler(HttpMediaTypeNotSupportedException::class)
 	fun handleInvalidRequest(): ResponseEntity<ApiResponse<Nothing>> =
 		respond(CommonErrorCode.INVALID_INPUT)
 
@@ -75,4 +87,30 @@ class GlobalExceptionHandler(private val errorResponseFactory: ErrorResponseFact
 		fieldErrors: List<FieldErrorResponse> = emptyList(),
 	): ResponseEntity<ApiResponse<Nothing>> =
 		ResponseEntity.status(errorCode.status).body(errorResponseFactory.create(errorCode, fieldErrors))
+
+	private fun bodyFieldError(cause: Throwable?): FieldErrorResponse? {
+		if (cause !is MismatchedInputException) {
+			return null
+		}
+		val field = fieldPath(cause.path).ifEmpty { return null }
+		val messageKey = when {
+			cause is UnrecognizedPropertyException -> UNKNOWN_FIELD_MESSAGE_KEY
+			cause is InvalidNullException || cause.currentToken in MISSING_OR_NULL_TOKENS -> REQUIRED_MESSAGE_KEY
+			else -> TYPE_MESSAGE_KEY
+		}
+		return errorResponseFactory.fieldError(field, messageKey)
+	}
+
+	private fun fieldPath(path: List<JacksonException.Reference>): String =
+		path.joinToString("") { if (it.index >= 0) "[${it.index}]" else ".${it.propertyName}" }.removePrefix(".")
+
+	companion object {
+		private const val REQUIRED_MESSAGE_KEY = "validation.required"
+		private const val TYPE_MESSAGE_KEY = "validation.type"
+		private const val UNKNOWN_FIELD_MESSAGE_KEY = "validation.unknown-field"
+
+		// Kotlin 원시 타입(Int, Boolean 등)의 누락·null은 Jackson이 하위 예외 없이 MismatchedInputException으로 던진다.
+		// 누락은 객체를 다 읽은 뒤(END_OBJECT), null은 그 값(VALUE_NULL)에서 나므로 토큰으로 필수 입력을 구분한다.
+		private val MISSING_OR_NULL_TOKENS = setOf(JsonToken.END_OBJECT, JsonToken.VALUE_NULL)
+	}
 }

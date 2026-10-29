@@ -101,6 +101,22 @@ class AccountAppAdminControllerTest {
 	}
 
 	@Test
+	fun `문서에 없는 필드를 보내면 로그인하지 않고 알 수 없는 항목 메시지와 함께 400으로 응답한다`() {
+		val browser = Browser().withXsrfToken()
+		val body = jsonMapper.writeValueAsString(mapOf("loginId" to LOGIN_ID, "password" to PASSWORD, "extra" to 1))
+
+		assertError(browser.post(LOGIN, body), CommonErrorCode.INVALID_INPUT, mapOf("extra" to message("validation.unknown-field")))
+		assertThat(browser.cookie(SESSION_COOKIE)).isNull()
+	}
+
+	@Test
+	fun `아이디를 숫자로 보내면 문자열로 바꾸지 않고 형식 메시지와 함께 400으로 응답한다`() {
+		val body = jsonMapper.writeValueAsString(mapOf("loginId" to 123, "password" to PASSWORD))
+
+		assertError(Browser().withXsrfToken().post(LOGIN, body), CommonErrorCode.INVALID_INPUT, mapOf("loginId" to message("validation.type")))
+	}
+
+	@Test
 	fun `로그인하면 계정 정보와 세션을 주고 XSRF-TOKEN을 새로 발급해 이전 토큰을 거절한다`() {
 		val browser = Browser().withXsrfToken()
 		val oldToken = checkNotNull(browser.cookie(XSRF_COOKIE))
