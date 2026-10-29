@@ -29,7 +29,7 @@
 - 라우터 생성 코드와 생성된 라우트 트리(`route-tree.gen.ts`)는 `src/app/router/`에, 진입점(`main.tsx`)은 `src/app/entrypoint/`에 둔다.
 - 라우트 생성 설정(`routesDirectory`, `generatedRouteTree` 등)은 앱의 `tsr.config.json`에만 둔다. Vite 플러그인과 `tsr generate`가 이 파일을 함께 읽는다.
 - 생성된 라우트 트리는 직접 수정하지 않고 커밋한다.
-- 루트 라우트(`__root.tsx`)는 `<HeadContent />`와 `<Outlet />`만 그린다. 브라우저 탭 제목은 루트 라우트의 `head`에서 `APP_INFO.name`(`shared/config`)으로 정하고, `index.html`에는 `<title>`을 두지 않는다.
+- 루트 라우트(`__root.tsx`)는 `<HeadContent />`와 `<Outlet />`만 그린다. 오류 화면(`errorComponent`)은 `<HeadContent />`와 pages의 오류 화면만 그린다. 브라우저 탭 제목은 루트 라우트의 `head`에서 `APP_INFO.name`(`shared/config`)으로 정하고, `index.html`에는 `<title>`을 두지 않는다.
 - 로그인이 필요한 화면은 경로를 만들지 않는 레이아웃 라우트 `_authenticated` 아래에 두고, 로그인 화면(`/login`)은 그 밖에 둔다. 로그인 확인은 `_authenticated`의 `beforeLoad`에서 한다.
 - 위쪽에 보여줄 현재 화면 제목은 각 화면 라우트의 `staticData.title`(선택)에 둔다. 타입은 `src/app/router/router.ts`에서 `StaticDataRouteOption`을 모듈 확장해 정한다.
 
@@ -102,8 +102,8 @@
   - 응답에 스키마에 없는 필드가 더 있으면 오류로 보지 않고 버린다. 빠진 필드와 타입이 틀린 필드만 오류다. 서버가 응답 필드를 추가해도 codegen 전까지 화면이 깨지지 않게 하기 위해서다.
   - 두 오류 모두 zod issue를 담는다. 개발 환경에서만 콘솔에 틀린 필드의 경로와 오류 코드를 남기고, 값은 남기지 않는다.
 - 서버의 오류 정보(`code`, `message`, `fieldErrors`)는 `getApiError(error)`로 읽는다. 오류 응답 본문이 형식과 다르면 응답 검증 실패처럼 콘솔에 남기고 아무것도 돌려주지 않는다.
-- QueryClient는 쿼리 재시도 규칙만 정하고 나머지는 TanStack Query 기본값을 쓴다. SPA라 서버 렌더링용 설정을 두지 않는다.
-  - 쿼리는 검증 오류와 4xx 응답이면 재시도하지 않는다. 그 밖(5xx, 네트워크 오류)은 기본값대로 세 번까지 재시도한다.
+- QueryClient는 쿼리 재시도 규칙과 오류 처리기(`QueryCache`·`MutationCache`의 `onError`, 아래 '로그인' 참고)만 정하고 나머지는 TanStack Query 기본값을 쓴다. SPA라 서버 렌더링용 설정을 두지 않는다.
+  - 쿼리는 검증 오류와 4xx 응답이면 재시도하지 않는다. 그 밖(5xx, 네트워크 오류)은 기본값대로 세 번까지 재시도한다. 단, 로그인 확인과 로그인 화면 진입의 내 정보 조회는 재시도하지 않는다(아래 '로그인' 참고).
   - 뮤테이션은 기본값대로 재시도하지 않는다.
 - 개발 도구는 React Query Devtools만 둔다.
 
@@ -111,7 +111,30 @@
 
 - 로그인 흐름과 CSRF는 `docs/api-convention.md`의 인증 절을 따른다.
 - axios는 같은 출처 요청에서 `XSRF-TOKEN` 쿠키를 읽어 `X-XSRF-TOKEN` 헤더로 보낸다. 이 기본 동작을 그대로 쓴다.
-- 로그인 API의 401(`INVALID_CREDENTIALS`)과 다른 API의 401(`UNAUTHORIZED`)을 구분해서 처리한다. 구체적인 화면 동작은 로그인을 연결할 때 정한다.
+- 로그인 API의 401(`INVALID_CREDENTIALS`)과 다른 API의 401(`UNAUTHORIZED`)을 구분해서 처리한다.
+- 로그인 상태는 내 정보 쿼리(`meQueryOptions`)의 캐시로 판단한다. 라우터 context로 QueryClient를 넘겨 `beforeLoad`에서 쓴다.
+  - 내 정보·로그인 API는 계정 정보(`data`)만 돌려준다. 성공 응답의 `success`가 false이거나 `data`가 null이면 응답 검증 실패로 본다.
+- 로그인 확인과 로그인 화면 진입은 내 정보를 캐시에서 읽고 없을 때만 조회한다(`queryClient.query`에 `staleTime: "static"`). 재시도하지 않으므로(`retry: false`) 백엔드가 응답하지 않으면 바로 실패한다.
+- 로그인 확인(`_authenticated`의 `beforeLoad`)
+  - 401 `UNAUTHORIZED`면 지금 경로(쿼리 포함)를 `redirect`에 담아 `/login`으로 보낸다.
+  - 그 밖의 오류는 루트 라우트의 오류 화면을 보여준다. '다시 시도'는 `router.invalidate()`로 다시 불러온다.
+- 로그인 화면(`/login`)
+  - `redirect`는 앱 안의 경로만 받는다. `/`로 시작하고, `//`·`/\`처럼 다른 호스트로 해석되지 않고, `/login`이 아닌 값이다. 그 밖의 값과 빈 값은 `/`로 바꾸고, `/`는 URL에 남기지 않는다.
+  - `beforeLoad`에서 내 정보를 조회한다. 성공하면 `redirect`로 보내고, 실패하면(401 등) 로그인 화면을 보여준다. 이 조회의 401 응답으로 로그인 전에 `XSRF-TOKEN` 쿠키를 받는다.
+  - 입력 검사는 제출할 때만 한다. 요청 스키마에 화면 문구를 덧붙인 폼 스키마로 검사하고, 공백만 있는 값도 비어 있는 것으로 본다. 보내는 값은 입력한 그대로다.
+  - 입력 오류는 입력창 아래에 보여주고 첫 번째로 틀린 입력창에 초점을 옮긴다. 입력창을 고치면 그 입력창의 오류만 지운다.
+  - 제출 중에는 버튼을 로딩 상태로 두고 다시 제출하지 않는다.
+  - 400의 `fieldErrors`(아이디·비밀번호)는 입력창 오류로 보여준다. 그 밖의 형식에 맞는 오류 응답(401 `INVALID_CREDENTIALS` 등)은 서버 `message`를, 본문을 쓸 수 없는 오류(네트워크 오류, 검증 오류, 형식이 다른 오류 응답)는 일반 오류 문구를 로그인 버튼 위 알림(`role="alert"`)으로 보여준다.
+  - 성공하면 쿼리 캐시를 모두 비운 뒤 받은 계정 정보를 내 정보 쿼리 캐시에 넣고 `redirect`로 이동한다.
+- 사용 중 로그인 만료
+  - 쿼리·뮤테이션이 401 `UNAUTHORIZED`로 실패하면 내 정보 캐시를 지우고 지금 위치를 `redirect`에 담아 `/login`으로 보낸다(`QueryCache`·`MutationCache`의 `onError`).
+  - 데이터가 있는 내 정보 쿼리(위쪽 영역의 창 포커스 재조회)도 같다.
+  - 데이터가 없는 내 정보 쿼리(로그인 확인과 로그인 화면 진입의 조회)의 오류는 각 `beforeLoad`가 처리하므로 무시한다. 이미 `/login`이면 아무것도 하지 않는다.
+- 위쪽 영역의 계정 이름은 내 정보 쿼리에서 읽는다. 처음 그릴 때는 로그인 확인이 불러온 값을 쓰고 다시 조회하지 않는다(`refetchOnMount: false`). 창에 다시 초점이 오면 기본값대로 다시 조회해 세션을 확인한다.
+- 로그아웃(위쪽 영역의 계정 이름 옆 버튼)
+  - 성공하거나 401이면 쿼리 캐시를 모두 비우고 `/login`으로 이동한다.
+  - 그 밖의 실패는 화면을 그대로 두고 버튼 옆에 오류 문구(`role="alert"`)를 보여준다.
+  - 로그아웃은 뮤테이션 캐시를 거치지 않고 직접 호출한다. 401을 로그아웃이 처리하므로 사용 중 만료 처리와 함께 이동하지 않는다.
 - hotel-admin의 로그인은 호텔 계정(백엔드)이 생긴 뒤 연결한다.
 
 ## foundation
