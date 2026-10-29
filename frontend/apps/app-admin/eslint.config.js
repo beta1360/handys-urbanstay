@@ -21,4 +21,22 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    files: ["**/*.{ts,tsx}"],
+    ignores: ["src/shared/api/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "(^|/)api/generated(/|$)",
+              message:
+                "생성 코드(shared/api/generated)는 shared/api 밖에서 가져오지 않는다. 검증된 API를 @/shared/api에서 가져온다.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);
