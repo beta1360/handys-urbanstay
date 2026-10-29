@@ -1,6 +1,7 @@
 package com.marco.assignment.handys.urbanstay.common.exception
 
 import com.marco.assignment.handys.urbanstay.account.exception.AccountErrorCode
+import com.marco.assignment.handys.urbanstay.hotel.exception.HotelErrorCode
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.boot.autoconfigure.AutoConfigurations
@@ -14,6 +15,7 @@ class ErrorCodeMessageTest {
 	private val errorCodes: List<ErrorCode> = listOf<List<ErrorCode>>(
 		CommonErrorCode.entries,
 		AccountErrorCode.entries,
+		HotelErrorCode.entries,
 	).flatten()
 
 	@Test

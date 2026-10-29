@@ -55,6 +55,17 @@ urbanstay/
   - 필드 이름은 Bean Validation과 같은 경로 형식이다. 예: `name`, `address.city`, `rooms[0].name`. 요청 파라미터는 파라미터 이름이다.
   - 필드를 알 수 없는 오류(JSON 문법 오류, 빈 본문, 본문 전체의 타입 불일치, 지원하지 않는 미디어 타입)는 빈 `fieldErrors`다.
   - Jackson은 첫 오류에서 멈추므로 본문을 읽는 오류는 `fieldErrors`가 하나다. Bean Validation 오류는 틀린 필드를 모두 담는다.
+- 앞뒤 공백을 지운 값으로 검사할 문자열 필드에는 `@JsonDeserialize(using = TrimmedStringDeserializer::class)`(`common/request`)를 붙인다. 본문을 읽을 때 Kotlin `trim()`으로 지우므로 `@NotBlank`·길이·형식 제약이 지운 값에 걸린다. 타입·null 처리는 기본 문자열과 같다. 저장할 값의 정규화는 엔티티가 따로 한다(예: `Hotel.normalize`).
+- 문자열 요청 파라미터(예: 검색어)는 컨트롤러의 `@InitBinder`에서 `TrimmedStringEditor`(`common/request`)를 등록해 앞뒤 공백을 지우고, 비면 null로 받는다. `@Size` 같은 제약은 지운 값에 걸린다.
+- 필수 문자열(`@NotBlank`)은 문서에 `minLength: 1`로 나온다. `@Size`는 문서의 minLength를 `min`(기본 0)으로 덮으므로 필수 문자열의 최대 길이는 `@Size` 대신 Hibernate Validator의 `@Length(max = ..., message = "{validation.max-length}")`로 검사하고 문서 길이는 `@Schema(maxLength = ...)`로 적는다. 선택 문자열은 `@Size(max)`를 그대로 쓴다.
+- 형식이 있는 필수 문자열(예: 전화번호)은 `@NotBlank`와 `@PatternThenMaxLength`(`common/validation`)를 붙이고 `@Pattern`·`@Size`는 쓰지 않는다. 필드마다 오류가 하나만 난다. 빈 값은 `validation.required`, 형식이 틀리면 길이와 관계없이 형식 메시지, 형식이 맞는데 길면 `validation.max-length`다. 문서의 형식과 길이는 `@Schema(pattern = ..., maxLength = ...)`로 적는다.
+
+## 목록 조회
+
+- 목록 API는 `ApiResponse<PageResponse<T>>`(`common/response/PageResponse`)로 응답한다. 서비스가 돌려준 `Page`를 `PageResponse.from(page.map(...))`으로 바꾼다. 문서 스키마 이름은 `PageResponse{항목 스키마}`(예: `PageResponseHotelAppAdminResponse`)이고 모든 필드가 필수다.
+- `page`(0~99, 기본 0), `size`(1~100, 기본 10)는 `@RequestParam`으로 받고 `common/request/PageParams` 상수를 쓴다(`@Min`·`@Max`, 메시지 `validation.min`·`validation.max`). 범위를 벗어나면 메서드 검증으로 400 `INVALID_INPUT`이고 `fieldErrors`의 필드는 파라미터 이름이다. 100페이지 밖의 항목은 검색으로 좁혀 찾는다.
+- 정렬 기준은 서비스에서 정하고 operation 설명에 적는다.
+- 부분 일치 검색은 Spring Data 파생 쿼리(예: `findByNameContainingIgnoreCase`)로 한다. 파생 쿼리는 `\`, `%`, `_`를 이스케이프하고 `escape '\'`를 붙여 입력을 글자 그대로 찾는다. `@Query`로 LIKE를 직접 쓰면 이스케이프되지 않는다.
 
 ## 보안
 
@@ -110,7 +121,7 @@ urbanstay/
 - 에러 코드는 별도 문자열 없이 enum 이름을 쓴다. 메시지 키는 `ErrorCode.messageKey`(`error.{CODE}`)다.
 - 도메인 ErrorCode enum을 추가하면 `messages.properties`에 키를 추가하고, `ErrorCodeMessageTest`의 목록에 등록한다.
 - 입력 검증 메시지는 제약마다 하나인 공용 키(`validation.{제약}`)를 `messages.properties`에 두고 어노테이션에서 `{키}`로 쓴다. 예: `@NotBlank(message = "{validation.required}")`
-  - 키 이름: `validation.required`(필수), `validation.email`(이메일 형식), `validation.max-length`(최대 길이, 문구에 `{max}`를 넣는다), `validation.type`(타입이 틀린 값), `validation.unknown-field`(문서에 없는 필드)
+  - 키 이름: `validation.required`(필수), `validation.email`(이메일 형식), `validation.max-length`(최대 길이, 문구에 `{max}`를 넣는다), `validation.min`·`validation.max`(숫자 범위, 문구에 `{value}`를 넣는다), `validation.phone`(전화번호 형식), `validation.type`(타입이 틀린 값), `validation.unknown-field`(문서에 없는 필드)
   - `validation.type`, `validation.unknown-field`는 어노테이션이 아니라 `GlobalExceptionHandler`가 본문·파라미터 오류에 쓴다.
   - Spring Boot의 MessageSource 기반 interpolator가 키를 풀고, `{max}` 같은 제약 속성은 Hibernate Validator가 채운다. 응답의 `fieldErrors[].message`에 풀린 문구가 들어간다.
   - 실제로 쓰는 키만 추가한다.
@@ -127,6 +138,19 @@ urbanstay/
   - `updated_at timestamptz not null`
 - 스키마는 Flyway로만 바꾼다. 앱 시작 시 `ddl-auto=validate`로 엔티티와 스키마가 일치하는지 검사한다.
 - open-in-view는 끈다. 지연 로딩은 Service의 트랜잭션 안에서만 쓴다.
+
+## 동시성과 충돌
+
+- 유일해야 하는 값은 서비스의 사전 확인과 함께 마이그레이션의 이름 있는 유일 제약(예: `constraint hotel_name_address_key unique (name, address)`)으로 막는다. 사전 확인만으로는 동시에 온 요청이 둘 다 통과한다.
+  - 서비스는 저장을 `saveAndFlush`로 서비스 안에서 실행하고, `DataIntegrityViolationException`이 그 제약을 가리키면(`common/exception`의 `violates(제약 이름)`) 도메인 409로 바꾼다. 다른 제약 위반은 그대로 던진다(500).
+  - 제약 이름은 엔티티 상수로 둔다. 예: `Hotel.NAME_ADDRESS_UNIQUE_CONSTRAINT`
+- 동시 수정은 낙관적 잠금으로 막는다. 엔티티에 `@Version var version: Long`(`version bigint not null`)을 두고 응답에 `version`을 싣고, 수정 요청은 `version`을 필수로 받는다.
+  - 서비스는 읽은 엔티티의 version이 요청과 다르면 도메인 409를 던진다.
+  - 같은 version으로 동시에 들어온 수정은 flush 때 JPA가 막는다. flush를 서비스 안(`saveAndFlush`)에서 해 `OptimisticLockingFailureException`도 같은 도메인 409로 바꾼다. 커밋 때 터지면 서비스 밖이라 500이 된다.
+- 중복 확인 같은 조회는 엔티티를 바꾸기 전에 한다. 바뀐 엔티티가 있으면 조회 전 자동 flush로 제약 위반이 변환 범위 밖에서 난다.
+- 테스트는 두 경로를 모두 확인한다.
+  - 동시 요청: 두 스레드를 `CountDownLatch`로 함께 출발시킨다.
+  - 사전 확인을 통과한 뒤 DB에서 막히는 경로: 먼저 온 트랜잭션을 열어 둔 채 다음 요청이 잠금을 기다리는지(`pg_stat_activity`) 확인하고 커밋한다(`HotelServiceTest`).
 
 ## 테스트
 
@@ -162,6 +186,7 @@ urbanstay/
   - 그룹 이름: `openapi.group.{group}`
   - 태그: `openapi.{group}.tag.{tag}`
   - 오퍼레이션: `openapi.{group}.operation.{operationId}.summary` (필요하면 `.description`)
+  - 요청 파라미터: `openapi.{group}.operation.{operationId}.parameter.{name}` (`@Parameter(description = ...)`)
   - 스키마 필드: `openapi.schema.{SchemaName}.{field}`
 - 400·500 공통 에러 응답은 모든 API에 자동으로 붙는다. 어드민 그룹에는 401·403도 붙고(`SecurityConfig.PUBLIC_ADMIN_APIS`의 열린 API는 빼고), 상태를 바꾸는 operation(POST·PUT·PATCH·DELETE)의 403에는 `INVALID_CSRF_TOKEN` 예시가 함께 붙는다. 에러 응답 스키마는 `ErrorApiResponse`다.
 - operation이 내는 도메인 에러는 도메인 어노테이션으로 적는다. 예: `@AccountApiErrors(AccountErrorCode.INVALID_CREDENTIALS)`. 자동 에러와 합쳐 상태 코드별로 예시가 붙는다.
