@@ -7,7 +7,9 @@
     "build": "tsr generate && tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint && steiger ./src",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@repo/ui": "workspace:*",
