@@ -54,6 +54,11 @@ class HotelAdmin(
 		this.name = normalizeName(name)
 	}
 
+	fun resetPassword(passwordHash: String) {
+		this.passwordHash = passwordHash
+		credentialVersion++
+	}
+
 	companion object {
 		const val LOGIN_ID_MAX_LENGTH = 254
 		const val NAME_MAX_LENGTH = 50

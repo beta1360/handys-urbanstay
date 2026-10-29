@@ -96,6 +96,19 @@ class HotelMasterServiceTest {
 		assertThat(listOf(unchanged.loginId, unchanged.version, unchanged.credentialVersion)).containsExactly(otherMaster.loginId, 0L, 0L)
 	}
 
+	@Test
+	fun `먼저 온 수정이 커밋되기 전에 읽은 비밀번호 재설정도 JPA 버전 검사에 막혀 HOTEL_ADMIN_MODIFIED로 거절되고 비밀번호는 그대로다`() {
+		val second = runSecondWhileFirstUncommitted(
+			first = { hotelMasterService.update(hotelIdOf(master), 0, master.loginId, FIRST_NAME) },
+			second = { hotelMasterService.resetPassword(hotelIdOf(master), NEW_PASSWORD) },
+			lockedTable = "hotel_admin",
+		)
+
+		assertErrorCode(second, AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+		val saved = reload(master)
+		assertThat(listOf(saved.name, saved.passwordHash, saved.version, saved.credentialVersion)).containsExactly(FIRST_NAME, PASSWORD_HASH, 1L, 0L)
+	}
+
 	private fun saveMaster(hotelName: String, loginId: String): HotelAdmin {
 		val hotel = hotelRepository.save(Hotel(hotelName, "서울 $suffix", PHONE, null))
 		createdHotelIds += checkNotNull(hotel.id)
@@ -143,6 +156,7 @@ class HotelMasterServiceTest {
 		private const val MASTER_NAME = "마스터"
 		private const val FIRST_NAME = "먼저 바꾼 이름"
 		private const val SECOND_NAME = "나중에 바꾼 이름"
+		private const val NEW_PASSWORD = "new-password-1"
 		private const val TIMEOUT_SECONDS = 10L
 		private const val POLL_INTERVAL_MILLIS = 20L
 		private const val DELETE_HOTEL_ADMINS = "delete from hotel_admin where hotel_id = ?"

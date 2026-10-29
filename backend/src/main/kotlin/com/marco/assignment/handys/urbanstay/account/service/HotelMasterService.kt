@@ -23,6 +23,11 @@ class HotelMasterService(
 	fun update(hotelId: Long, version: Long, loginId: String, name: String): HotelAdmin =
 		hotelAdminService.update(findMaster(hotelId), version, loginId, name)
 
+	@Transactional
+	fun resetPassword(hotelId: Long, password: String) {
+		hotelAdminService.resetPassword(findMaster(hotelId), password)
+	}
+
 	private fun findMaster(hotelId: Long): HotelAdmin {
 		hotelService.getHotel(hotelId)
 		return hotelAdminRepository.findByHotelIdAndRole(hotelId, HotelAdminRole.MASTER)

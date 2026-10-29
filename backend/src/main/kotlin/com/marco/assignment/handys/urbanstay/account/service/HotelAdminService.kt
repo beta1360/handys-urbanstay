@@ -49,6 +49,12 @@ class HotelAdminService(
 		return translateConflicts { hotelAdminRepository.saveAndFlush(hotelAdmin) }
 	}
 
+	@Transactional
+	fun resetPassword(hotelAdmin: HotelAdmin, password: String) {
+		hotelAdmin.resetPassword(checkNotNull(passwordEncoder.encode(password)))
+		translateConflicts { hotelAdminRepository.saveAndFlush(hotelAdmin) }
+	}
+
 	private fun translateConflicts(save: () -> HotelAdmin): HotelAdmin =
 		try {
 			save()

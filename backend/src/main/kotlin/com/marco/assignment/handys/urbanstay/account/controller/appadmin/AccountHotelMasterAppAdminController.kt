@@ -1,6 +1,7 @@
 package com.marco.assignment.handys.urbanstay.account.controller.appadmin
 
 import com.marco.assignment.handys.urbanstay.account.dto.appadmin.AccountHotelMasterAppAdminResponse
+import com.marco.assignment.handys.urbanstay.account.dto.appadmin.AccountHotelMasterPasswordResetAppAdminRequest
 import com.marco.assignment.handys.urbanstay.account.dto.appadmin.AccountHotelMasterUpdateAppAdminRequest
 import com.marco.assignment.handys.urbanstay.account.exception.AccountApiErrors
 import com.marco.assignment.handys.urbanstay.account.exception.AccountErrorCode
@@ -43,5 +44,20 @@ class AccountHotelMasterAppAdminController(
 	): ApiResponse<AccountHotelMasterAppAdminResponse> {
 		val master = hotelMasterService.update(hotelId, request.version, request.loginId, request.name)
 		return ApiResponse.success(AccountHotelMasterAppAdminResponse.from(master))
+	}
+
+	@Operation(
+		summary = "openapi.app-admin.operation.resetHotelMasterPassword.summary",
+		description = "openapi.app-admin.operation.resetHotelMasterPassword.description",
+	)
+	@HotelApiErrors(HotelErrorCode.HOTEL_NOT_FOUND)
+	@AccountApiErrors(AccountErrorCode.HOTEL_MASTER_NOT_FOUND, AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+	@PutMapping("/password")
+	fun resetHotelMasterPassword(
+		@PathVariable hotelId: Long,
+		@Valid @RequestBody request: AccountHotelMasterPasswordResetAppAdminRequest,
+	): ApiResponse<Nothing?> {
+		hotelMasterService.resetPassword(hotelId, request.password)
+		return ApiResponse.success(null)
 	}
 }

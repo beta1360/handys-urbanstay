@@ -10,6 +10,7 @@ import com.marco.assignment.handys.urbanstay.common.ApiPaths
 import com.marco.assignment.handys.urbanstay.common.exception.CommonErrorCode
 import com.marco.assignment.handys.urbanstay.common.exception.ErrorCode
 import com.marco.assignment.handys.urbanstay.common.security.Role
+import com.marco.assignment.handys.urbanstay.common.validation.Password
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelErrorCode
 import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRepository
@@ -31,6 +32,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.mock.web.MockHttpServletResponse
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.web.servlet.MockHttpServletRequestDsl
 import org.springframework.test.web.servlet.MockMvc
@@ -70,6 +72,9 @@ class AccountHotelMasterAppAdminControllerTest {
 
 	@Autowired
 	private lateinit var jdbcTemplate: JdbcTemplate
+
+	@Autowired
+	private lateinit var passwordEncoder: PasswordEncoder
 
 	private val executor = Executors.newFixedThreadPool(CONCURRENT_REQUESTS)
 
@@ -111,19 +116,21 @@ class AccountHotelMasterAppAdminControllerTest {
 	}
 
 	@Test
-	fun `없는 호텔의 마스터를 조회하거나 수정하면 404 HOTEL_NOT_FOUND로 응답한다`() {
+	fun `없는 호텔의 마스터를 조회, 수정, 비밀번호 재설정하면 404 HOTEL_NOT_FOUND로 응답한다`() {
 		mockMvc.get(masterPath(MISSING_ID)) { loggedIn() }.andExpectError(HotelErrorCode.HOTEL_NOT_FOUND)
 		update(MISSING_ID, updateBody(0)).andExpectError(HotelErrorCode.HOTEL_NOT_FOUND)
+		resetPassword(MISSING_ID, passwordBody()).andExpectError(HotelErrorCode.HOTEL_NOT_FOUND)
 	}
 
 	@Test
-	fun `운영자만 있고 마스터가 없는 호텔이면 조회와 수정 모두 404 HOTEL_MASTER_NOT_FOUND로 응답한다`() {
+	fun `운영자만 있고 마스터가 없는 호텔이면 조회, 수정, 비밀번호 재설정 모두 404 HOTEL_MASTER_NOT_FOUND로 응답한다`() {
 		val noMasterHotel = saveHotel("마스터 없는 호텔 $suffix")
 		val noMasterHotelId = checkNotNull(noMasterHotel.id)
 		val operator = saveHotelAdmin(noMasterHotel, "operator-$suffix@test.local", HotelAdminRole.OPERATOR)
 
 		mockMvc.get(masterPath(noMasterHotelId)) { loggedIn() }.andExpectError(AccountErrorCode.HOTEL_MASTER_NOT_FOUND)
 		update(noMasterHotelId, updateBody(0, "loginId" to operator.loginId)).andExpectError(AccountErrorCode.HOTEL_MASTER_NOT_FOUND)
+		resetPassword(noMasterHotelId, passwordBody()).andExpectError(AccountErrorCode.HOTEL_MASTER_NOT_FOUND)
 		assertUnchanged(operator)
 	}
 
@@ -268,9 +275,71 @@ class AccountHotelMasterAppAdminControllerTest {
 	}
 
 	@Test
-	fun `로그인하지 않으면 마스터 조회와 수정은 401 UNAUTHORIZED로 응답하고 바꾸지 않는다`() {
+	fun `비밀번호를 재설정하면 입력한 그대로 해시해 저장하고 version과 로그인 정보 버전을 올려 data null로 200 응답한다`() {
+		val password = " New pass 1 "
+
+		val data = resetPassword(hotelId, passwordBody(password)).andExpectSuccess()
+
+		assertThat(data.isNull).isTrue()
+		val saved = reload(master)
+		assertThat(passwordEncoder.matches(password, saved.passwordHash)).isTrue()
+		assertThat(passwordEncoder.matches(password.trim(), saved.passwordHash)).isFalse()
+		assertThat(listOf(saved.loginId, saved.name, saved.version, saved.credentialVersion)).containsExactly(masterLoginId, MASTER_NAME, 1L, 1L)
+	}
+
+	@Test
+	fun `지금과 같은 비밀번호로 다시 재설정해도 version과 로그인 정보 버전을 올린다`() {
+		repeat(2) { resetPassword(hotelId, passwordBody(NEW_PASSWORD)).andExpectSuccess() }
+
+		val saved = reload(master)
+		assertThat(passwordEncoder.matches(NEW_PASSWORD, saved.passwordHash)).isTrue()
+		assertThat(listOf(saved.version, saved.credentialVersion)).containsExactly(2L, 2L)
+	}
+
+	@Test
+	fun `비밀번호를 재설정한 뒤 그 전에 조회한 version으로 정보를 수정하면 409 HOTEL_ADMIN_MODIFIED로 응답한다`() {
+		resetPassword(hotelId, passwordBody()).andExpectSuccess()
+
+		update(hotelId, updateBody(0, "name" to "새 이름")).andExpectError(AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+		assertThat(update(hotelId, updateBody(1, "name" to "새 이름")).andExpectSuccess()["version"].longValue()).isEqualTo(2)
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["", " ", "        ", "\t\n"])
+	fun `새 비밀번호가 비어 있거나 공백만 있으면 비밀번호 규칙 메시지 없이 필수 입력 메시지 하나로 400 응답하고 바꾸지 않는다`(password: String) {
+		resetPassword(hotelId, passwordBody(password)).andExpectError(CommonErrorCode.INVALID_INPUT, "password" to message(REQUIRED))
+		assertUnchanged(master)
+	}
+
+	@ParameterizedTest
+	@ValueSource(
+		strings = [
+			"abcdefgh", "12345678", "abc1234", "a1bcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklm", "비밀번호abc123", "abc123\t45",
+		],
+	)
+	fun `새 비밀번호가 8~64자, 영문과 숫자 포함, 영문 자판 글자 규칙을 어기면 비밀번호 규칙 메시지 하나로 400 응답한다`(password: String) {
+		resetPassword(hotelId, passwordBody(password)).andExpectError(CommonErrorCode.INVALID_INPUT, "password" to message(PASSWORD))
+		assertUnchanged(master)
+	}
+
+	@Test
+	fun `새 비밀번호가 없거나 null이거나 문자열이 아니면 필수 입력이나 형식 메시지로 400 응답한다`() {
+		resetPassword(hotelId, emptyMap()).andExpectError(CommonErrorCode.INVALID_INPUT, "password" to message(REQUIRED))
+		resetPassword(hotelId, mapOf("password" to null)).andExpectError(CommonErrorCode.INVALID_INPUT, "password" to message(REQUIRED))
+		resetPassword(hotelId, mapOf("password" to 12345678)).andExpectError(CommonErrorCode.INVALID_INPUT, "password" to message(TYPE))
+	}
+
+	@Test
+	fun `비밀번호 재설정에 문서에 없는 version 항목을 보내면 알 수 없는 항목 메시지로 400 응답한다`() {
+		resetPassword(hotelId, passwordBody() + ("version" to 0))
+			.andExpectError(CommonErrorCode.INVALID_INPUT, "version" to message("validation.unknown-field"))
+	}
+
+	@Test
+	fun `로그인하지 않으면 마스터 조회, 수정, 비밀번호 재설정은 401 UNAUTHORIZED로 응답하고 바꾸지 않는다`() {
 		mockMvc.get(masterPath(hotelId)).andExpectError(CommonErrorCode.UNAUTHORIZED)
 		mockMvc.put(masterPath(hotelId)) { withCsrf(); jsonBody(updateBody(0, "name" to "새 이름")) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
+		mockMvc.put(passwordPath(hotelId)) { withCsrf(); jsonBody(passwordBody()) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
 		assertUnchanged(master)
 	}
 
@@ -278,12 +347,14 @@ class AccountHotelMasterAppAdminControllerTest {
 	fun `호텔 계정 역할로는 전체 어드민의 마스터 API를 쓸 수 없어 403 FORBIDDEN으로 응답한다`() {
 		mockMvc.get(masterPath(hotelId)) { loggedIn(HOTEL_MASTER_ROLES) }.andExpectError(CommonErrorCode.FORBIDDEN)
 		update(hotelId, updateBody(0, "name" to "새 이름"), HOTEL_MASTER_ROLES).andExpectError(CommonErrorCode.FORBIDDEN)
+		resetPassword(hotelId, passwordBody(), HOTEL_MASTER_ROLES).andExpectError(CommonErrorCode.FORBIDDEN)
 		assertUnchanged(master)
 	}
 
 	@Test
-	fun `CSRF 토큰 없이 수정하면 403 INVALID_CSRF_TOKEN으로 응답하고 바꾸지 않는다`() {
+	fun `CSRF 토큰 없이 수정하거나 비밀번호를 재설정하면 403 INVALID_CSRF_TOKEN으로 응답하고 바꾸지 않는다`() {
 		mockMvc.put(masterPath(hotelId)) { loggedIn(); jsonBody(updateBody(0, "name" to "새 이름")) }.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
+		mockMvc.put(passwordPath(hotelId)) { loggedIn(); jsonBody(passwordBody()) }.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
 		assertUnchanged(master)
 	}
 
@@ -291,9 +362,10 @@ class AccountHotelMasterAppAdminControllerTest {
 	fun `마스터 API 문서는 account 태그에 operation마다 낼 수 있는 호텔·계정 에러를 예시로 보여준다`() {
 		val docs = apiDocs()
 		val master = docs["paths"][MASTER_DOC_PATH]
-		val operations = listOf(master["get"], master["put"])
+		val reset = docs["paths"]["$MASTER_DOC_PATH/password"]["put"]
+		val operations = listOf(master["get"], master["put"], reset)
 
-		assertThat(operations.map { it["operationId"].stringValue() }).containsExactly("getHotelMaster", "updateHotelMaster")
+		assertThat(operations.map { it["operationId"].stringValue() }).containsExactly("getHotelMaster", "updateHotelMaster", "resetHotelMasterPassword")
 		assertThat(operations.map { op -> op["tags"].values().map { it.stringValue() } }).containsOnly(listOf("account"))
 		assertThat(docs["tags"].values().single { it["name"].stringValue() == "account" }["description"].stringValue())
 			.isEqualTo(message("openapi.app-admin.tag.account"))
@@ -304,6 +376,21 @@ class AccountHotelMasterAppAdminControllerTest {
 		assertThat(master["get"]["responses"].propertyNames()).doesNotContain("409")
 		assertThat(errorCodes(master["put"], HttpStatus.CONFLICT))
 			.containsExactlyInAnyOrder(AccountErrorCode.LOGIN_ID_DUPLICATED.code, AccountErrorCode.HOTEL_ADMIN_MODIFIED.code)
+		assertThat(errorCodes(reset, HttpStatus.CONFLICT)).containsExactly(AccountErrorCode.HOTEL_ADMIN_MODIFIED.code)
+	}
+
+	@Test
+	fun `비밀번호 재설정 문서는 data가 null인 응답과 필수인 비밀번호의 규칙을 보여준다`() {
+		val docs = apiDocs()
+		val request = docs["components"]["schemas"]["AccountHotelMasterPasswordResetAppAdminRequest"]
+		val password = request["properties"]["password"]
+
+		assertThat(docs["paths"]["$MASTER_DOC_PATH/password"]["put"]["responses"]["200"]["content"][JSON]["schema"])
+			.isEqualTo(schemaRef("EmptyApiResponse"))
+		assertThat(request["properties"].propertyNames()).containsExactly("password")
+		assertThat(required(request)).containsExactly("password")
+		assertThat(listOf("minLength", "maxLength", "pattern").map { password[it].asString() })
+			.containsExactly(Password.MIN_LENGTH.toString(), Password.MAX_LENGTH.toString(), Password.PATTERN)
 	}
 
 	@Test
@@ -335,6 +422,13 @@ class AccountHotelMasterAppAdminControllerTest {
 			jsonBody(body)
 		}
 
+	private fun resetPassword(hotelId: Long, body: Map<String, Any?>, roles: List<Role> = APP_ADMIN_ROLES): ResultActionsDsl =
+		mockMvc.put(passwordPath(hotelId)) {
+			loggedIn(roles)
+			withCsrf()
+			jsonBody(body)
+		}
+
 	private fun MockHttpServletRequestDsl.loggedIn(roles: List<Role> = APP_ADMIN_ROLES) {
 		with(user(USERNAME).roles(*roles.map { it.name }.toTypedArray()))
 	}
@@ -352,7 +446,11 @@ class AccountHotelMasterAppAdminControllerTest {
 	private fun updateBody(version: Long, vararg overrides: Pair<String, Any?>): Map<String, Any?> =
 		linkedMapOf<String, Any?>("loginId" to masterLoginId, "name" to MASTER_NAME, "version" to version) + overrides
 
+	private fun passwordBody(password: String = NEW_PASSWORD): Map<String, Any?> = mapOf("password" to password)
+
 	private fun masterPath(hotelId: Long): String = "${ApiPaths.APP_ADMIN}/hotels/$hotelId/master"
+
+	private fun passwordPath(hotelId: Long): String = "${masterPath(hotelId)}/password"
 
 	private fun saveHotel(name: String): Hotel =
 		hotelRepository.save(Hotel(name, "서울 $suffix", PHONE, null)).also { createdHotelIds += checkNotNull(it.id) }
@@ -442,6 +540,8 @@ class AccountHotelMasterAppAdminControllerTest {
 		private const val TYPE = "validation.type"
 		private const val MAX_LENGTH = "validation.max-length"
 		private const val EMAIL = "validation.email"
+		private const val PASSWORD = "validation.password"
+		private const val NEW_PASSWORD = "new-password-1"
 		private const val MISSING_ID = Long.MAX_VALUE
 		private const val CONCURRENT_REQUESTS = 2
 		private const val TIMEOUT_SECONDS = 10L

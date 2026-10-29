@@ -89,6 +89,20 @@ class HotelAdminRepositoryTest {
 	}
 
 	@Test
+	fun `비밀번호를 재설정하면 같은 해시여도 version과 로그인 정보 버전이 1씩 커진다`() {
+		val hotelAdmin = hotelAdminRepository.saveAndFlush(admin(hotel, "reset-$suffix@test.local", HotelAdminRole.MASTER))
+
+		hotelAdmin.resetPassword(PASSWORD_HASH)
+		hotelAdminRepository.flush()
+		hotelAdmin.resetPassword("new-password-hash")
+		hotelAdminRepository.flush()
+		entityManager.clear()
+
+		val found = hotelAdminRepository.findById(checkNotNull(hotelAdmin.id)).orElseThrow()
+		assertThat(listOf(found.passwordHash, found.version, found.credentialVersion)).containsExactly("new-password-hash", 2L, 2L)
+	}
+
+	@Test
 	fun `대소문자와 앞뒤 공백만 다른 로그인 아이디는 다른 호텔이어도 이름 있는 DB 유일 제약이 저장을 막는다`() {
 		hotelAdminRepository.saveAndFlush(admin(hotel, "duplicate-$suffix@test.local", HotelAdminRole.MASTER))
 

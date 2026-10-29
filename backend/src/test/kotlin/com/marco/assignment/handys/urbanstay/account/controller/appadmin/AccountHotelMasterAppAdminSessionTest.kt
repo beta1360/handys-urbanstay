@@ -122,7 +122,32 @@ class AccountHotelMasterAppAdminSessionTest {
 		assertThat(me(masterBrowser)["loginId"].stringValue()).isEqualTo(masterLoginId)
 	}
 
+	@Test
+	fun `어드민이 비밀번호를 재설정하면 마스터의 기존 세션은 다음 요청에서 401로 끊기고 새 비밀번호로만 다시 로그인할 수 있다`() {
+		val masterBrowser = loggedInMaster(masterLoginId, PASSWORD)
+
+		assertThat(loggedInAdmin().put(passwordPath(), passwordBody(NEW_PASSWORD)).statusCode()).isEqualTo(HttpStatus.OK.value())
+
+		assertError(masterBrowser.get(ME), CommonErrorCode.UNAUTHORIZED)
+		assertError(Browser().withXsrfToken().post(LOGIN, loginBody(masterLoginId, PASSWORD)), AccountErrorCode.INVALID_CREDENTIALS)
+		assertThat(me(loggedInMaster(masterLoginId, NEW_PASSWORD))["loginId"].stringValue()).isEqualTo(masterLoginId)
+	}
+
+	@Test
+	fun `어드민이 지금과 같은 비밀번호로 재설정해도 마스터의 기존 세션은 끊기고 같은 비밀번호로 다시 로그인한다`() {
+		val masterBrowser = loggedInMaster(masterLoginId, PASSWORD)
+
+		assertThat(loggedInAdmin().put(passwordPath(), passwordBody(PASSWORD)).statusCode()).isEqualTo(HttpStatus.OK.value())
+
+		assertError(masterBrowser.get(ME), CommonErrorCode.UNAUTHORIZED)
+		assertThat(me(loggedInMaster(masterLoginId, PASSWORD))["loginId"].stringValue()).isEqualTo(masterLoginId)
+	}
+
 	private fun encode(password: String): String = checkNotNull(passwordEncoder.encode(password))
+
+	private fun passwordPath(): String = "${masterPath()}/password"
+
+	private fun passwordBody(password: String): String = jsonMapper.writeValueAsString(mapOf("password" to password))
 
 	private fun masterPath(): String = "${ApiPaths.APP_ADMIN}/hotels/${hotel.id}/master"
 
@@ -194,6 +219,7 @@ class AccountHotelMasterAppAdminSessionTest {
 
 	companion object {
 		private const val PASSWORD = "hotel-password-1"
+		private const val NEW_PASSWORD = " new hotel password 2 "
 		private const val ADMIN_PASSWORD = "admin-password-1"
 		private const val MASTER_NAME = "마스터"
 		private const val PHONE = "02-1234-5678"
