@@ -42,6 +42,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.OffsetDateTime
 import java.util.Locale
 
@@ -127,6 +128,13 @@ class GlobalExceptionHandlerTest {
 	fun `ISO 형식이면 오프셋이 있는 날짜·시간을 받아 UTC로 읽는다`() {
 		postDetail(detailBody("offsetDateTime" to "\"2026-10-29T19:00:00+09:00\""))
 			.andExpectEnvelope(200, """{"success":true,"data":${detailBody()},"error":null}""")
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["00:00", "09:30", "12:05", "23:59"])
+	fun `시각은 시와 분이 두 자리씩인 문자열을 받아 같은 형식의 문자열로 응답한다`(time: String) {
+		postDetail(detailBody("time" to "\"$time\""))
+			.andExpectEnvelope(200, """{"success":true,"data":${detailBody("time" to "\"$time\"")},"error":null}""")
 	}
 
 	@Test
@@ -315,6 +323,7 @@ class GlobalExceptionHandlerTest {
 		val date: LocalDate,
 		val dateTime: LocalDateTime,
 		val offsetDateTime: OffsetDateTime,
+		val time: LocalTime,
 	)
 
 	enum class TestGrade { STANDARD, DELUXE }
@@ -387,6 +396,7 @@ class GlobalExceptionHandlerTest {
 			"date" to "\"2026-10-29\"",
 			"dateTime" to "\"2026-10-29T10:00:00\"",
 			"offsetDateTime" to "\"2026-10-29T10:00:00Z\"",
+			"time" to "\"15:00\"",
 		)
 
 		@JvmStatic
@@ -422,6 +432,22 @@ class GlobalExceptionHandlerTest {
 			Arguments.of("offsetDateTime", "1700000000.5"),
 			Arguments.of("offsetDateTime", "\"1700000000\""),
 			Arguments.of("offsetDateTime", "\"2026-10-29T10:00:00\""),
+			Arguments.of("time", "\"15:00:00\""),
+			Arguments.of("time", "\"15:00:00.000\""),
+			Arguments.of("time", "\"9:30\""),
+			Arguments.of("time", "\"24:00\""),
+			Arguments.of("time", "\"15:60\""),
+			Arguments.of("time", "\"1500\""),
+			Arguments.of("time", "\"15:00Z\""),
+			Arguments.of("time", "\"15:00+09:00\""),
+			Arguments.of("time", "\" 15:00\""),
+			Arguments.of("time", "\"15:00 \""),
+			Arguments.of("time", "\"\""),
+			Arguments.of("time", "\"2026-10-29T15:00\""),
+			Arguments.of("time", "54000"),
+			Arguments.of("time", "15.5"),
+			Arguments.of("time", "[15,0]"),
+			Arguments.of("time", """{"hour":15,"minute":0}"""),
 		)
 
 		@JvmStatic

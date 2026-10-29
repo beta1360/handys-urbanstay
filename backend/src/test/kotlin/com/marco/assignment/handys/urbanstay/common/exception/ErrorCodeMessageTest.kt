@@ -2,6 +2,7 @@ package com.marco.assignment.handys.urbanstay.common.exception
 
 import com.marco.assignment.handys.urbanstay.account.exception.AccountErrorCode
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelErrorCode
+import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.boot.autoconfigure.AutoConfigurations
@@ -16,6 +17,7 @@ class ErrorCodeMessageTest {
 		CommonErrorCode.entries,
 		AccountErrorCode.entries,
 		HotelErrorCode.entries,
+		RoomErrorCode.entries,
 	).flatten()
 
 	@Test
