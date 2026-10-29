@@ -20,7 +20,8 @@
     "axios": "1.20.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "tailwindcss": "^4.1.18"
+    "tailwindcss": "^4.1.18",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^9",
@@ -47,7 +48,6 @@
     "typescript": "^5",
     "typescript-eslint": "^8.72.1",
     "vite": "^8.0.0",
-    "vitest": "^5.0.5",
-    "zod": "^4.6.7"
+    "vitest": "^5.0.5"
   }
 }

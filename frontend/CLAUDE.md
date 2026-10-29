@@ -69,6 +69,7 @@ frontend/
 ## API 코드
 
 - orval이 생성한 `src/shared/api/generated`를 쓴다. 생성 코드는 직접 수정하지 않고 codegen으로 다시 만든다.
+- 요청 본문은 보내기 전에, 응답은 쓰기 전에 orval이 생성한 zod 스키마로 검증한다. 규칙은 `docs/api-convention.md`의 '검증'을 따른다.
 
 ## 스타일
 
