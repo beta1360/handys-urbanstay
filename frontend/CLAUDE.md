@@ -26,7 +26,7 @@ frontend/
 ```
 
 - 세 앱은 정책이 다르므로 각자 전용 API만 쓴다. API 코드는 앱마다 orval로 따로 생성한다.
-- 어드민 앱 중 `app-admin`은 만들었다(규칙: `apps/app-admin/CLAUDE.md`). `hotel-admin`은 아직 만들지 않았다. 앱을 만들 때 각 앱의 CLAUDE.md를 두고 `docs/admin-app.md`를 인용한다.
+- 어드민 앱은 `app-admin`(규칙: `apps/app-admin/CLAUDE.md`)과 `hotel-admin`(규칙: `apps/hotel-admin/CLAUDE.md`)이다. 각 앱의 CLAUDE.md는 `docs/admin-app.md`를 인용한다.
 
 ## 구조 (FSD)
 
@@ -88,7 +88,7 @@ frontend/
 ## 명령어 (`frontend/`에서 실행)
 
 - 모든 앱: `pnpm dev`, `pnpm build`, `pnpm lint`(ESLint + Steiger), `pnpm test`(한 번 실행), `pnpm codegen` (turbo로 실행)
-- 타입 검사: `pnpm typecheck` (`tsc --noEmit`). `typecheck` 스크립트가 있는 `app-admin`과 `@repo/ui`에서 실행한다. web은 `next build`가 타입을 검사한다.
+- 타입 검사: `pnpm typecheck` (`tsc --noEmit`). `typecheck` 스크립트가 있는 `app-admin`, `hotel-admin`, `@repo/ui`에서 실행한다. web은 `next build`가 타입을 검사한다.
 - 특정 앱만: `pnpm --filter web dev`처럼 `--filter`로 지정한다. 패키지는 `pnpm --filter @repo/ui test`처럼 패키지 이름으로 지정한다.
 - 테스트 감시 모드: `pnpm --filter web test:watch`
 - API 코드 생성은 백엔드가 실행 중이어야 한다.
