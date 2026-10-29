@@ -4,6 +4,7 @@ import com.marco.assignment.handys.urbanstay.common.request.TrimmedStringDeseria
 import com.marco.assignment.handys.urbanstay.common.validation.PatternThenMaxLength
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import io.swagger.v3.oas.annotations.media.Schema
+import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import org.hibernate.validator.constraints.Length
@@ -29,4 +30,7 @@ data class HotelCreateAppAdminRequest(
 	@Size(max = Hotel.DESCRIPTION_MAX_LENGTH, message = "{validation.max-length}")
 	@Schema(description = "openapi.schema.HotelCreateAppAdminRequest.description", example = "강남역에서 걸어서 5분 거리의 비즈니스 호텔입니다.")
 	val description: String?,
+	@Valid
+	@Schema(description = "openapi.schema.HotelCreateAppAdminRequest.master")
+	val master: HotelMasterCreateAppAdminRequest,
 )

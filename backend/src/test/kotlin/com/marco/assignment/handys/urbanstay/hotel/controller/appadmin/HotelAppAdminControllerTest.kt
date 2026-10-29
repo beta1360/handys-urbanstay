@@ -1,10 +1,16 @@
 package com.marco.assignment.handys.urbanstay.hotel.controller.appadmin
 
 import com.marco.assignment.handys.urbanstay.TestcontainersConfiguration
+import com.marco.assignment.handys.urbanstay.account.entity.AppAdmin
+import com.marco.assignment.handys.urbanstay.account.entity.HotelAdmin
+import com.marco.assignment.handys.urbanstay.account.entity.LoginId
+import com.marco.assignment.handys.urbanstay.account.exception.AccountErrorCode
+import com.marco.assignment.handys.urbanstay.account.repository.AppAdminRepository
 import com.marco.assignment.handys.urbanstay.common.ApiPaths
 import com.marco.assignment.handys.urbanstay.common.exception.CommonErrorCode
 import com.marco.assignment.handys.urbanstay.common.exception.ErrorCode
 import com.marco.assignment.handys.urbanstay.common.security.Role
+import com.marco.assignment.handys.urbanstay.common.validation.Password
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelErrorCode
 import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRepository
@@ -13,6 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertTimeout
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.CsvSource
@@ -25,7 +32,9 @@ import org.springframework.context.MessageSource
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.mock.web.MockHttpServletResponse
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.web.servlet.MockHttpServletRequestDsl
 import org.springframework.test.web.servlet.MockMvc
@@ -37,12 +46,14 @@ import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.databind.node.ObjectNode
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.Callable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -61,11 +72,21 @@ class HotelAppAdminControllerTest {
 	@Autowired
 	private lateinit var jsonMapper: JsonMapper
 
+	@Autowired
+	private lateinit var jdbcTemplate: JdbcTemplate
+
+	@Autowired
+	private lateinit var passwordEncoder: PasswordEncoder
+
+	@Autowired
+	private lateinit var appAdminRepository: AppAdminRepository
+
 	private val executor = Executors.newFixedThreadPool(2)
 
 	private val suffix = UUID.randomUUID().toString().take(8)
 	private val name = "어반스테이 $suffix"
 	private val address = "서울특별시 강남구 테헤란로 $suffix"
+	private val masterSequence = AtomicInteger()
 
 	private val xsrf: Cookie by lazy { checkNotNull(mockMvc.get(HOTELS).andReturn().response.getCookie(XSRF_COOKIE)) }
 
@@ -79,7 +100,9 @@ class HotelAppAdminControllerTest {
 	@AfterEach
 	fun deleteCreatedHotels() {
 		executor.shutdownNow()
-		hotelRepository.deleteAllByIdInBatch(hotelIds() - existingIds)
+		val createdIds = hotelIds() - existingIds
+		createdIds.forEach { jdbcTemplate.update(DELETE_HOTEL_ADMINS, it) }
+		hotelRepository.deleteAllByIdInBatch(createdIds)
 	}
 
 	@Test
@@ -184,7 +207,7 @@ class HotelAppAdminControllerTest {
 	}
 
 	@ParameterizedTest
-	@ValueSource(strings = ["name", "address", "phone"])
+	@ValueSource(strings = ["name", "address", "phone", "master"])
 	fun `필수 항목이 없거나 null이면 필수 입력 메시지로 400 응답한다`(field: String) {
 		create(createBody() - field).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(REQUIRED))
 		create(createBody(field to null)).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(REQUIRED))
@@ -222,11 +245,195 @@ class HotelAppAdminControllerTest {
 
 	@Test
 	fun `같은 등록 요청이 동시에 두 번 오면 하나만 201로 등록되고 나머지는 409 HOTEL_DUPLICATED로 응답한다`() {
-		val responses = concurrently { create(createBody()).andReturn().response }
+		val body = createBody()
+
+		val responses = concurrently { create(body).andReturn().response }
 
 		assertThat(responses.map { it.status }).containsExactlyInAnyOrder(HttpStatus.CREATED.value(), HttpStatus.CONFLICT.value())
 		assertError(responses.single { it.status == HttpStatus.CONFLICT.value() }, HotelErrorCode.HOTEL_DUPLICATED)
 		assertThat(hotelsNamed(name)).hasSize(1)
+		assertThat(mastersWithLoginId(masterLoginId(body))).hasSize(1)
+	}
+
+	@Test
+	fun `호텔을 등록하면 마스터 계정을 함께 만들어 아이디는 소문자로, 이름은 앞뒤 공백을 지워 저장하고 비밀번호는 입력한 그대로 해시해 저장한다`() {
+		val loginId = "Master-$suffix@Test.LOCAL"
+		val password = " Urbanstay 123! "
+
+		val data = create(createBody("master" to masterBody("loginId" to " $loginId\t", "name" to " 홍길동 ", "password" to password)))
+			.andExpectSuccess(HttpStatus.CREATED)
+
+		assertThat(data).isEqualTo(hotelJson(hotelRepository.findById(data["id"].longValue()).orElseThrow()))
+		val master = masterOf(data["id"].longValue())
+		assertThat(listOf(master["login_id"], master["name"], master["role"], master["active"], master["credential_version"]))
+			.containsExactly(loginId.lowercase(), "홍길동", "MASTER", true, 0L)
+		val passwordHash = master["password_hash"] as String
+		assertThat(passwordHash).startsWith("{bcrypt}").doesNotContain(password.trim())
+		assertThat(passwordEncoder.matches(password, passwordHash)).isTrue()
+		assertThat(passwordEncoder.matches(password.trim(), passwordHash)).isFalse()
+	}
+
+	@Test
+	fun `영문 자판 글자로만 된 64자 비밀번호도 해시해 저장한다`() {
+		val password = " 1aZ!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~" + "x".repeat(28)
+
+		val data = create(createBody("master" to masterBody("password" to password))).andExpectSuccess(HttpStatus.CREATED)
+
+		assertThat(password).hasSize(Password.MAX_LENGTH)
+		assertThat(passwordEncoder.matches(password, masterOf(data["id"].longValue())["password_hash"] as String)).isTrue()
+	}
+
+	@Test
+	fun `마스터 아이디를 다른 호텔 계정이 쓰고 있으면 대소문자와 앞뒤 공백과 관계없이 409 LOGIN_ID_DUPLICATED로 응답하고 호텔을 저장하지 않는다`() {
+		val loginId = "taken-$suffix@test.local"
+		create(createBody("master" to masterBody("loginId" to loginId))).andExpectSuccess(HttpStatus.CREATED)
+
+		create(createBody("name" to "다른 호텔 $suffix", "master" to masterBody("loginId" to " ${loginId.uppercase()} ")))
+			.andExpectError(AccountErrorCode.LOGIN_ID_DUPLICATED)
+
+		assertThat(hotelsNamed("다른 호텔 $suffix")).isEmpty()
+		assertThat(mastersWithLoginId(loginId)).hasSize(1)
+	}
+
+	@Test
+	fun `호텔과 마스터 아이디가 모두 중복이면 409 HOTEL_DUPLICATED로 응답한다`() {
+		val body = createBody()
+		create(body).andExpectSuccess(HttpStatus.CREATED)
+
+		create(body).andExpectError(HotelErrorCode.HOTEL_DUPLICATED)
+	}
+
+	@Test
+	fun `전체 어드민 계정과 같은 이메일도 마스터 아이디로 쓸 수 있다`() {
+		val loginId = "app-admin-$suffix@test.local"
+		val appAdmin = appAdminRepository.save(AppAdmin(loginId, "password-hash", "어드민"))
+		try {
+			create(createBody("master" to masterBody("loginId" to loginId))).andExpectSuccess(HttpStatus.CREATED)
+
+			assertThat(mastersWithLoginId(loginId)).hasSize(1)
+		} finally {
+			appAdminRepository.deleteById(checkNotNull(appAdmin.id))
+		}
+	}
+
+	@Test
+	fun `서로 다른 호텔을 같은 마스터 아이디로 동시에 등록하면 하나만 201로 등록되고 나머지는 409 LOGIN_ID_DUPLICATED로 응답하며 진 쪽 호텔은 저장하지 않는다`() {
+		val loginId = "concurrent-$suffix@test.local"
+		val names = (0 until CONCURRENT_REQUESTS).map { "$name 동시 $it" }
+
+		val responses = concurrently { index -> create(createBody("name" to names[index], "master" to masterBody("loginId" to loginId))).andReturn().response }
+
+		assertThat(responses.map { it.status }).containsExactlyInAnyOrder(HttpStatus.CREATED.value(), HttpStatus.CONFLICT.value())
+		assertError(responses.single { it.status == HttpStatus.CONFLICT.value() }, AccountErrorCode.LOGIN_ID_DUPLICATED)
+		val winnerId = json(responses.single { it.status == HttpStatus.CREATED.value() })["data"]["id"].longValue()
+		assertThat(names.flatMap(::hotelsNamed).map { it.id }).containsExactly(winnerId)
+		assertThat(mastersWithLoginId(loginId)).containsExactly(winnerId)
+	}
+
+	@ParameterizedTest
+	@MethodSource("masterLoginIdErrors")
+	fun `마스터 아이디는 앞뒤 공백을 지운 뒤 빈 값, 이메일 형식, 길이 순으로 오류 하나만 응답한다`(loginId: String, messageKey: String) {
+		val expected = if (messageKey == MAX_LENGTH) maxLength(HotelAdmin.LOGIN_ID_MAX_LENGTH) else message(messageKey)
+
+		create(createBody("master" to masterBody("loginId" to loginId))).andExpectError(CommonErrorCode.INVALID_INPUT, "master.loginId" to expected)
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["a@b.com", "A.B+c@x-y.co.kr"])
+	fun `영문 자판 글자로 된 이메일 형식의 마스터 아이디는 소문자로 바꿔 등록한다`(loginId: String) {
+		val data = create(createBody("master" to masterBody("loginId" to loginId))).andExpectSuccess(HttpStatus.CREATED)
+
+		assertThat(masterOf(data["id"].longValue())["login_id"]).isEqualTo(loginId.lowercase())
+	}
+
+	@Test
+	fun `긴 형식 오류 아이디도 길이에 비례하는 시간 안에 이메일 형식 메시지 하나로 400 응답한다`() {
+		val loginId = "a@" + ".".repeat(100_000) + "@"
+
+		assertTimeout(Duration.ofSeconds(LONG_INPUT_TIMEOUT_SECONDS)) {
+			create(createBody("master" to masterBody("loginId" to loginId)))
+				.andExpectError(CommonErrorCode.INVALID_INPUT, "master.loginId" to message(EMAIL))
+		}
+	}
+
+	@Test
+	fun `마스터 아이디와 이름의 최대 길이는 앞뒤 공백을 지운 값으로 센다`() {
+		val loginId = emailOfLength(HotelAdmin.LOGIN_ID_MAX_LENGTH)
+		val masterName = "가".repeat(HotelAdmin.NAME_MAX_LENGTH)
+
+		val data = create(createBody("master" to masterBody("loginId" to " $loginId ", "name" to " $masterName "))).andExpectSuccess(HttpStatus.CREATED)
+
+		val master = masterOf(data["id"].longValue())
+		assertThat(listOf(master["login_id"], master["name"])).containsExactly(loginId, masterName)
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["", " ", "\t", "　"])
+	fun `마스터 이름이 비어 있거나 공백만 있으면 필수 입력 메시지로 400 응답한다`(masterName: String) {
+		create(createBody("master" to masterBody("name" to masterName))).andExpectError(CommonErrorCode.INVALID_INPUT, "master.name" to message(REQUIRED))
+	}
+
+	@Test
+	fun `마스터 이름이 앞뒤 공백을 지워도 50자를 넘으면 최대 길이 메시지로 400 응답한다`() {
+		create(createBody("master" to masterBody("name" to "가".repeat(HotelAdmin.NAME_MAX_LENGTH + 1))))
+			.andExpectError(CommonErrorCode.INVALID_INPUT, "master.name" to maxLength(HotelAdmin.NAME_MAX_LENGTH))
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["", " ", "        ", "\t\n"])
+	fun `마스터 비밀번호가 비어 있거나 공백만 있으면 비밀번호 규칙 메시지 없이 필수 입력 메시지 하나로 400 응답한다`(password: String) {
+		create(createBody("master" to masterBody("password" to password))).andExpectError(CommonErrorCode.INVALID_INPUT, "master.password" to message(REQUIRED))
+	}
+
+	@ParameterizedTest
+	@ValueSource(
+		strings = [
+			"abcdefgh", "12345678", "!@#$%^&*", "abc1234", "abc 123", "a1bcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklm",
+			"비밀번호abc123", "abc123\t45", "ａｂｃ１２３４５", "abcd1234é", "abcd1234 ",
+		],
+	)
+	fun `마스터 비밀번호가 8~64자, 영문과 숫자 포함, 영문 자판 글자 규칙을 어기면 비밀번호 규칙 메시지 하나로 400 응답한다`(password: String) {
+		create(createBody("master" to masterBody("password" to password))).andExpectError(CommonErrorCode.INVALID_INPUT, "master.password" to message(PASSWORD))
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["abcdefg1", "1234567A", "  a1  b2  ", "P@ssw0rd!"])
+	fun `영문과 숫자를 모두 넣은 8자 이상의 영문 자판 글자 비밀번호는 공백과 특수문자가 있어도 등록한다`(password: String) {
+		val data = create(createBody("master" to masterBody("password" to password))).andExpectSuccess(HttpStatus.CREATED)
+
+		assertThat(passwordEncoder.matches(password, masterOf(data["id"].longValue())["password_hash"] as String)).isTrue()
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["loginId", "name", "password"])
+	fun `마스터의 필수 항목이 없거나 null이면 master 아래 경로와 필수 입력 메시지로 400 응답한다`(field: String) {
+		create(createBody("master" to masterBody() - field)).andExpectError(CommonErrorCode.INVALID_INPUT, "master.$field" to message(REQUIRED))
+		create(createBody("master" to masterBody(field to null))).andExpectError(CommonErrorCode.INVALID_INPUT, "master.$field" to message(REQUIRED))
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["loginId", "name", "password"])
+	fun `마스터의 문자열 항목에 다른 타입을 보내면 master 아래 경로와 형식 메시지로 400 응답한다`(field: String) {
+		create(createBody("master" to masterBody(field to 12345678))).andExpectError(CommonErrorCode.INVALID_INPUT, "master.$field" to message(TYPE))
+	}
+
+	@Test
+	fun `master 안에 문서에 없는 항목을 보내면 master 아래 경로와 알 수 없는 항목 메시지로 400 응답한다`() {
+		create(createBody("master" to masterBody("role" to "MASTER")))
+			.andExpectError(CommonErrorCode.INVALID_INPUT, "master.role" to message("validation.unknown-field"))
+	}
+
+	@Test
+	fun `호텔과 마스터 항목의 검증 오류를 필드마다 하나씩 함께 응답하고 아무것도 저장하지 않는다`() {
+		create(createBody("name" to " ", "master" to masterBody("loginId" to "not-an-email", "name" to "", "password" to "short")))
+			.andExpectError(
+				CommonErrorCode.INVALID_INPUT,
+				"name" to message(REQUIRED),
+				"master.loginId" to message(EMAIL),
+				"master.name" to message(REQUIRED),
+				"master.password" to message(PASSWORD),
+			)
+		assertThat(hotelIds() - existingIds).isEmpty()
 	}
 
 	@Test
@@ -512,7 +719,8 @@ class HotelAppAdminControllerTest {
 		val paths = apiDocs()["paths"]
 		val hotel = paths["$HOTELS/{hotelId}"]
 
-		assertThat(errorCodes(paths[HOTELS]["post"], HttpStatus.CONFLICT)).containsExactly(HotelErrorCode.HOTEL_DUPLICATED.code)
+		assertThat(errorCodes(paths[HOTELS]["post"], HttpStatus.CONFLICT))
+			.containsExactlyInAnyOrder(HotelErrorCode.HOTEL_DUPLICATED.code, AccountErrorCode.LOGIN_ID_DUPLICATED.code)
 		assertThat(paths[HOTELS]["get"]["responses"].propertyNames()).doesNotContain("404", "409")
 		assertThat(errorCodes(hotel["get"], HttpStatus.NOT_FOUND)).containsExactly(HotelErrorCode.HOTEL_NOT_FOUND.code)
 		assertThat(errorCodes(hotel["put"], HttpStatus.NOT_FOUND)).containsExactly(HotelErrorCode.HOTEL_NOT_FOUND.code)
@@ -538,6 +746,29 @@ class HotelAppAdminControllerTest {
 		)
 		assertThat(properties["phone"]["pattern"].stringValue()).isEqualTo(Hotel.PHONE_PATTERN)
 		assertThat(properties["version"]?.get("minLength")).isNull()
+	}
+
+	@Test
+	fun `등록 요청 문서는 필수인 master 객체에 아이디의 이메일 형식과 길이, 이름 길이, 비밀번호 규칙을 보여주고 수정 요청에는 master가 없다`() {
+		val schemas = apiDocs()["components"]["schemas"]
+		val create = schemas["HotelCreateAppAdminRequest"]
+		val master = schemas["HotelMasterCreateAppAdminRequest"]
+		val properties = master["properties"]
+		val rules = listOf("loginId", "name", "password").associateWith { field ->
+			listOf("minLength", "maxLength", "pattern").map { properties[field][it]?.asString() }
+		}
+
+		assertThat(create["properties"]["master"]["\$ref"].stringValue()).isEqualTo("#/components/schemas/HotelMasterCreateAppAdminRequest")
+		assertThat(create["required"].values().map { it.stringValue() }).contains("master")
+		assertThat(schemas["HotelUpdateAppAdminRequest"]["properties"].propertyNames()).doesNotContain("master")
+		assertThat(master["required"].values().map { it.stringValue() }).containsExactlyInAnyOrder("loginId", "name", "password")
+		assertThat(rules).containsExactlyInAnyOrderEntriesOf(
+			mapOf(
+				"loginId" to listOf("1", HotelAdmin.LOGIN_ID_MAX_LENGTH.toString(), LoginId.PATTERN),
+				"name" to listOf("1", HotelAdmin.NAME_MAX_LENGTH.toString(), null),
+				"password" to listOf(Password.MIN_LENGTH.toString(), Password.MAX_LENGTH.toString(), Password.PATTERN),
+			),
+		)
 	}
 
 	private fun create(body: Map<String, Any?>, role: Role = Role.APP_ADMIN): ResultActionsDsl =
@@ -575,11 +806,34 @@ class HotelAppAdminControllerTest {
 		content = jsonMapper.writeValueAsString(body)
 	}
 
+	private fun hotelFields(): Map<String, Any?> =
+		linkedMapOf("name" to name, "address" to address, "phone" to PHONE, "description" to DESCRIPTION)
+
 	private fun createBody(vararg overrides: Pair<String, Any?>): Map<String, Any?> =
-		linkedMapOf("name" to name, "address" to address, "phone" to PHONE, "description" to DESCRIPTION) + overrides
+		hotelFields() + ("master" to masterBody()) + overrides
+
+	private fun masterBody(vararg overrides: Pair<String, Any?>): Map<String, Any?> =
+		linkedMapOf<String, Any?>(
+			"loginId" to "master-${masterSequence.incrementAndGet()}-$suffix@test.local",
+			"name" to MASTER_NAME,
+			"password" to MASTER_PASSWORD,
+		) + overrides
 
 	private fun updateBody(version: Long, vararg overrides: Pair<String, Any?>): Map<String, Any?> =
-		createBody() + ("version" to version) + overrides
+		hotelFields() + ("version" to version) + overrides
+
+	@Suppress("UNCHECKED_CAST")
+	private fun masterLoginId(body: Map<String, Any?>): String = (body["master"] as Map<String, Any?>)["loginId"] as String
+
+	private fun masterOf(hotelId: Long): Map<String, Any?> = jdbcTemplate.queryForMap(SELECT_MASTER, hotelId)
+
+	private fun mastersWithLoginId(loginId: String): List<Long> =
+		jdbcTemplate.queryForList(SELECT_MASTER_HOTEL_IDS, Long::class.javaObjectType, LoginId.normalize(loginId)).filterNotNull()
+
+	private fun emailOfLength(length: Int): String {
+		val prefix = "$suffix@test."
+		return prefix + "d".repeat(length - prefix.length)
+	}
 
 	private fun saveHotel(name: String = this.name): Hotel = hotelRepository.save(Hotel(name, address, PHONE, DESCRIPTION))
 
@@ -670,9 +924,18 @@ class HotelAppAdminControllerTest {
 		private const val TYPE = "validation.type"
 		private const val PHONE_FORMAT = "validation.phone"
 		private const val MAX_LENGTH = "validation.max-length"
+		private const val EMAIL = "validation.email"
+		private const val PASSWORD = "validation.password"
+		private const val MASTER_NAME = "마스터"
+		private const val MASTER_PASSWORD = "master-password-1"
 		private const val MISSING_ID = Long.MAX_VALUE
 		private const val CONCURRENT_REQUESTS = 2
 		private const val TIMEOUT_SECONDS = 10L
+		private const val LONG_INPUT_TIMEOUT_SECONDS = 3L
+		private const val DELETE_HOTEL_ADMINS = "delete from hotel_admin where hotel_id = ?"
+		private const val SELECT_MASTER =
+			"select login_id, name, role, active, credential_version, password_hash from hotel_admin where hotel_id = ? and role = 'MASTER'"
+		private const val SELECT_MASTER_HOTEL_IDS = "select hotel_id from hotel_admin where role = 'MASTER' and login_id = ?"
 
 		@JvmStatic
 		fun phoneErrors(): List<Arguments> = listOf(
@@ -690,6 +953,35 @@ class HotelAppAdminControllerTest {
 			Arguments.of("address", listOf("서울")),
 			Arguments.of("phone", 212345678),
 			Arguments.of("description", mapOf("text" to "소개")),
+			Arguments.of("master", "master@test.local"),
+			Arguments.of("master", listOf("master@test.local")),
 		)
+
+		@JvmStatic
+		fun masterLoginIdErrors(): List<Arguments> {
+			val tooLong = "a".repeat(HotelAdmin.LOGIN_ID_MAX_LENGTH - "@test.local".length + 1) + "@test.local"
+			return listOf(
+				Arguments.of("", REQUIRED),
+				Arguments.of("   ", REQUIRED),
+				Arguments.of("　", REQUIRED),
+				Arguments.of("master", EMAIL),
+				Arguments.of("master@", EMAIL),
+				Arguments.of("@test.local", EMAIL),
+				Arguments.of("master@test", EMAIL),
+				Arguments.of("master@test.", EMAIL),
+				Arguments.of("mas ter@test.local", EMAIL),
+				Arguments.of("a b@x.com", EMAIL),
+				Arguments.of("a　b@x.com", EMAIL),
+				Arguments.of("홍길동@x.com", EMAIL),
+				Arguments.of("a@b..com", EMAIL),
+				Arguments.of("a@.b.com", EMAIL),
+				Arguments.of("a@b.com.", EMAIL),
+				Arguments.of("a@b", EMAIL),
+				Arguments.of("master@@test.local", EMAIL),
+				Arguments.of("a".repeat(HotelAdmin.LOGIN_ID_MAX_LENGTH + 1), EMAIL),
+				Arguments.of(tooLong, MAX_LENGTH),
+				Arguments.of(" $tooLong ", MAX_LENGTH),
+			)
+		}
 	}
 }

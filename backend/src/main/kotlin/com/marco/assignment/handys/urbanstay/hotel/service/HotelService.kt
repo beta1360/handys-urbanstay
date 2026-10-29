@@ -1,5 +1,6 @@
 package com.marco.assignment.handys.urbanstay.hotel.service
 
+import com.marco.assignment.handys.urbanstay.account.service.HotelAdminService
 import com.marco.assignment.handys.urbanstay.common.exception.BusinessException
 import com.marco.assignment.handys.urbanstay.common.exception.violates
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
@@ -17,12 +18,24 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class HotelService(
 	private val hotelRepository: HotelRepository,
+	private val hotelAdminService: HotelAdminService,
 ) {
 
 	@Transactional
-	fun create(name: String, address: String, phone: String, description: String?): Hotel {
+	fun create(
+		name: String,
+		address: String,
+		phone: String,
+		description: String?,
+		masterLoginId: String,
+		masterName: String,
+		masterPassword: String,
+	): Hotel {
 		checkNotDuplicated(name, address, null)
-		return translateConflicts { hotelRepository.saveAndFlush(Hotel(name, address, phone, description)) }
+		hotelAdminService.checkLoginIdAvailable(masterLoginId)
+		val hotel = translateConflicts { hotelRepository.saveAndFlush(Hotel(name, address, phone, description)) }
+		hotelAdminService.createMaster(hotel, masterLoginId, masterName, masterPassword)
+		return hotel
 	}
 
 	@Transactional(readOnly = true)
