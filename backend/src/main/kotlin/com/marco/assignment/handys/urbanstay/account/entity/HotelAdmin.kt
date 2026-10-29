@@ -7,6 +7,7 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.FetchType
 import jakarta.persistence.ManyToOne
+import jakarta.persistence.Version
 
 @Entity
 class HotelAdmin(
@@ -39,6 +40,24 @@ class HotelAdmin(
 
 	var credentialVersion: Long = 0
 		protected set
+
+	@Version
+	var version: Long = 0
+		protected set
+
+	fun update(loginId: String, name: String) {
+		val normalizedLoginId = LoginId.normalize(loginId)
+		if (normalizedLoginId != this.loginId) {
+			this.loginId = normalizedLoginId
+			credentialVersion++
+		}
+		this.name = normalizeName(name)
+	}
+
+	fun resetPassword(passwordHash: String) {
+		this.passwordHash = passwordHash
+		credentialVersion++
+	}
 
 	companion object {
 		const val LOGIN_ID_MAX_LENGTH = 254

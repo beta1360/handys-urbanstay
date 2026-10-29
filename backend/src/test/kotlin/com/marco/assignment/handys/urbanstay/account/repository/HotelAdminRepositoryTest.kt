@@ -57,6 +57,52 @@ class HotelAdminRepositoryTest {
 	}
 
 	@Test
+	fun `호텔 계정의 version은 0에서 시작하고 컬럼은 호텔의 version처럼 기본값 없는 bigint not null이다`() {
+		val saved = hotelAdminRepository.saveAndFlush(admin(hotel, "version-$suffix@test.local", HotelAdminRole.MASTER))
+		entityManager.clear()
+
+		val columns = jdbcTemplate.query(VERSION_COLUMNS) { rs, _ -> rs.getString(1) to rs.getString(2) }.toMap()
+
+		assertThat(hotelAdminRepository.findById(checkNotNull(saved.id)).orElseThrow().version).isZero()
+		assertThat(columns).containsExactlyInAnyOrderEntriesOf(mapOf("hotel" to "bigint not null", "hotel_admin" to "bigint not null"))
+	}
+
+	@Test
+	fun `아이디나 이름이 바뀌어 저장될 때만 version이 1씩 커지고 로그인 정보 버전은 정규화한 아이디가 바뀔 때만 커진다`() {
+		val hotelAdmin = hotelAdminRepository.saveAndFlush(admin(hotel, "before-$suffix@test.local", HotelAdminRole.MASTER))
+
+		hotelAdmin.update(" BEFORE-$suffix@Test.local\t", " $NAME ")
+		hotelAdminRepository.flush()
+		assertThat(listOf(hotelAdmin.version, hotelAdmin.credentialVersion)).containsExactly(0L, 0L)
+
+		hotelAdmin.update("before-$suffix@test.local", "새 이름")
+		hotelAdminRepository.flush()
+		assertThat(listOf(hotelAdmin.version, hotelAdmin.credentialVersion)).containsExactly(1L, 0L)
+
+		hotelAdmin.update(" After-$suffix@test.local ", "새 이름")
+		hotelAdminRepository.flush()
+		entityManager.clear()
+
+		val found = hotelAdminRepository.findById(checkNotNull(hotelAdmin.id)).orElseThrow()
+		assertThat(listOf(found.loginId, found.name, found.version, found.credentialVersion))
+			.containsExactly("after-$suffix@test.local", "새 이름", 2L, 1L)
+	}
+
+	@Test
+	fun `비밀번호를 재설정하면 같은 해시여도 version과 로그인 정보 버전이 1씩 커진다`() {
+		val hotelAdmin = hotelAdminRepository.saveAndFlush(admin(hotel, "reset-$suffix@test.local", HotelAdminRole.MASTER))
+
+		hotelAdmin.resetPassword(PASSWORD_HASH)
+		hotelAdminRepository.flush()
+		hotelAdmin.resetPassword("new-password-hash")
+		hotelAdminRepository.flush()
+		entityManager.clear()
+
+		val found = hotelAdminRepository.findById(checkNotNull(hotelAdmin.id)).orElseThrow()
+		assertThat(listOf(found.passwordHash, found.version, found.credentialVersion)).containsExactly("new-password-hash", 2L, 2L)
+	}
+
+	@Test
 	fun `대소문자와 앞뒤 공백만 다른 로그인 아이디는 다른 호텔이어도 이름 있는 DB 유일 제약이 저장을 막는다`() {
 		hotelAdminRepository.saveAndFlush(admin(hotel, "duplicate-$suffix@test.local", HotelAdminRole.MASTER))
 
@@ -136,8 +182,13 @@ class HotelAdminRepositoryTest {
 		private const val PASSWORD_HASH = "password-hash"
 		private const val NAME = "홍길동"
 		private const val INSERT_HOTEL_ADMIN = """
-			insert into hotel_admin (hotel_id, login_id, password_hash, name, role, active, credential_version, created_at, updated_at)
-			values (?, ?, ?, ?, ?, true, 0, now(), now())
+			insert into hotel_admin (hotel_id, login_id, password_hash, name, role, active, credential_version, version, created_at, updated_at)
+			values (?, ?, ?, ?, ?, true, 0, 0, now(), now())
+		"""
+		private const val VERSION_COLUMNS = """
+			select table_name, concat_ws(' ', data_type, case when is_nullable = 'NO' then 'not null' end, 'default ' || column_default)
+			from information_schema.columns
+			where table_schema = 'public' and table_name in ('hotel', 'hotel_admin') and column_name = 'version'
 		"""
 	}
 }

@@ -127,11 +127,20 @@ urbanstay/
   - 문서는 `@Schema(minLength = Password.MIN_LENGTH, maxLength = Password.MAX_LENGTH, pattern = Password.PATTERN)`로 적는다.
   - 로그인 요청의 비밀번호는 규칙을 검사하지 않고 `@NotBlank`만 붙인다.
 - 호텔 계정(`hotel_admin`)
-  - 호텔(`hotel_id`)에 속하고 역할(`HotelAdminRole`: `MASTER`, `OPERATOR`), 활성 여부(`active`), 로그인 정보 버전(`credential_version`)을 가진다. 이름은 앞뒤 공백을 지워 저장한다.
-  - 로그인 아이디는 모든 호텔 계정을 통틀어 유일하다(`hotel_admin_login_id_key`). 사전 확인과 함께 이 제약 위반도 `AccountErrorCode.LOGIN_ID_DUPLICATED`(409)로 바꾼다.
+  - 호텔(`hotel_id`)에 속하고 역할(`HotelAdminRole`: `MASTER`, `OPERATOR`), 활성 여부(`active`), 로그인 정보 버전(`credential_version`), 낙관적 잠금 버전(`version`)을 가진다. 이름은 앞뒤 공백을 지워 저장한다.
+  - 로그인 아이디는 모든 호텔 계정을 통틀어 유일하다(`hotel_admin_login_id_key`). 사전 확인(수정은 자기 자신을 빼고 `existsByLoginIdAndIdNot`)과 함께 이 제약 위반도 `AccountErrorCode.LOGIN_ID_DUPLICATED`(409)로 바꾼다.
   - 호텔마다 마스터는 하나다(부분 유일 인덱스 `hotel_admin_master_key`).
   - `credential_version`은 0에서 시작한다. 기존 세션을 끊어야 하는 변경(비활성화, 비밀번호 재설정, 아이디 변경)에서 올린다. 이름 변경은 올리지 않는다.
+    - 아이디 변경은 `LoginId.normalize`한 값이 지금과 다를 때만 올린다. 대소문자·앞뒤 공백만 다른 아이디는 같은 아이디라 올리지 않고 중복으로도 보지 않는다.
+    - 비밀번호 재설정은 같은 비밀번호여도 항상 올린다.
+    - 엔티티 메서드(`HotelAdmin.update`, `HotelAdmin.resetPassword`)가 올린다. 서비스가 직접 셈하지 않는다.
+  - `version`은 호텔(`hotel.version`)과 같은 낙관적 잠금이다(`V4__add_hotel_admin_version.sql`). 정보 수정은 요청의 `version`이 다르면 409 `AccountErrorCode.HOTEL_ADMIN_MODIFIED`다.
+    - 비밀번호 재설정도 엔티티를 바꾸므로 version이 올라간다. 그사이 열어 둔 정보 수정 화면의 저장은 409가 된다(의도한 동작).
+    - 재설정은 `version`을 받지 않는다. 같은 계정의 다른 변경과 동시에 처리돼 flush 때 막히면 같은 409 `HOTEL_ADMIN_MODIFIED`다.
+  - 호텔 계정의 변경은 `HotelAdminService`(`createMaster`, `update`, `resetPassword`)가 한다. 순서는 version 확인 → 아이디 중복 확인 → 엔티티 변경 → `saveAndFlush`이고, 유일 제약 위반과 `OptimisticLockingFailureException`의 변환(`translateConflicts`)을 함께 쓴다. version 충돌과 아이디 중복이 겹치면 version 충돌이 먼저다.
   - 마스터는 호텔 등록(`HotelService.create`)이 계정 도메인의 `HotelAdminService`로 같은 트랜잭션에서 만든다. 사전 확인은 호텔 중복 → 아이디 중복 순서이고, 저장은 호텔 → 마스터 순서다. 마스터 저장이 실패하면 호텔도 남지 않는다.
+  - 전체 어드민의 마스터 관리(`ApiPaths.APP_ADMIN + "/hotels/{hotelId}/master"`의 조회·정보 수정과 `/password` 재설정, `AccountHotelMasterAppAdminController`)는 `HotelMasterService`가 한다. 호텔이 없으면 `HotelService.getHotel`의 404 `HOTEL_NOT_FOUND`, 호텔은 있는데 마스터가 없으면 404 `AccountErrorCode.HOTEL_MASTER_NOT_FOUND`다. 찾은 마스터의 변경은 `HotelAdminService`에 맡긴다.
+    - 순환 의존을 피해 서비스를 나눈다. `HotelService`가 마스터 생성에 `HotelAdminService`를 쓰므로 `HotelAdminService`는 호텔 도메인 Service를 쓰지 않는다. 호텔 확인이 필요한 계정 기능은 `HotelMasterService`처럼 따로 두어 `HotelMasterService → HotelService → HotelAdminService`, `HotelMasterService → HotelAdminService` 방향만 둔다.
 - `AppAdminUserDetailsService`가 로그인 아이디로 전체 어드민을 읽고 `Role.APP_ADMIN`을 준다. `HotelAdminUserDetailsService`는 활성 호텔 계정만 읽고 `Role.HOTEL_ADMIN`(마스터는 `Role.HOTEL_MASTER`도)을 준다. 이 빈들이 있어서 Spring Boot의 기본 사용자(`user`, 생성 비밀번호)는 만들어지지 않는다.
 - 첫 전체 어드민은 백엔드가 뜰 때(`account/config/InitialAdminConfig`의 `ApplicationRunner`) `urbanstay.initial-admin.*`(`login-id`, `password`, `name`) 설정값으로 만든다.
   - 전체 어드민이 하나도 없을 때만 만들고, 하나라도 있으면 아무것도 하지 않는다. 기존 계정은 바꾸지 않는다.
@@ -141,7 +150,8 @@ urbanstay/
 - 테스트
   - `@SpringBootTest` 컨텍스트가 뜰 때도 첫 어드민 생성이 실행되므로 테스트 DB에 어드민이 남아 있을 수 있다. 어드민이 없는 상태가 필요하면 테스트 트랜잭션 안에서 지우고 롤백한다.
   - 호텔 계정이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔의 `hotel_admin`을 먼저 지운다.
-  - 비활성화·`credential_version` 변경처럼 아직 API가 없는 변경은 테스트에서 DB를 직접 바꿔 재현한다.
+  - 비활성화처럼 아직 API가 없는 변경과, 세션 확인 규칙만 따로 볼 때의 `credential_version` 변경은 테스트에서 DB를 직접 바꿔 재현한다.
+  - 마스터의 아이디 변경·비밀번호 재설정이 세션을 끊는지는 전체 어드민과 마스터가 각자 실제로 로그인한 `RANDOM_PORT` 서버에서 확인한다(`AccountHotelMasterAppAdminSessionTest`).
 
 ## 상수
 
@@ -175,10 +185,12 @@ urbanstay/
 - 동시 수정은 낙관적 잠금으로 막는다. 엔티티에 `@Version var version: Long`(`version bigint not null`)을 두고 응답에 `version`을 싣고, 수정 요청은 `version`을 필수로 받는다.
   - 서비스는 읽은 엔티티의 version이 요청과 다르면 도메인 409를 던진다.
   - 같은 version으로 동시에 들어온 수정은 flush 때 JPA가 막는다. flush를 서비스 안(`saveAndFlush`)에서 해 `OptimisticLockingFailureException`도 같은 도메인 409로 바꾼다. 커밋 때 터지면 서비스 밖이라 500이 된다.
+  - 지금 낙관적 잠금을 쓰는 엔티티는 `Hotel`(`HOTEL_MODIFIED`)과 `HotelAdmin`(`HOTEL_ADMIN_MODIFIED`)이다. version을 받지 않는 변경(예: 비밀번호 재설정)도 같은 엔티티를 바꾸면 같은 변환을 거친다.
 - 중복 확인 같은 조회는 엔티티를 바꾸기 전에 한다. 바뀐 엔티티가 있으면 조회 전 자동 flush로 제약 위반이 변환 범위 밖에서 난다.
 - 테스트는 두 경로를 모두 확인한다.
   - 동시 요청: 두 스레드를 `CountDownLatch`로 함께 출발시킨다.
-  - 사전 확인을 통과한 뒤 DB에서 막히는 경로: 먼저 온 트랜잭션을 열어 둔 채 다음 요청이 잠금을 기다리는지(`pg_stat_activity`) 확인하고 커밋한다(`HotelServiceTest`).
+  - 사전 확인을 통과한 뒤 DB에서 막히는 경로: 먼저 온 트랜잭션을 열어 둔 채 다음 요청이 잠금을 기다리는지(`pg_stat_activity`) 확인하고 커밋한다(`HotelServiceTest`, `HotelMasterServiceTest`).
+  - 동시 요청 테스트는 실행마다 어느 경로를 탈지 정해지지 않는다. 변환 코드를 지켜 주는 것은 순서를 고정한 경로 테스트다.
 
 ## 테스트
 
