@@ -15,7 +15,9 @@
 ## 구조
 
 - 라우트 파일은 `src/app/routes`에 두고, `src/pages`의 페이지를 가져와 연결만 한다.
-- `__root.tsx`에는 자체 UI를 두지 않는다. 탭 제목(`head`)과 `<HeadContent />`, `<Outlet />`만 둔다.
+- `__root.tsx`에는 자체 UI를 두지 않는다. 탭 제목(`head`)과 `<HeadContent />`, `<Outlet />`, 오류 화면(`errorComponent`: `<HeadContent />`와 `ErrorPage`)만 둔다.
+- 로그인 확인·로그인 화면 진입·사용 중 401 처리는 `src/app/auth`의 함수로 두고, 라우트 파일과 라우터는 이 함수를 연결만 한다. 화면 동작은 `frontend/docs/admin-app.md`의 '로그인'을 따른다.
+- QueryClient와 라우터는 `src/app/router/router.ts`에서 함께 만든다. 라우터 context에 QueryClient를 넣고, QueryClient의 오류 처리기에 라우터를 넘기기 위해서다. `QueryProvider`도 여기서 만든 QueryClient를 쓴다.
 - 라우트 트리는 `src/app/router/route-tree.gen.ts`에 생성된다. 직접 수정하지 않고 커밋한다.
 - 라우트 생성 설정은 `tsr.config.json`에만 둔다.
 
@@ -29,21 +31,25 @@ apps/app-admin/
 ├─ vitest-setup.ts     # jest-dom 매처 등록, 테스트마다 cleanup
 └─ src/
    ├─ app/
+   │  ├─ auth/         # 로그인 연결
+   │  │  ├─ login-guard.ts          # 로그인 확인, 로그인 화면 진입 (beforeLoad에서 부른다)
+   │  │  ├─ login-redirect.ts       # /login의 search 스키마, redirect 경로 검사
+   │  │  └─ unauthorized-handler.ts # 사용 중 401이면 /login으로 보낸다
    │  ├─ entrypoint/   # main.tsx, app-providers.tsx (Provider 조합)
-   │  ├─ query/        # QueryClient, QueryProvider (Devtools 포함)
-   │  ├─ router/       # 라우터 생성, route-tree.gen.ts
+   │  ├─ query/        # QueryClient 생성(재시도 규칙, 오류 처리기), QueryProvider (Devtools 포함)
+   │  ├─ router/       # QueryClient·라우터 생성, route-tree.gen.ts
    │  ├─ routes/       # TanStack Router 라우트 파일
-   │  │  ├─ __root.tsx
-   │  │  ├─ _authenticated.tsx   # 로그인이 필요한 화면의 레이아웃
+   │  │  ├─ __root.tsx           # 탭 제목, 오류 화면
+   │  │  ├─ _authenticated.tsx   # 로그인이 필요한 화면의 레이아웃, 로그인 확인
    │  │  ├─ _authenticated/      # 로그인이 필요한 화면 (index.tsx: /)
-   │  │  └─ login.tsx            # /login
+   │  │  └─ login.tsx            # /login (?redirect=)
    │  └─ styles/
-   ├─ pages/           # home, login
-   ├─ widgets/         # admin-layout: 사이드바 메뉴(config/menu.ts), 위쪽 화면 제목
+   ├─ pages/           # error(화면 오류), home, login(로그인 폼)
+   ├─ widgets/         # admin-layout: 사이드바 메뉴(config/menu.ts), 위쪽 화면 제목·계정 이름·로그아웃
    └─ shared/
       ├─ api/          # 검증된 API만 index.ts로 내보낸다
-      │  ├─ account.ts          # 내 정보 쿼리 옵션, 로그인, 로그아웃
-      │  ├─ api-error.ts        # 서버 오류 정보 읽기 (getApiError)
+      │  ├─ account.ts          # 내 정보 쿼리 옵션, 로그인, 로그아웃, 로그인 요청 스키마
+      │  ├─ api-error.ts        # 서버 오류 정보 읽기 (getApiError), 오류 코드 (API_ERROR_CODES)
       │  ├─ validate.ts         # 요청 본문·응답 zod 검증, 개발 콘솔 로그
       │  ├─ validation-error.ts # RequestValidationError, ResponseValidationError
       │  ├─ http.ts             # orval mutator

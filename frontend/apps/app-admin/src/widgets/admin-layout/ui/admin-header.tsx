@@ -1,15 +1,38 @@
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@repo/ui/button";
+import { meQueryOptions } from "@/shared/api";
+import { ADMIN_LAYOUT_MESSAGES } from "../config/messages";
 import { useCurrentTitle } from "../model/use-current-title";
+import { useLogout } from "../model/use-logout";
 
 export function AdminHeader() {
   const currentTitle = useCurrentTitle();
+  const { data: account } = useQuery({
+    ...meQueryOptions(),
+    refetchOnMount: false,
+  });
+  const { logout, isPending, isFailed } = useLogout();
 
   return (
-    <header className="flex h-14 shrink-0 items-center border-b border-neutral-200 bg-white px-6">
+    <header className="flex h-14 shrink-0 items-center gap-4 border-b border-neutral-200 bg-white px-6">
       {currentTitle ? (
         <h1 className="text-lg font-semibold text-neutral-900">
           {currentTitle}
         </h1>
       ) : null}
+      <div className="ml-auto flex items-center gap-3">
+        {account ? (
+          <span className="text-sm text-neutral-700">{account.name}</span>
+        ) : null}
+        {isFailed ? (
+          <p role="alert" className="text-sm text-red-600">
+            {ADMIN_LAYOUT_MESSAGES.logoutFailed}
+          </p>
+        ) : null}
+        <Button variant="secondary" loading={isPending} onClick={logout}>
+          {ADMIN_LAYOUT_MESSAGES.logout}
+        </Button>
+      </div>
     </header>
   );
 }

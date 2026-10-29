@@ -1,9 +1,12 @@
-import { QueryClient } from "@tanstack/react-query";
+import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
+import type { QueryKey } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { RequestValidationError, ResponseValidationError } from "@/shared/api";
 
 const MAX_QUERY_RETRY_COUNT = 3;
 const CLIENT_ERROR_STATUS = { min: 400, max: 499 } as const;
+
+export type QueryErrorListener = (error: unknown, queryKey?: QueryKey) => void;
 
 function isClientError(error: unknown) {
   if (!isAxiosError(error) || error.response === undefined) {
@@ -24,10 +27,18 @@ function shouldRetryQuery(failureCount: number, error: unknown) {
   return failureCount < MAX_QUERY_RETRY_COUNT;
 }
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: shouldRetryQuery,
+export function createQueryClient(onError: QueryErrorListener) {
+  return new QueryClient({
+    queryCache: new QueryCache({
+      onError: (error, query) => onError(error, query.queryKey),
+    }),
+    mutationCache: new MutationCache({
+      onError: (error) => onError(error),
+    }),
+    defaultOptions: {
+      queries: {
+        retry: shouldRetryQuery,
+      },
     },
-  },
-});
+  });
+}
