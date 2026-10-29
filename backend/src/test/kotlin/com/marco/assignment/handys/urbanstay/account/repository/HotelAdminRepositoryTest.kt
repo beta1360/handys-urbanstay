@@ -68,6 +68,27 @@ class HotelAdminRepositoryTest {
 	}
 
 	@Test
+	fun `아이디나 이름이 바뀌어 저장될 때만 version이 1씩 커지고 로그인 정보 버전은 정규화한 아이디가 바뀔 때만 커진다`() {
+		val hotelAdmin = hotelAdminRepository.saveAndFlush(admin(hotel, "before-$suffix@test.local", HotelAdminRole.MASTER))
+
+		hotelAdmin.update(" BEFORE-$suffix@Test.local\t", " $NAME ")
+		hotelAdminRepository.flush()
+		assertThat(listOf(hotelAdmin.version, hotelAdmin.credentialVersion)).containsExactly(0L, 0L)
+
+		hotelAdmin.update("before-$suffix@test.local", "새 이름")
+		hotelAdminRepository.flush()
+		assertThat(listOf(hotelAdmin.version, hotelAdmin.credentialVersion)).containsExactly(1L, 0L)
+
+		hotelAdmin.update(" After-$suffix@test.local ", "새 이름")
+		hotelAdminRepository.flush()
+		entityManager.clear()
+
+		val found = hotelAdminRepository.findById(checkNotNull(hotelAdmin.id)).orElseThrow()
+		assertThat(listOf(found.loginId, found.name, found.version, found.credentialVersion))
+			.containsExactly("after-$suffix@test.local", "새 이름", 2L, 1L)
+	}
+
+	@Test
 	fun `대소문자와 앞뒤 공백만 다른 로그인 아이디는 다른 호텔이어도 이름 있는 DB 유일 제약이 저장을 막는다`() {
 		hotelAdminRepository.saveAndFlush(admin(hotel, "duplicate-$suffix@test.local", HotelAdminRole.MASTER))
 

@@ -45,6 +45,15 @@ class HotelAdmin(
 	var version: Long = 0
 		protected set
 
+	fun update(loginId: String, name: String) {
+		val normalizedLoginId = LoginId.normalize(loginId)
+		if (normalizedLoginId != this.loginId) {
+			this.loginId = normalizedLoginId
+			credentialVersion++
+		}
+		this.name = normalizeName(name)
+	}
+
 	companion object {
 		const val LOGIN_ID_MAX_LENGTH = 254
 		const val NAME_MAX_LENGTH = 50
