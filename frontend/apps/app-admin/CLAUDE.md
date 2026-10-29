@@ -41,8 +41,14 @@ apps/app-admin/
    ├─ pages/           # home, login
    ├─ widgets/         # admin-layout: 사이드바 메뉴(config/menu.ts), 위쪽 화면 제목
    └─ shared/
-      ├─ api/          # http.ts (orval mutator)
-      │  └─ generated/ # orval 생성 코드. 직접 수정하지 않는다
+      ├─ api/          # 검증된 API만 index.ts로 내보낸다
+      │  ├─ account.ts          # 내 정보 쿼리 옵션, 로그인, 로그아웃
+      │  ├─ api-error.ts        # 서버 오류 정보 읽기 (getApiError)
+      │  ├─ validate.ts         # 요청 본문·응답 zod 검증, 개발 콘솔 로그
+      │  ├─ validation-error.ts # RequestValidationError, ResponseValidationError
+      │  ├─ http.ts             # orval mutator
+      │  └─ generated/ # orval 생성 코드. 직접 수정하지 않고 shared/api 밖에서 import하지 않는다
+      │     └─ zod/    # orval 생성 zod 스키마
       └─ config/       # APP_INFO (앱 이름)
 ```
 
@@ -58,6 +64,7 @@ TanStack Router 파일 기반 라우팅이 정한 이름은 kebab-case 규칙의
 ## 린트
 
 - ESLint는 Vite 공식 React-TS 템플릿 구성(`@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`)에 `@tanstack/eslint-plugin-router` 권장 설정을 더해 쓴다.
+- `src/shared/api` 밖의 파일은 `no-restricted-imports`로 `shared/api/generated` import를 막는다.
 - Steiger는 `fsd.configs.recommended`를 예외 없이 쓴다.
 
 ## 명령어 (`frontend/`에서 실행)
@@ -68,5 +75,5 @@ TanStack Router 파일 기반 라우팅이 정한 이름은 kebab-case 규칙의
 - 타입 검사: `pnpm --filter app-admin typecheck` (`tsc --noEmit`)
 - 테스트: `pnpm --filter app-admin test` (한 번 실행)
 - 테스트 감시 모드: `pnpm --filter app-admin test:watch`
-- API 코드 생성: `pnpm --filter app-admin codegen`. 백엔드가 실행 중이어야 한다.
+- API 코드 생성: `pnpm --filter app-admin codegen`. 백엔드가 실행 중이어야 한다. TanStack Query·axios 코드(`generated`)와 zod 스키마(`generated/zod`)를 함께 만든다.
 - 라우트 트리만 다시 만들기: `pnpm --filter app-admin exec tsr generate`. 개발 서버와 빌드는 라우트 트리를 자동으로 다시 만든다.

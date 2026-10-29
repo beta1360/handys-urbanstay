@@ -89,8 +89,22 @@
   - `.env.local`은 과제 제출용으로 커밋한다.
 - 쿠키는 포트로 나뉘지 않는다. 두 앱의 세션·CSRF 쿠키가 섞이지 않도록 위 표의 접속 주소(`*.localhost`)로 연다.
 - API 코드는 orval이 자기 문서 그룹(`/v3/api-docs/app-admin`, `/v3/api-docs/hotel-admin`)에서 TanStack Query 훅과 axios 함수로 생성한다. 요청은 mutator인 `shared/api/http.ts`를 거친다.
+- zod 스키마도 같은 문서 그룹에서 orval로 `shared/api/generated/zod`에 생성한다. 요청 본문·응답 스키마와 오류 응답(`ErrorApiResponse`) 스키마가 들어 있다.
+  - orval의 axios 클라이언트는 응답을 검증하지 않는다. 그래서 검증은 `shared/api`에서 직접 연결한다.
 - `shared/api/http.ts`는 axios 인스턴스로 요청하고 응답 본문을 돌려준다. 2xx가 아닌 응답은 오류로 던지므로 React Query가 error로 받는다.
-- QueryClient는 TanStack Query 기본값을 그대로 쓴다. SPA라 서버 렌더링용 설정을 두지 않는다.
+- `shared/api`는 검증을 거친 것만 내보낸다. 생성 코드와 `http`는 내보내지 않는다.
+  - 요청 본문을 스키마로 검증한 뒤 생성 함수를 부르고, 받은 응답을 스키마로 검증한 뒤 돌려준다.
+  - 조회는 TanStack Query 옵션(`queryKey`, `queryFn`)으로, 변경은 함수로 내보낸다.
+- `shared/api` 밖에서는 `shared/api/generated`를 import하지 않는다. ESLint `no-restricted-imports`로 막는다. Steiger는 다른 레이어의 import만 막고 재수출과 같은 shared 레이어의 import는 막지 않기 때문이다.
+- 검증에 실패하면 전용 오류를 던진다. AxiosError와 구분된다.
+  - 요청 검증 실패는 `RequestValidationError`다. 요청을 보내지 않는다.
+  - 응답 검증 실패는 `ResponseValidationError`다. 받은 값을 쓰지 않는다.
+  - 응답에 스키마에 없는 필드가 더 있으면 오류로 보지 않고 버린다. 빠진 필드와 타입이 틀린 필드만 오류다. 서버가 응답 필드를 추가해도 codegen 전까지 화면이 깨지지 않게 하기 위해서다.
+  - 두 오류 모두 zod issue를 담는다. 개발 환경에서만 콘솔에 틀린 필드의 경로와 오류 코드를 남기고, 값은 남기지 않는다.
+- 서버의 오류 정보(`code`, `message`, `fieldErrors`)는 `getApiError(error)`로 읽는다. 오류 응답 본문이 형식과 다르면 응답 검증 실패처럼 콘솔에 남기고 아무것도 돌려주지 않는다.
+- QueryClient는 쿼리 재시도 규칙만 정하고 나머지는 TanStack Query 기본값을 쓴다. SPA라 서버 렌더링용 설정을 두지 않는다.
+  - 쿼리는 검증 오류와 4xx 응답이면 재시도하지 않는다. 그 밖(5xx, 네트워크 오류)은 기본값대로 세 번까지 재시도한다.
+  - 뮤테이션은 기본값대로 재시도하지 않는다.
 - 개발 도구는 React Query Devtools만 둔다.
 
 ## 로그인
