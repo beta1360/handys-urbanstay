@@ -10,8 +10,10 @@ import org.springframework.stereotype.Component
 @Component
 class ErrorResponseFactory(private val messageSource: MessageSource) {
 
-	fun create(errorCode: ErrorCode, fieldErrors: List<FieldErrorResponse> = emptyList()): ApiResponse<Nothing> {
-		val message = messageSource.getMessage(errorCode.messageKey, null, LocaleContextHolder.getLocale())
-		return ApiResponse.failure(ErrorResponse(errorCode.code, message, fieldErrors))
-	}
+	fun create(errorCode: ErrorCode, fieldErrors: List<FieldErrorResponse> = emptyList()): ApiResponse<Nothing> =
+		ApiResponse.failure(ErrorResponse(errorCode.code, message(errorCode.messageKey), fieldErrors))
+
+	fun fieldError(field: String, messageKey: String): FieldErrorResponse = FieldErrorResponse(field, message(messageKey))
+
+	private fun message(key: String): String = messageSource.getMessage(key, null, LocaleContextHolder.getLocale())
 }

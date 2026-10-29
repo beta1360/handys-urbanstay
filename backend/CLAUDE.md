@@ -44,6 +44,17 @@ urbanstay/
 
 - 모든 응답은 API 규약의 공통 형식(`success / data / error`)으로 감싼다. 에러도 같은 형식이다.
 - 예외는 전역에서 처리해 공통 에러 형식으로 바꾼다.
+- 요청 본문을 읽지 못했거나 요청 파라미터가 맞지 않으면 400 `INVALID_INPUT`이다. 어느 필드인지 알 수 있으면 `fieldErrors`에 하나를 담는다(`GlobalExceptionHandler`).
+  - 문서에 없는 필드: `validation.unknown-field`. 모든 앱의 JSON 본문에 적용한다(`spring.jackson.deserialization.fail-on-unknown-properties=true`).
+  - non-null 프로퍼티의 빠진 필드·null, 빠진 필수 요청 파라미터: `validation.required`
+  - non-null 원소 목록(예: `List<String>`)의 null 원소도 `validation.required`이고 필드는 원소 경로(예: `tags[0]`)다. Kotlin 모듈의 `StrictNullChecks`(기본 켜짐)가 막는다. `List<String?>`는 null 원소를 받는다.
+  - 타입이 틀린 값(예: 문자열 자리에 배열·객체), 쿼리·경로 파라미터 타입 불일치: `validation.type`
+  - enum은 상수 이름 문자열만 받는다(대소문자 구분). 숫자(예: `0`)와 없는 이름은 `validation.type`이다(`spring.jackson.datatype.enum.fail-on-numbers-for-enums=true`).
+  - `LocalDate`, `LocalDateTime`, `OffsetDateTime`은 ISO 8601 문자열(예: `2026-10-29`, `2026-10-29T10:00:00`, `2026-10-29T10:00:00+09:00`)만 받는다. 숫자(타임스탬프), 배열, 숫자 문자열, 다른 형식은 `validation.type`이다(`JacksonConfig`의 `isoDateTimeModule`, `@JsonFormat` 패턴으로 바꿀 수 없다). `OffsetDateTime`은 UTC로 바꿔 읽는다. 다른 날짜·시간 타입(예: `Instant`)을 요청에 쓰려면 먼저 `isoDateTimeModule`에 등록한다.
+  - Jackson의 스칼라 강제 변환은 끈다. 숫자·불리언을 문자열로, 문자열을 숫자·불리언으로, 실수를 정수로 바꾸지 않고 `validation.type`으로 응답한다. 문자열 대상은 `common/config/JacksonConfig`가, 나머지는 `application.properties`의 `spring.jackson.mapper.allow-coercion-of-scalars=false`, `spring.jackson.deserialization.accept-float-as-int=false`가 막는다.
+  - 필드 이름은 Bean Validation과 같은 경로 형식이다. 예: `name`, `address.city`, `rooms[0].name`. 요청 파라미터는 파라미터 이름이다.
+  - 필드를 알 수 없는 오류(JSON 문법 오류, 빈 본문, 본문 전체의 타입 불일치, 지원하지 않는 미디어 타입)는 빈 `fieldErrors`다.
+  - Jackson은 첫 오류에서 멈추므로 본문을 읽는 오류는 `fieldErrors`가 하나다. Bean Validation 오류는 틀린 필드를 모두 담는다.
 
 ## 보안
 
@@ -64,7 +75,7 @@ urbanstay/
 - 테스트
   - 로그인 사용자는 `with(user("tester").roles(Role.APP_ADMIN.name))`로 만든다.
   - CSRF 토큰은 어드민 API 응답의 `XSRF-TOKEN` 쿠키를 받아 `cookie(xsrf)`와 `header("X-XSRF-TOKEN", xsrf.value)`로 보낸다. `csrf()` post-processor는 쓰지 않는다. 캐시된 컨텍스트의 CsrfFilter 저장소를 세션 저장소로 바꿔 다른 테스트에 영향을 준다.
-  - `@WebMvcTest`는 `SecurityConfig`를 읽지 않으므로 `SecurityConfig`, `SecurityErrorHandler`, `ErrorResponseFactory`를 `@Import`한다. 테스트용 컨트롤러는 열린 경로나 검증할 앱 경로 아래에 둔다.
+  - `@WebMvcTest`는 `SecurityConfig`, `JacksonConfig`를 읽지 않으므로 `SecurityConfig`, `JacksonConfig`, `SecurityErrorHandler`, `ErrorResponseFactory`를 `@Import`한다. 테스트용 컨트롤러는 열린 경로나 검증할 앱 경로 아래에 둔다.
   - 세션 쿠키 속성과 에러 디스패치는 서블릿 컨테이너 동작이라 MockMvc로 확인할 수 없다. `RANDOM_PORT`로 띄운 서버에 HTTP로 요청한다.
   - 로그인·로그아웃 API는 가짜 사용자 없이 `RANDOM_PORT` 서버에 실제 세션·`XSRF-TOKEN` 쿠키를 주고받으며 확인한다.
 
@@ -99,7 +110,8 @@ urbanstay/
 - 에러 코드는 별도 문자열 없이 enum 이름을 쓴다. 메시지 키는 `ErrorCode.messageKey`(`error.{CODE}`)다.
 - 도메인 ErrorCode enum을 추가하면 `messages.properties`에 키를 추가하고, `ErrorCodeMessageTest`의 목록에 등록한다.
 - 입력 검증 메시지는 제약마다 하나인 공용 키(`validation.{제약}`)를 `messages.properties`에 두고 어노테이션에서 `{키}`로 쓴다. 예: `@NotBlank(message = "{validation.required}")`
-  - 키 이름: `validation.required`(필수), `validation.email`(이메일 형식), `validation.max-length`(최대 길이, 문구에 `{max}`를 넣는다)
+  - 키 이름: `validation.required`(필수), `validation.email`(이메일 형식), `validation.max-length`(최대 길이, 문구에 `{max}`를 넣는다), `validation.type`(타입이 틀린 값), `validation.unknown-field`(문서에 없는 필드)
+  - `validation.type`, `validation.unknown-field`는 어노테이션이 아니라 `GlobalExceptionHandler`가 본문·파라미터 오류에 쓴다.
   - Spring Boot의 MessageSource 기반 interpolator가 키를 풀고, `{max}` 같은 제약 속성은 Hibernate Validator가 채운다. 응답의 `fieldErrors[].message`에 풀린 문구가 들어간다.
   - 실제로 쓰는 키만 추가한다.
 - 설정값은 `application.properties`에 둔다.
