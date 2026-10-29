@@ -51,6 +51,9 @@ urbanstay/
   - 타입이 틀린 값(예: 문자열 자리에 배열·객체), 쿼리·경로 파라미터 타입 불일치: `validation.type`
   - enum은 상수 이름 문자열만 받는다(대소문자 구분). 숫자(예: `0`)와 없는 이름은 `validation.type`이다(`spring.jackson.datatype.enum.fail-on-numbers-for-enums=true`).
   - `LocalDate`, `LocalDateTime`, `OffsetDateTime`은 ISO 8601 문자열(예: `2026-10-29`, `2026-10-29T10:00:00`, `2026-10-29T10:00:00+09:00`)만 받는다. 숫자(타임스탬프), 배열, 숫자 문자열, 다른 형식은 `validation.type`이다(`JacksonConfig`의 `isoDateTimeModule`, `@JsonFormat` 패턴으로 바꿀 수 없다). `OffsetDateTime`은 UTC로 바꿔 읽는다. 다른 날짜·시간 타입(예: `Instant`)을 요청에 쓰려면 먼저 `isoDateTimeModule`에 등록한다.
+  - `LocalTime`은 시와 분이 두 자리씩인 `HH:mm` 문자열(`00:00`~`23:59`, 예: `15:00`, `09:30`)만 받는다. 초가 붙은 값(`15:00:00`), 한 자리 시(`9:30`), `24:00`, 앞뒤 공백이 붙은 값, 숫자, 배열은 `validation.type`이다(`isoDateTimeModule`에 등록한 `ResolverStyle.STRICT`의 `HH:mm` 포매터). 응답도 같은 포매터의 `LocalTimeSerializer`(`isoDateTimeModule`에 등록)로 `HH:mm` 문자열이다. Jackson 기본 직렬화는 `15:00:00`이다.
+    - 요청·응답의 `LocalTime` 필드에는 `@Schema(pattern = JacksonConfig.LOCAL_TIME_PATTERN, example = "15:00")`를 붙인다. springdoc 기본 스키마(`type: string`, `format: time-local`)에 pattern이 더해져 orval zod가 서버와 같은 규칙으로 검사한다.
+    - DB 컬럼은 `time`이고 CHECK 제약(`extract(second from 컬럼) = 0`)으로 초가 있는 값을 막는다. 엔티티도 분 단위로 잘라 저장한다(예: `Room`).
   - Jackson의 스칼라 강제 변환은 끈다. 숫자·불리언을 문자열로, 문자열을 숫자·불리언으로, 실수를 정수로 바꾸지 않고 `validation.type`으로 응답한다. 문자열 대상은 `common/config/JacksonConfig`가, 나머지는 `application.properties`의 `spring.jackson.mapper.allow-coercion-of-scalars=false`, `spring.jackson.deserialization.accept-float-as-int=false`가 막는다.
   - 요청 파라미터(쿼리·경로 변수 등)의 불리언은 소문자 `true`, `false`만 받고, 그 밖의 값(`1`·`yes`·`on`·`TRUE`, 빈 값, 앞뒤 공백이 붙은 값)은 `validation.type`이다. `common/request/RequestParameterBindingAdvice`가 모든 컨트롤러의 `@InitBinder`에 `StrictBooleanEditor`를 등록한다(`Converter`로 등록하면 실패했을 때 Spring이 기본 `CustomBooleanEditor`로 다시 변환해 이 값들을 받아 버린다). 기본값이 있는 파라미터의 빈 값은 Spring이 변환 전에 기본값으로 바꾼다.
   - 필드 이름은 Bean Validation과 같은 경로 형식이다. 예: `name`, `address.city`, `rooms[0].name`. 요청 파라미터는 파라미터 이름이다.
@@ -67,6 +70,11 @@ urbanstay/
 - 목록 API는 `ApiResponse<PageResponse<T>>`(`common/response/PageResponse`)로 응답한다. 서비스가 돌려준 `Page`를 `PageResponse.from(page.map(...))`으로 바꾼다. 문서 스키마 이름은 `PageResponse{항목 스키마}`(예: `PageResponseHotelAppAdminResponse`)이고 모든 필드가 필수다.
 - `page`(0~99, 기본 0), `size`(1~100, 기본 10)는 `@RequestParam`으로 받고 `common/request/PageParams` 상수를 쓴다(`@Min`·`@Max`, 메시지 `validation.min`·`validation.max`). 범위를 벗어나면 메서드 검증으로 400 `INVALID_INPUT`이고 `fieldErrors`의 필드는 파라미터 이름이다. 100페이지 밖의 항목은 검색으로 좁혀 찾는다.
 - 정렬 기준은 서비스에서 정하고 operation 설명에 적는다.
+- 사람이 보는 이름으로 정렬하는 컬럼에는 ICU collation `natural_sort`(`provider = icu, locale = 'und-u-kn'`)를 지정한다. 예: `name varchar(50) collate natural_sort`(`V6__create_room.sql`이 collation을 만든다).
+  - 이유: DB 기본 collation(postgres:18 이미지 기본값 `en_US.utf8`)은 숫자도 글자 순서(`1001`, `101`, `99`)이고, 한글이 영문보다 앞에 오는 등 환경(collation)마다 순서가 달라진다. `natural_sort`는 이름 속 숫자를 숫자 크기로 비교하고(`99`, `101`, `1001`, `B동 99`, `B동 101`) 숫자, 영문, 한글 순이며, 대소문자만 다르면 소문자가 먼저다(`deluxe`, `Deluxe`).
+  - 결정적(deterministic, 기본값) collation이라 같은 값 비교(유일 제약, 중복 확인)는 지금처럼 글자 그대로, 대소문자를 구분한다. `upper`·LIKE 검색과 이스케이프도 그대로 동작한다.
+  - 정렬 순서는 operation 설명에 적고, 숫자·영문 대소문자·한글이 섞인 이름으로 저장소 테스트와 API 테스트에서 확인한다.
+  - 이름이 유일한 범위의 목록에도 id를 둘째 기준으로 둔다(예: 객실 목록은 이름 오름차순, 같으면 id 오름차순).
 - 부분 일치 검색은 Spring Data 파생 쿼리(예: `findByNameContainingIgnoreCase`)로 한다. 파생 쿼리는 `\`, `%`, `_`를 이스케이프하고 `escape '\'`를 붙여 입력을 글자 그대로 찾는다. `@Query`로 LIKE를 직접 쓰면 이스케이프되지 않는다.
 - 여러 필드 중 하나에 들어 있으면 찾는 검색(OR)과 선택 필터가 함께 있어 파생 쿼리로 쓰기 어려우면 `Specification`(`JpaSpecificationExecutor`)으로 한다. 예: `account/repository/HotelAdminSpecifications.search`(이름 또는 아이디 검색 + 활성 여부 필터)
   - 이스케이프는 파생 쿼리와 같게 직접 한다. 검색어를 `EscapeCharacter.DEFAULT.escape`로 바꿔 `%검색어%`를 만들고, `like(..., EscapeCharacter.DEFAULT.escapeCharacter)`로 `escape '\'`를 붙인다.
@@ -169,6 +177,28 @@ urbanstay/
   - 세션 확인 규칙만 따로 볼 때의 비활성화와 `credential_version` 변경은 테스트에서 DB를 직접 바꿔 재현한다(`AccountHotelAdminControllerTest`). 그 밖의 테스트에서 비활성 계정이 필요하면 API나 `HotelAdmin.changeActive`로 만든다.
   - 마스터의 아이디 변경·비밀번호 재설정이 세션을 끊는지는 전체 어드민과 마스터가 각자 실제로 로그인한 `RANDOM_PORT` 서버에서 확인한다(`AccountHotelMasterAppAdminSessionTest`). 운영자의 아이디 변경·비밀번호 재설정·비활성화도 마스터와 운영자가 각자 실제로 로그인해 확인하고, 마스터 자신의 세션이 유지되는지도 함께 본다(`AccountHotelOperatorHotelAdminSessionTest`).
 
+## 객실
+
+- 객실은 `room` 도메인의 `room` 테이블(`Room`, `V6__create_room.sql`)에 저장한다. 한 호텔에 속하고(`hotel_id`, `Hotel`과 JPA 연관관계) 이름, 객실 유형, 최대 인원, 층(선택), 소개(선택), 체크인·체크아웃 시각, 낙관적 잠금 버전(`version`)을 가진다.
+  - 객실 상태와 삭제는 아직 없다. 테이블에 상태 컬럼도 두지 않는다.
+- 값의 규칙
+  - 이름(호수)과 객실 유형은 앞뒤 공백을 지운 뒤 1~50자, 소개는 1000자 이하이고 비거나 공백만 있으면 null이다. 엔티티(`Room.normalize`)가 지워 저장한다.
+  - 최대 인원은 1~20, 층은 -10~200(지하는 음수, null 가능) 정수다. 요청은 `@Min`·`@Max`(`validation.min`·`validation.max`)로 검사하고 상수는 `Room.MIN_CAPACITY` 등이다.
+  - 체크인·체크아웃 시각은 `LocalTime`(`HH:mm`, 응답과 예외 절)이고 앞뒤를 비교하지 않는다. 체크아웃이 체크인보다 이르거나 같아도 된다.
+  - DB도 CHECK 제약으로 정리된 문자열, 인원·층 범위, 초가 0인 시각만 받는다.
+- 이름 컬럼은 `natural_sort` collation이다(목록 조회 절). 목록의 이름순은 이 collation을 따른다.
+- 이름은 같은 호텔 안에서만 유일하다(`room_hotel_id_name_key unique (hotel_id, name)`, 앞뒤 공백을 지운 값을 대소문자 구분해 비교). 다른 호텔과는 같아도 된다.
+  - 사전 확인(수정은 자기 자신을 빼고 `existsByHotelIdAndNameAndIdNot`)과 함께 이 제약 위반도 `RoomErrorCode.ROOM_DUPLICATED`(409)로 바꾼다.
+  - 이 제약의 인덱스가 호텔별 목록의 `hotel_id` 조건에도 쓰여 따로 인덱스를 두지 않는다.
+- 객실 관리(`ApiPaths.HOTEL_ADMIN + "/rooms"`의 등록·목록·조회·수정, `RoomHotelAdminController`)는 `RoomService`가 한다. 호텔 계정 모두(`Role.HOTEL_ADMIN`, 마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 보안 규칙은 따로 두지 않는다(`HOTEL_ADMIN_PATTERN`).
+  - 대상 호텔은 로그인한 계정의 `HotelAdminPrincipal.hotelId`다. 등록은 `HotelService.getHotel(hotelId)`로 호텔을 읽어 연관관계에 쓴다.
+  - 조회·수정할 객실은 같은 호텔에서만 찾는다(`findByIdAndHotelId`). 없는 id와 다른 호텔의 객실 id는 모두 404 `RoomErrorCode.ROOM_NOT_FOUND`다. 다른 호텔 객실의 존재를 알리지 않기 위해서다.
+  - 수정은 PUT으로 모든 항목을 바꾼다. 층과 소개를 보내지 않거나 null이면 null로 바뀐다. 순서는 객실 조회 → version 확인(`ROOM_MODIFIED`) → 이름 중복 확인 → 엔티티 변경 → `saveAndFlush`이고, 유일 제약 위반과 `OptimisticLockingFailureException`을 함께 변환한다. version 충돌과 이름 중복이 겹치면 version 충돌이 먼저다.
+  - 목록은 같은 호텔의 객실을 이름 오름차순, 같으면 id 오름차순으로 준다(목록 조회 절). `keyword`(선택, 100자)는 이름에서 대소문자 구분 없이 찾는다(`findByHotelIdAndNameContainingIgnoreCase`).
+- 테스트
+  - 마스터와 운영자가 모두 쓰는 API는 두 역할의 principal로 정상 흐름을 확인한다(`@EnumSource(HotelAdminRole::class)`, `RoomHotelAdminControllerTest`).
+  - 객실이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔의 `room`을 먼저 지운다.
+
 ## 상수
 
 - 응답 메시지는 `src/main/resources/messages.properties`에 두고 MessageSource로 읽는다.
@@ -201,11 +231,11 @@ urbanstay/
 - 동시 수정은 낙관적 잠금으로 막는다. 엔티티에 `@Version var version: Long`(`version bigint not null`)을 두고 응답에 `version`을 싣고, 수정 요청은 `version`을 필수로 받는다.
   - 서비스는 읽은 엔티티의 version이 요청과 다르면 도메인 409를 던진다.
   - 같은 version으로 동시에 들어온 수정은 flush 때 JPA가 막는다. flush를 서비스 안(`saveAndFlush`)에서 해 `OptimisticLockingFailureException`도 같은 도메인 409로 바꾼다. 커밋 때 터지면 서비스 밖이라 500이 된다.
-  - 지금 낙관적 잠금을 쓰는 엔티티는 `Hotel`(`HOTEL_MODIFIED`)과 `HotelAdmin`(`HOTEL_ADMIN_MODIFIED`)이다. version을 받지 않는 변경(예: 비밀번호 재설정, 활성 상태 변경)도 같은 엔티티를 바꾸면 같은 변환을 거친다.
+  - 지금 낙관적 잠금을 쓰는 엔티티는 `Hotel`(`HOTEL_MODIFIED`), `HotelAdmin`(`HOTEL_ADMIN_MODIFIED`), `Room`(`ROOM_MODIFIED`)이다. version을 받지 않는 변경(예: 비밀번호 재설정, 활성 상태 변경)도 같은 엔티티를 바꾸면 같은 변환을 거친다.
 - 중복 확인 같은 조회는 엔티티를 바꾸기 전에 한다. 바뀐 엔티티가 있으면 조회 전 자동 flush로 제약 위반이 변환 범위 밖에서 난다.
 - 테스트는 두 경로를 모두 확인한다.
   - 동시 요청: 두 스레드를 `CountDownLatch`로 함께 출발시킨다.
-  - 사전 확인을 통과한 뒤 DB에서 막히는 경로: 먼저 온 트랜잭션을 열어 둔 채 다음 요청이 잠금을 기다리는지(`pg_stat_activity`) 확인하고 커밋한다(`HotelServiceTest`, `HotelMasterServiceTest`, `HotelOperatorServiceTest`).
+  - 사전 확인을 통과한 뒤 DB에서 막히는 경로: 먼저 온 트랜잭션을 열어 둔 채 다음 요청이 잠금을 기다리는지(`pg_stat_activity`) 확인하고 커밋한다(`HotelServiceTest`, `HotelMasterServiceTest`, `HotelOperatorServiceTest`, `RoomServiceTest`).
   - 동시 요청 테스트는 실행마다 어느 경로를 탈지 정해지지 않는다. 변환 코드를 지켜 주는 것은 순서를 고정한 경로 테스트다.
 
 ## 테스트
