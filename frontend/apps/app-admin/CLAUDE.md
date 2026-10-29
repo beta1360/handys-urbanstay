@@ -21,11 +21,14 @@
 
 ```
 apps/app-admin/
+├─ .env.local          # API_BASE_URL (proxy가 넘길 백엔드 주소)
 ├─ index.html          # 진입점: /src/app/entrypoint/main.tsx
+├─ orval.config.ts     # API 코드 생성 설정
 ├─ tsr.config.json     # 라우트 생성 설정
 └─ src/
    ├─ app/
-   │  ├─ entrypoint/   # main.tsx
+   │  ├─ entrypoint/   # main.tsx, app-providers.tsx (Provider 조합)
+   │  ├─ query/        # QueryClient, QueryProvider (Devtools 포함)
    │  ├─ router/       # 라우터 생성, route-tree.gen.ts
    │  ├─ routes/       # TanStack Router 라우트 파일
    │  │  ├─ __root.tsx
@@ -36,6 +39,8 @@ apps/app-admin/
    ├─ pages/           # home, login
    ├─ widgets/         # admin-layout: 사이드바 메뉴(config/menu.ts), 위쪽 화면 제목
    └─ shared/
+      ├─ api/          # http.ts (orval mutator)
+      │  └─ generated/ # orval 생성 코드. 직접 수정하지 않는다
       └─ config/       # APP_INFO (앱 이름)
 ```
 
@@ -59,4 +64,5 @@ TanStack Router 파일 기반 라우팅이 정한 이름은 kebab-case 규칙의
 - 빌드: `pnpm --filter app-admin build` (`tsr generate` → `tsc --noEmit` → `vite build`)
 - 린트: `pnpm --filter app-admin lint` (ESLint + Steiger)
 - 타입 검사: `pnpm --filter app-admin typecheck` (`tsc --noEmit`)
+- API 코드 생성: `pnpm --filter app-admin codegen`. 백엔드가 실행 중이어야 한다.
 - 라우트 트리만 다시 만들기: `pnpm --filter app-admin exec tsr generate`. 개발 서버와 빌드는 라우트 트리를 자동으로 다시 만든다.

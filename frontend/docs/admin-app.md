@@ -81,10 +81,13 @@
 - 자기 앱의 API만 쓴다.
 - 브라우저에서 상대 경로로 호출한다. Vite 개발 서버의 proxy가 자기 앱의 API 경로만 백엔드로 넘긴다. CORS는 쓰지 않는다.
 - 백엔드 주소는 각 앱의 `.env.local`에 둔 `API_BASE_URL`에서 읽는다.
-  - `VITE_` 접두어를 붙이지 않는다. 브라우저 코드에는 들어가지 않고 `vite.config`의 proxy 설정에서만 읽는다.
+  - `VITE_` 접두어를 붙이지 않는다. 브라우저 코드에는 들어가지 않고, `vite.config.ts`가 `loadEnv`로 읽어 proxy 설정에만 쓴다.
   - `.env.local`은 과제 제출용으로 커밋한다.
 - 쿠키는 포트로 나뉘지 않는다. 두 앱의 세션·CSRF 쿠키가 섞이지 않도록 위 표의 접속 주소(`*.localhost`)로 연다.
-- API 코드는 orval이 자기 문서 그룹(`/v3/api-docs/app-admin`, `/v3/api-docs/hotel-admin`)에서 TanStack Query 훅과 axios 함수로 생성한다.
+- API 코드는 orval이 자기 문서 그룹(`/v3/api-docs/app-admin`, `/v3/api-docs/hotel-admin`)에서 TanStack Query 훅과 axios 함수로 생성한다. 요청은 mutator인 `shared/api/http.ts`를 거친다.
+- `shared/api/http.ts`는 axios 인스턴스로 요청하고 응답 본문을 돌려준다. 2xx가 아닌 응답은 오류로 던지므로 React Query가 error로 받는다.
+- QueryClient는 TanStack Query 기본값을 그대로 쓴다. SPA라 서버 렌더링용 설정을 두지 않는다.
+- 개발 도구는 React Query Devtools만 둔다.
 
 ## 로그인
 
