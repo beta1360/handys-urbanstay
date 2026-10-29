@@ -15,7 +15,7 @@
 ## 구조
 
 - 라우트 파일은 `src/app/routes`에 두고, `src/pages`의 페이지를 가져와 연결만 한다.
-- `__root.tsx`에는 자체 UI를 두지 않는다. 루트 라우트의 기본 동작(`Outlet`)만 쓴다.
+- `__root.tsx`에는 자체 UI를 두지 않는다. 탭 제목(`head`)과 `<HeadContent />`, `<Outlet />`만 둔다.
 - 라우트 트리는 `src/app/router/route-tree.gen.ts`에 생성된다. 직접 수정하지 않고 커밋한다.
 - 라우트 생성 설정은 `tsr.config.json`에만 둔다.
 
@@ -28,8 +28,15 @@ apps/app-admin/
    │  ├─ entrypoint/   # main.tsx
    │  ├─ router/       # 라우터 생성, route-tree.gen.ts
    │  ├─ routes/       # TanStack Router 라우트 파일
+   │  │  ├─ __root.tsx
+   │  │  ├─ _authenticated.tsx   # 로그인이 필요한 화면의 레이아웃
+   │  │  ├─ _authenticated/      # 로그인이 필요한 화면 (index.tsx: /)
+   │  │  └─ login.tsx            # /login
    │  └─ styles/
-   └─ pages/
+   ├─ pages/           # home, login
+   ├─ widgets/         # admin-layout: 사이드바 메뉴(config/menu.ts), 위쪽 화면 제목
+   └─ shared/
+      └─ config/       # APP_INFO (앱 이름)
 ```
 
 ## 라우트 파일 이름

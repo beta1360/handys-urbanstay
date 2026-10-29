@@ -28,12 +28,15 @@
 - 라우터 생성 코드와 생성된 라우트 트리(`route-tree.gen.ts`)는 `src/app/router/`에, 진입점(`main.tsx`)은 `src/app/entrypoint/`에 둔다.
 - 라우트 생성 설정(`routesDirectory`, `generatedRouteTree` 등)은 앱의 `tsr.config.json`에만 둔다. Vite 플러그인과 `tsr generate`가 이 파일을 함께 읽는다.
 - 생성된 라우트 트리는 직접 수정하지 않고 커밋한다.
-- 로그인 확인은 로그인이 필요한 화면을 묶는 레이아웃 라우트의 `beforeLoad`에서 한다.
+- 루트 라우트(`__root.tsx`)는 `<HeadContent />`와 `<Outlet />`만 그린다. 브라우저 탭 제목은 루트 라우트의 `head`에서 `APP_INFO.name`(`shared/config`)으로 정하고, `index.html`에는 `<title>`을 두지 않는다.
+- 로그인이 필요한 화면은 경로를 만들지 않는 레이아웃 라우트 `_authenticated` 아래에 두고, 로그인 화면(`/login`)은 그 밖에 둔다. 로그인 확인은 `_authenticated`의 `beforeLoad`에서 한다.
+- 위쪽에 보여줄 현재 화면 제목은 각 화면 라우트의 `staticData.title`(선택)에 둔다. 타입은 `src/app/router/router.ts`에서 `StaticDataRouteOption`을 모듈 확장해 정한다.
 
 ## 화면
 
 - 데스크톱 화면을 기준으로 만든다.
 - 기본 틀은 왼쪽 사이드바(메뉴), 위쪽(현재 위치, 계정·로그아웃), 가운데(내용)로 나눈다. 로그인 화면은 이 틀 밖에 둔다.
+  - 기본 틀은 widgets에 두고, `_authenticated` 레이아웃 라우트가 연결한다.
 - 라이트 테마만 지원하고, 폰트는 Pretendard를 쓴다.
 
 ## UI 컴포넌트와 공유 코드
