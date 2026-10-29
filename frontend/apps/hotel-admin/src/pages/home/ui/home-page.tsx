@@ -2,7 +2,7 @@ import { HOME_MESSAGES } from "../config/messages";
 
 export function HomePage() {
   return (
-    <section className="px-4 py-6">
+    <section>
       <p className="text-sm text-neutral-500">{HOME_MESSAGES.placeholder}</p>
     </section>
   );
