@@ -33,6 +33,15 @@ class HotelOperatorService(
 	@Transactional(readOnly = true)
 	fun getOperator(hotelId: Long, operatorId: Long): HotelAdmin = findOperator(hotelId, operatorId)
 
+	@Transactional
+	fun update(hotelId: Long, operatorId: Long, version: Long, loginId: String, name: String): HotelAdmin =
+		hotelAdminService.update(findOperator(hotelId, operatorId), version, loginId, name)
+
+	@Transactional
+	fun resetPassword(hotelId: Long, operatorId: Long, password: String) {
+		hotelAdminService.resetPassword(findOperator(hotelId, operatorId), password)
+	}
+
 	private fun findOperator(hotelId: Long, operatorId: Long): HotelAdmin =
 		hotelAdminRepository.findByIdAndHotelIdAndRole(operatorId, hotelId, HotelAdminRole.OPERATOR)
 			?: throw BusinessException(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND)

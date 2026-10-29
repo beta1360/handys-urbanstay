@@ -44,6 +44,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.databind.node.ObjectNode
@@ -246,10 +247,212 @@ class AccountHotelOperatorHotelAdminControllerTest {
 	}
 
 	@Test
-	fun `없는 id, 다른 호텔의 계정, 마스터 자신의 id로 조회하면 모두 404 HOTEL_OPERATOR_NOT_FOUND로 응답한다`() {
+	fun `없는 id, 다른 호텔의 계정, 마스터 자신의 id로 조회, 수정, 비밀번호 재설정하면 모두 404 HOTEL_OPERATOR_NOT_FOUND로 응답하고 바꾸지 않는다`() {
 		listOf(MISSING_ID, checkNotNull(otherOperator.id), checkNotNull(otherMaster.id), checkNotNull(master.id)).forEach { id ->
 			getOperator(id).andExpectError(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND)
+			update(id, updateBody(0, "name" to "새 이름")).andExpectError(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND)
+			resetPassword(id, passwordBody()).andExpectError(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND)
 		}
+		listOf(otherOperator, otherMaster, master).forEach(::assertUnchanged)
+	}
+
+	@Test
+	fun `조회한 version으로 아이디와 이름을 바꾸면 아이디는 소문자로, 이름은 앞뒤 공백을 지워 저장하고 version과 로그인 정보 버전을 올려 200으로 응답한다`() {
+		val operator = saveOperator()
+
+		val data = update(operator.id!!, updateBody(0, "loginId" to " New-Operator-$suffix@Test.LOCAL\t", "name" to " 새 이름 ")).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data).isEqualTo(operatorJson(operator.id!!, "new-operator-$suffix@test.local", "새 이름", true, 1))
+		val saved = reload(operator)
+		assertThat(listOf(saved.loginId, saved.name, saved.version, saved.credentialVersion, saved.active))
+			.containsExactly("new-operator-$suffix@test.local", "새 이름", 1L, 1L, true)
+	}
+
+	@Test
+	fun `이름만 바꾸면 version은 올리고 로그인 정보 버전은 그대로 둔다`() {
+		val operator = saveOperator()
+
+		val data = update(operator.id!!, updateBody(0, "name" to "새 이름")).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data).isEqualTo(operatorJson(operator.id!!, operatorLoginId, "새 이름", true, 1))
+		assertThat(reload(operator).credentialVersion).isZero()
+	}
+
+	@Test
+	fun `자기 아이디를 대소문자와 앞뒤 공백만 바꿔 보내면 중복이 아니고 같은 아이디라 로그인 정보 버전을 올리지 않는다`() {
+		val operator = saveOperator()
+
+		val data = update(operator.id!!, updateBody(0, "loginId" to " ${operatorLoginId.uppercase()} ", "name" to "새 이름")).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data).isEqualTo(operatorJson(operator.id!!, operatorLoginId, "새 이름", true, 1))
+		assertThat(reload(operator).credentialVersion).isZero()
+	}
+
+	@Test
+	fun `바뀐 값이 없는 수정은 version을 올리지 않고 200으로 응답한다`() {
+		val operator = saveOperator()
+
+		val data = update(operator.id!!, updateBody(0, "loginId" to operatorLoginId.uppercase(), "name" to " $OPERATOR_NAME ")).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data).isEqualTo(operatorJson(operator.id!!, operatorLoginId, OPERATOR_NAME, true, 0))
+		assertUnchanged(operator)
+	}
+
+	@Test
+	fun `비활성 운영자도 정보를 수정하고 비밀번호를 재설정할 수 있으며 비활성 상태는 그대로다`() {
+		val operator = saveOperator().also(::deactivate)
+
+		val data = update(operator.id!!, updateBody(0, "name" to "새 이름")).andExpectSuccess(HttpStatus.OK)
+		resetPassword(operator.id!!, passwordBody()).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data).isEqualTo(operatorJson(operator.id!!, operatorLoginId, "새 이름", false, 1))
+		val saved = reload(operator)
+		assertThat(listOf(saved.active, saved.version, saved.credentialVersion)).containsExactly(false, 2L, 1L)
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["master-%s@test.local", "other-master-%s@test.local", "other-operator-%s@test.local", " OTHER-OPERATOR-%s@Test.Local ", "inactive-%s@test.local"])
+	fun `아이디를 마스터, 다른 호텔, 비활성 계정을 포함한 다른 호텔 계정이 쓰고 있으면 대소문자와 앞뒤 공백과 관계없이 409 LOGIN_ID_DUPLICATED로 응답하고 바꾸지 않는다`(loginId: String) {
+		val operator = saveOperator()
+		deactivate(saveHotelAdmin(hotel, "inactive-$suffix@test.local", OPERATOR_NAME, HotelAdminRole.OPERATOR))
+
+		update(operator.id!!, updateBody(0, "loginId" to loginId.format(suffix), "name" to "새 이름")).andExpectError(AccountErrorCode.LOGIN_ID_DUPLICATED)
+
+		assertUnchanged(operator)
+	}
+
+	@Test
+	fun `같은 version으로 두 번 수정하면 먼저 수정한 쪽만 반영되고, version이 다르면서 아이디도 겹치면 version 충돌인 409 HOTEL_ADMIN_MODIFIED로 응답한다`() {
+		val operator = saveOperator()
+
+		update(operator.id!!, updateBody(0, "name" to "먼저 수정")).andExpectSuccess(HttpStatus.OK)
+		update(operator.id!!, updateBody(0, "name" to "나중 수정")).andExpectError(AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+		update(operator.id!!, updateBody(0, "loginId" to otherOperator.loginId)).andExpectError(AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+
+		val saved = reload(operator)
+		assertThat(listOf(saved.loginId, saved.name, saved.version)).containsExactly(operatorLoginId, "먼저 수정", 1L)
+	}
+
+	@Test
+	fun `같은 version으로 동시에 수정하면 하나만 200으로 반영되고 나머지는 409 HOTEL_ADMIN_MODIFIED로 응답한다`() {
+		val operator = saveOperator()
+
+		val responses = concurrently { index -> update(operator.id!!, updateBody(0, "name" to "동시 수정 $index")).andReturn().response }
+
+		assertThat(responses.map { it.status }).containsExactlyInAnyOrder(HttpStatus.OK.value(), HttpStatus.CONFLICT.value())
+		assertError(responses.single { it.status == HttpStatus.CONFLICT.value() }, AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+		val winner = json(responses.single { it.status == HttpStatus.OK.value() })["data"]
+		assertThat(operatorJson(reload(operator))).isEqualTo(winner)
+		assertThat(winner["version"].longValue()).isEqualTo(1)
+	}
+
+	@Test
+	fun `서로 다른 운영자를 같은 새 아이디로 동시에 바꾸면 하나만 200으로 반영되고 나머지는 409 LOGIN_ID_DUPLICATED로 응답한다`() {
+		val newLoginId = "concurrent-$suffix@test.local"
+		val operators = listOf(saveOperator(), saveOperator("second-$suffix@test.local"))
+
+		val responses = concurrently { index -> update(operators[index].id!!, updateBody(0, "loginId" to newLoginId)).andReturn().response }
+
+		assertThat(responses.map { it.status }).containsExactlyInAnyOrder(HttpStatus.OK.value(), HttpStatus.CONFLICT.value())
+		assertError(responses.single { it.status == HttpStatus.CONFLICT.value() }, AccountErrorCode.LOGIN_ID_DUPLICATED)
+		val winnerId = json(responses.single { it.status == HttpStatus.OK.value() })["data"]["id"].longValue()
+		assertThat(operators.map { reload(it).loginId }).containsOnlyOnce(newLoginId)
+		assertUnchanged(operators.single { it.id != winnerId })
+	}
+
+	@ParameterizedTest
+	@MethodSource("loginIdErrors")
+	fun `수정할 아이디도 앞뒤 공백을 지운 뒤 빈 값, 이메일 형식, 길이 순으로 오류 하나만 응답하고 바꾸지 않는다`(loginId: String, messageKey: String) {
+		val operator = saveOperator()
+		val expected = if (messageKey == MAX_LENGTH) maxLength(HotelAdmin.LOGIN_ID_MAX_LENGTH) else message(messageKey)
+
+		update(operator.id!!, updateBody(0, "loginId" to loginId)).andExpectError(CommonErrorCode.INVALID_INPUT, "loginId" to expected)
+		assertUnchanged(operator)
+	}
+
+	@Test
+	fun `수정 요청의 이름은 비거나 50자를 넘으면 안 되고 아이디와 이름의 오류를 필드마다 하나씩 함께 응답한다`() {
+		val operator = saveOperator()
+
+		update(operator.id!!, updateBody(0, "name" to "　")).andExpectError(CommonErrorCode.INVALID_INPUT, "name" to message(REQUIRED))
+		update(operator.id!!, updateBody(0, "name" to " ${"가".repeat(HotelAdmin.NAME_MAX_LENGTH + 1)} "))
+			.andExpectError(CommonErrorCode.INVALID_INPUT, "name" to maxLength(HotelAdmin.NAME_MAX_LENGTH))
+		update(operator.id!!, updateBody(0, "loginId" to "not-an-email", "name" to " "))
+			.andExpectError(CommonErrorCode.INVALID_INPUT, "loginId" to message(EMAIL), "name" to message(REQUIRED))
+		assertUnchanged(operator)
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["loginId", "name", "version"])
+	fun `수정 요청의 필수 항목이 없거나 null이면 필수 입력 메시지로 400 응답한다`(field: String) {
+		val operator = saveOperator()
+
+		update(operator.id!!, updateBody(0) - field).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(REQUIRED))
+		update(operator.id!!, updateBody(0, field to null)).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(REQUIRED))
+	}
+
+	@ParameterizedTest
+	@MethodSource("updateTypeMismatches")
+	fun `수정 요청 항목에 다른 타입을 보내면 형식 메시지로 400 응답한다`(field: String, value: Any) {
+		update(saveOperator().id!!, updateBody(0, field to value)).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(TYPE))
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["password", "active"])
+	fun `수정 요청에 문서에 없는 비밀번호나 활성 여부 항목을 보내면 알 수 없는 항목 메시지로 400 응답한다`(field: String) {
+		val operator = saveOperator()
+
+		update(operator.id!!, updateBody(0, field to "x")).andExpectError(CommonErrorCode.INVALID_INPUT, field to message("validation.unknown-field"))
+		assertUnchanged(operator)
+	}
+
+	@Test
+	fun `비밀번호를 재설정하면 입력한 그대로 해시해 저장하고 version과 로그인 정보 버전을 올려 data null로 200 응답한다`() {
+		val operator = saveOperator()
+		val password = " New pass 1 "
+
+		val data = resetPassword(operator.id!!, passwordBody(password)).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data.isNull).isTrue()
+		val saved = reload(operator)
+		assertThat(passwordEncoder.matches(password, saved.passwordHash)).isTrue()
+		assertThat(passwordEncoder.matches(password.trim(), saved.passwordHash)).isFalse()
+		assertThat(listOf(saved.loginId, saved.name, saved.version, saved.credentialVersion)).containsExactly(operatorLoginId, OPERATOR_NAME, 1L, 1L)
+	}
+
+	@Test
+	fun `지금과 같은 비밀번호로 다시 재설정해도 version과 로그인 정보 버전을 올리고 그 전에 조회한 version의 수정은 409 HOTEL_ADMIN_MODIFIED다`() {
+		val operator = saveOperator()
+
+		repeat(2) { resetPassword(operator.id!!, passwordBody(NEW_PASSWORD)).andExpectSuccess(HttpStatus.OK) }
+
+		val saved = reload(operator)
+		assertThat(passwordEncoder.matches(NEW_PASSWORD, saved.passwordHash)).isTrue()
+		assertThat(listOf(saved.version, saved.credentialVersion)).containsExactly(2L, 2L)
+		update(operator.id!!, updateBody(0, "name" to "새 이름")).andExpectError(AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+		assertThat(update(operator.id!!, updateBody(2, "name" to "새 이름")).andExpectSuccess(HttpStatus.OK)["version"].longValue()).isEqualTo(3)
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["", " ", "        ", "abcdefgh", "12345678", "abc1234", "비밀번호abc123"])
+	fun `새 비밀번호는 빈 값이면 필수 입력, 규칙을 어기면 비밀번호 규칙 메시지 하나로 400 응답하고 바꾸지 않는다`(password: String) {
+		val operator = saveOperator()
+		val messageKey = if (password.isBlank()) REQUIRED else PASSWORD
+
+		resetPassword(operator.id!!, passwordBody(password)).andExpectError(CommonErrorCode.INVALID_INPUT, "password" to message(messageKey))
+		assertUnchanged(operator)
+	}
+
+	@Test
+	fun `새 비밀번호가 없거나 null이거나 문자열이 아니거나 문서에 없는 version을 보내면 400 응답한다`() {
+		val operator = saveOperator()
+
+		resetPassword(operator.id!!, emptyMap()).andExpectError(CommonErrorCode.INVALID_INPUT, "password" to message(REQUIRED))
+		resetPassword(operator.id!!, mapOf("password" to null)).andExpectError(CommonErrorCode.INVALID_INPUT, "password" to message(REQUIRED))
+		resetPassword(operator.id!!, mapOf("password" to 12345678)).andExpectError(CommonErrorCode.INVALID_INPUT, "password" to message(TYPE))
+		resetPassword(operator.id!!, passwordBody() + ("version" to 0))
+			.andExpectError(CommonErrorCode.INVALID_INPUT, "version" to message("validation.unknown-field"))
+		assertUnchanged(operator)
 	}
 
 	@Test
@@ -352,39 +555,59 @@ class AccountHotelOperatorHotelAdminControllerTest {
 	}
 
 	@Test
-	fun `로그인하지 않으면 운영자 API는 401 UNAUTHORIZED로 응답하고 등록하지 않는다`() {
+	fun `로그인하지 않으면 운영자 API는 401 UNAUTHORIZED로 응답하고 바꾸지 않는다`() {
+		val operator = saveOperator()
+
 		mockMvc.get(OPERATORS).andExpectError(CommonErrorCode.UNAUTHORIZED)
-		mockMvc.get("$OPERATORS/${otherOperator.id}").andExpectError(CommonErrorCode.UNAUTHORIZED)
-		mockMvc.post(OPERATORS) { withCsrf(); jsonBody(createBody()) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
-		assertThat(operatorIds()).isEmpty()
+		mockMvc.get("$OPERATORS/${operator.id}").andExpectError(CommonErrorCode.UNAUTHORIZED)
+		mockMvc.post(OPERATORS) { withCsrf(); jsonBody(createBody("loginId" to "new-$suffix@test.local")) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
+		mockMvc.put("$OPERATORS/${operator.id}") { withCsrf(); jsonBody(updateBody(0, "name" to "새 이름")) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
+		mockMvc.put("$OPERATORS/${operator.id}/password") { withCsrf(); jsonBody(passwordBody()) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
+		assertThat(operatorIds()).containsExactly(operator.id)
+		assertUnchanged(operator)
 	}
 
 	@Test
-	fun `마스터가 아닌 운영자 계정과 전체 어드민 역할로는 운영자 API를 쓸 수 없어 403 FORBIDDEN으로 응답한다`() {
-		val operator = HotelAdminPrincipal.from(saveHotelAdmin(hotel, "logged-in-$suffix@test.local", OPERATOR_NAME, HotelAdminRole.OPERATOR))
+	fun `마스터가 아닌 운영자 계정과 전체 어드민 역할로는 운영자 API를 쓸 수 없어 403 FORBIDDEN으로 응답하고 바꾸지 않는다`() {
+		val operator = saveOperator()
+		val loggedInOperator = HotelAdminPrincipal.from(operator)
 		val appAdmin = User.withUsername(USERNAME).password(PASSWORD_HASH).roles(Role.APP_ADMIN.name).build()
 
-		listOf(operator, appAdmin).forEach { principal ->
+		listOf(loggedInOperator, appAdmin).forEach { principal ->
 			getOperators(principal = principal).andExpectError(CommonErrorCode.FORBIDDEN)
-			getOperator(checkNotNull(master.id), principal).andExpectError(CommonErrorCode.FORBIDDEN)
-			create(createBody(), principal).andExpectError(CommonErrorCode.FORBIDDEN)
+			getOperator(operator.id!!, principal).andExpectError(CommonErrorCode.FORBIDDEN)
+			create(createBody("loginId" to "new-$suffix@test.local"), principal).andExpectError(CommonErrorCode.FORBIDDEN)
+			update(operator.id!!, updateBody(0, "name" to "새 이름"), principal).andExpectError(CommonErrorCode.FORBIDDEN)
+			resetPassword(operator.id!!, passwordBody(), principal).andExpectError(CommonErrorCode.FORBIDDEN)
 		}
 		assertThat(operatorIds()).containsExactly(operator.id)
+		assertUnchanged(operator)
 	}
 
 	@Test
-	fun `CSRF 토큰 없이 등록하면 403 INVALID_CSRF_TOKEN으로 응답하고 등록하지 않는다`() {
-		mockMvc.post(OPERATORS) { with(user(masterPrincipal)); jsonBody(createBody()) }.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
-		assertThat(operatorIds()).isEmpty()
+	fun `CSRF 토큰 없이 등록, 수정, 비밀번호 재설정하면 403 INVALID_CSRF_TOKEN으로 응답하고 바꾸지 않는다`() {
+		val operator = saveOperator()
+
+		mockMvc.post(OPERATORS) { with(user(masterPrincipal)); jsonBody(createBody("loginId" to "new-$suffix@test.local")) }
+			.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
+		mockMvc.put("$OPERATORS/${operator.id}") { with(user(masterPrincipal)); jsonBody(updateBody(0, "name" to "새 이름")) }
+			.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
+		mockMvc.put("$OPERATORS/${operator.id}/password") { with(user(masterPrincipal)); jsonBody(passwordBody()) }
+			.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
+		assertThat(operatorIds()).containsExactly(operator.id)
+		assertUnchanged(operator)
 	}
 
 	@Test
 	fun `운영자 API 문서는 account 태그에 마스터 전용 operation과 낼 수 있는 계정 에러를 예시로 보여준다`() {
 		val docs = apiDocs()
 		val operators = docs["paths"][OPERATORS]
-		val operations = listOf(operators["post"], operators["get"], docs["paths"]["$OPERATORS/{operatorId}"]["get"])
+		val operator = docs["paths"]["$OPERATORS/{operatorId}"]
+		val reset = docs["paths"]["$OPERATORS/{operatorId}/password"]["put"]
+		val operations = listOf(operators["post"], operators["get"], operator["get"], operator["put"], reset)
 
-		assertThat(operations.map { it["operationId"].stringValue() }).containsExactly("createHotelOperator", "getHotelOperators", "getHotelOperator")
+		assertThat(operations.map { it["operationId"].stringValue() })
+			.containsExactly("createHotelOperator", "getHotelOperators", "getHotelOperator", "updateHotelOperator", "resetHotelOperatorPassword")
 		assertThat(operations.map { op -> op["tags"].values().map { it.stringValue() } }).containsOnly(listOf("account"))
 		assertThat(docs["tags"].values().single { it["name"].stringValue() == "account" }["description"].stringValue())
 			.isEqualTo(message("openapi.hotel-admin.tag.account"))
@@ -395,8 +618,15 @@ class AccountHotelOperatorHotelAdminControllerTest {
 		assertThat(operators["post"]["responses"].propertyNames()).containsExactlyInAnyOrder("201", "400", "401", "403", "409", "500")
 		assertThat(errorCodes(operators["post"], HttpStatus.CONFLICT)).containsExactly(AccountErrorCode.LOGIN_ID_DUPLICATED.code)
 		assertThat(operators["get"]["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "403", "500")
-		assertThat(errorCodes(operations[2], HttpStatus.NOT_FOUND)).containsExactly(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND.code)
-		assertThat(operations[2]["parameters"].values().map { it["name"].stringValue() }).containsExactly("operatorId")
+		assertThat(operator["get"]["responses"].propertyNames()).doesNotContain("409")
+		listOf(operator["get"], operator["put"], reset).forEach { op ->
+			assertThat(errorCodes(op, HttpStatus.NOT_FOUND)).containsExactly(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND.code)
+			assertThat(op["parameters"].values().map { it["name"].stringValue() }).containsExactly("operatorId")
+		}
+		assertThat(errorCodes(operator["put"], HttpStatus.CONFLICT))
+			.containsExactlyInAnyOrder(AccountErrorCode.LOGIN_ID_DUPLICATED.code, AccountErrorCode.HOTEL_ADMIN_MODIFIED.code)
+		assertThat(errorCodes(reset, HttpStatus.CONFLICT)).containsExactly(AccountErrorCode.HOTEL_ADMIN_MODIFIED.code)
+		assertThat(reset["responses"]["200"]["content"][JSON]["schema"]).isEqualTo(schemaRef("EmptyApiResponse"))
 	}
 
 	@Test
@@ -424,26 +654,30 @@ class AccountHotelOperatorHotelAdminControllerTest {
 	}
 
 	@Test
-	fun `운영자 응답 문서는 모든 필드가 필수이고 등록 요청 문서는 아이디의 이메일 형식과 길이, 이름 길이, 비밀번호 규칙을 보여준다`() {
+	fun `운영자 응답 문서는 모든 필드가 필수이고 요청 문서는 필수 항목과 아이디의 이메일 형식과 길이, 이름 길이, 비밀번호 규칙을 보여준다`() {
 		val docs = apiDocs()
 		val schemas = docs["components"]["schemas"]
-		val request = schemas["AccountHotelOperatorCreateHotelAdminRequest"]
-		val rules = listOf("loginId", "name", "password").associateWith { field ->
-			listOf("minLength", "maxLength", "pattern").map { request["properties"][field][it]?.asString() }
-		}
+		val loginId = listOf("1", HotelAdmin.LOGIN_ID_MAX_LENGTH.toString(), LoginId.PATTERN)
+		val name = listOf("1", HotelAdmin.NAME_MAX_LENGTH.toString(), null)
+		val password = listOf(Password.MIN_LENGTH.toString(), Password.MAX_LENGTH.toString(), Password.PATTERN)
+		val requests = mapOf(
+			"AccountHotelOperatorCreateHotelAdminRequest" to mapOf("loginId" to loginId, "name" to name, "password" to password),
+			"AccountHotelOperatorUpdateHotelAdminRequest" to mapOf("loginId" to loginId, "name" to name, "version" to listOf(null, null, null)),
+			"AccountHotelOperatorPasswordResetHotelAdminRequest" to mapOf("password" to password),
+		)
 
 		assertThat(docs["paths"][OPERATORS]["post"]["responses"]["201"]["content"][JSON]["schema"])
 			.isEqualTo(schemaRef("ApiResponseAccountHotelOperatorHotelAdminResponse"))
+		assertThat(docs["paths"]["$OPERATORS/{operatorId}"]["put"]["responses"]["200"]["content"][JSON]["schema"])
+			.isEqualTo(schemaRef("ApiResponseAccountHotelOperatorHotelAdminResponse"))
 		assertThat(required(schemas["AccountHotelOperatorHotelAdminResponse"])).containsExactlyInAnyOrder("id", "loginId", "name", "active", "version")
-		assertThat(request["properties"].propertyNames()).containsExactlyInAnyOrder("loginId", "name", "password")
-		assertThat(required(request)).containsExactlyInAnyOrder("loginId", "name", "password")
-		assertThat(rules).containsExactlyInAnyOrderEntriesOf(
-			mapOf(
-				"loginId" to listOf("1", HotelAdmin.LOGIN_ID_MAX_LENGTH.toString(), LoginId.PATTERN),
-				"name" to listOf("1", HotelAdmin.NAME_MAX_LENGTH.toString(), null),
-				"password" to listOf(Password.MIN_LENGTH.toString(), Password.MAX_LENGTH.toString(), Password.PATTERN),
-			),
-		)
+		requests.forEach { (schemaName, rules) ->
+			val request = schemas[schemaName]
+			val actual = rules.keys.associateWith { field -> listOf("minLength", "maxLength", "pattern").map { request["properties"][field][it]?.asString() } }
+			assertThat(request["properties"].propertyNames()).describedAs(schemaName).containsExactlyInAnyOrderElementsOf(rules.keys)
+			assertThat(required(request)).describedAs(schemaName).containsExactlyInAnyOrderElementsOf(rules.keys)
+			assertThat(actual).describedAs(schemaName).containsExactlyInAnyOrderEntriesOf(rules)
+		}
 	}
 
 	private fun create(body: Map<String, Any?>, principal: UserDetails = masterPrincipal): ResultActionsDsl =
@@ -462,6 +696,20 @@ class AccountHotelOperatorHotelAdminControllerTest {
 	private fun getOperator(id: Long, principal: UserDetails = masterPrincipal): ResultActionsDsl =
 		mockMvc.get("$OPERATORS/$id") { with(user(principal)) }
 
+	private fun update(id: Long, body: Map<String, Any?>, principal: UserDetails = masterPrincipal): ResultActionsDsl =
+		mockMvc.put("$OPERATORS/$id") {
+			with(user(principal))
+			withCsrf()
+			jsonBody(body)
+		}
+
+	private fun resetPassword(id: Long, body: Map<String, Any?>, principal: UserDetails = masterPrincipal): ResultActionsDsl =
+		mockMvc.put("$OPERATORS/$id/password") {
+			with(user(principal))
+			withCsrf()
+			jsonBody(body)
+		}
+
 	private fun MockHttpServletRequestDsl.withCsrf() {
 		cookie(xsrf)
 		header(XSRF_HEADER, xsrf.value)
@@ -475,17 +723,32 @@ class AccountHotelOperatorHotelAdminControllerTest {
 	private fun createBody(vararg overrides: Pair<String, Any?>): Map<String, Any?> =
 		linkedMapOf<String, Any?>("loginId" to operatorLoginId, "name" to OPERATOR_NAME, "password" to NEW_PASSWORD) + overrides
 
+	private fun updateBody(version: Long, vararg overrides: Pair<String, Any?>): Map<String, Any?> =
+		linkedMapOf<String, Any?>("loginId" to operatorLoginId, "name" to OPERATOR_NAME, "version" to version) + overrides
+
+	private fun passwordBody(password: String = NEW_PASSWORD): Map<String, Any?> = mapOf("password" to password)
+
 	private fun saveHotel(name: String): Hotel =
 		hotelRepository.save(Hotel(name, "서울 $suffix", PHONE, null)).also { createdHotelIds += checkNotNull(it.id) }
 
 	private fun saveHotelAdmin(hotel: Hotel, loginId: String, name: String, role: HotelAdminRole): HotelAdmin =
 		hotelAdminRepository.save(HotelAdmin(hotel, loginId, PASSWORD_HASH, name, role))
 
+	private fun saveOperator(loginId: String = operatorLoginId): HotelAdmin = saveHotelAdmin(hotel, loginId, OPERATOR_NAME, HotelAdminRole.OPERATOR)
+
 	private fun saveOperators(count: Int): List<Long> =
 		(1..count).map { checkNotNull(saveHotelAdmin(hotel, "list-$it-$suffix@test.local", "목록 $it", HotelAdminRole.OPERATOR).id) }
 
 	private fun deactivate(hotelAdmin: HotelAdmin) {
 		jdbcTemplate.update("update hotel_admin set active = false where id = ?", hotelAdmin.id)
+	}
+
+	private fun reload(hotelAdmin: HotelAdmin): HotelAdmin = hotelAdminRepository.findById(checkNotNull(hotelAdmin.id)).orElseThrow()
+
+	private fun assertUnchanged(hotelAdmin: HotelAdmin) {
+		val saved = reload(hotelAdmin)
+		assertThat(listOf(saved.loginId, saved.name, saved.passwordHash, saved.active, saved.version, saved.credentialVersion))
+			.containsExactly(hotelAdmin.loginId, hotelAdmin.name, hotelAdmin.passwordHash, hotelAdmin.active, hotelAdmin.version, hotelAdmin.credentialVersion)
 	}
 
 	private fun operatorIds(): List<Long> =
@@ -524,6 +787,9 @@ class AccountHotelOperatorHotelAdminControllerTest {
 
 	private fun operatorJson(id: Long, loginId: String, name: String, active: Boolean, version: Long): JsonNode =
 		json(jsonMapper.writeValueAsString(linkedMapOf("id" to id, "loginId" to loginId, "name" to name, "active" to active, "version" to version)))
+
+	private fun operatorJson(hotelAdmin: HotelAdmin): JsonNode =
+		operatorJson(checkNotNull(hotelAdmin.id), hotelAdmin.loginId, hotelAdmin.name, hotelAdmin.active, hotelAdmin.version)
 
 	private fun itemIds(data: JsonNode): List<Long> = data["items"].values().map { it["id"].longValue() }
 
@@ -597,6 +863,14 @@ class AccountHotelOperatorHotelAdminControllerTest {
 			Arguments.of("loginId", listOf("operator@test.local")),
 			Arguments.of("name", true),
 			Arguments.of("password", 12345678),
+		)
+
+		@JvmStatic
+		fun updateTypeMismatches(): List<Arguments> = listOf(
+			Arguments.of("loginId", 123),
+			Arguments.of("name", listOf("이름")),
+			Arguments.of("version", "0"),
+			Arguments.of("version", 0.5),
 		)
 	}
 }

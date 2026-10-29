@@ -3,6 +3,7 @@ package com.marco.assignment.handys.urbanstay.account.controller.hoteladmin
 import com.marco.assignment.handys.urbanstay.TestcontainersConfiguration
 import com.marco.assignment.handys.urbanstay.account.entity.HotelAdmin
 import com.marco.assignment.handys.urbanstay.account.entity.HotelAdminRole
+import com.marco.assignment.handys.urbanstay.account.exception.AccountErrorCode
 import com.marco.assignment.handys.urbanstay.account.repository.HotelAdminRepository
 import com.marco.assignment.handys.urbanstay.common.ApiPaths
 import com.marco.assignment.handys.urbanstay.common.exception.CommonErrorCode
@@ -102,8 +103,51 @@ class AccountHotelOperatorHotelAdminSessionTest {
 		assertError(operatorBrowser.get(OPERATORS), CommonErrorCode.FORBIDDEN)
 		assertError(operatorBrowser.get("$OPERATORS/${operator.id}"), CommonErrorCode.FORBIDDEN)
 		assertError(operatorBrowser.post(OPERATORS, createBody("new-$suffix@test.local", NEW_PASSWORD)), CommonErrorCode.FORBIDDEN)
+		assertError(operatorBrowser.put(operatorPath(), updateBody("new-$suffix@test.local", OPERATOR_NAME, 0)), CommonErrorCode.FORBIDDEN)
+		assertError(operatorBrowser.put("${operatorPath()}/password", passwordBody(NEW_PASSWORD)), CommonErrorCode.FORBIDDEN)
 		assertThat(me(operatorBrowser)["loginId"].stringValue()).isEqualTo(operatorLoginId)
 		assertThat(hotelAdminRepository.findAll().filter { it.loginId == "new-$suffix@test.local" }).isEmpty()
+	}
+
+	@Test
+	fun `마스터가 운영자 아이디를 바꾸면 운영자의 기존 세션은 다음 요청에서 401로 끊기고 새 아이디로만 다시 로그인하며 마스터 세션은 유지된다`() {
+		val masterBrowser = loggedIn(masterLoginId, PASSWORD)
+		val operatorBrowser = loggedIn(operatorLoginId, PASSWORD)
+		val newLoginId = "new-$suffix@test.local"
+
+		assertThat(masterBrowser.put(operatorPath(), updateBody(" ${newLoginId.uppercase()} ", OPERATOR_NAME, 0)).statusCode()).isEqualTo(HttpStatus.OK.value())
+
+		assertError(operatorBrowser.get(ME), CommonErrorCode.UNAUTHORIZED)
+		assertError(Browser().withXsrfToken().post(LOGIN, loginBody(operatorLoginId, PASSWORD)), AccountErrorCode.INVALID_CREDENTIALS)
+		assertThat(me(loggedIn(newLoginId, PASSWORD))["loginId"].stringValue()).isEqualTo(newLoginId)
+		assertThat(me(masterBrowser)["loginId"].stringValue()).isEqualTo(masterLoginId)
+	}
+
+	@Test
+	fun `마스터가 운영자 이름만 바꾸거나 대소문자와 앞뒤 공백만 다른 같은 아이디로 수정하면 운영자 세션은 유지되고 내 정보에 새 이름이 나온다`() {
+		val masterBrowser = loggedIn(masterLoginId, PASSWORD)
+		val operatorBrowser = loggedIn(operatorLoginId, PASSWORD)
+
+		assertThat(masterBrowser.put(operatorPath(), updateBody(" ${operatorLoginId.uppercase()} ", "새 이름", 0)).statusCode())
+			.isEqualTo(HttpStatus.OK.value())
+
+		repeat(2) { assertThat(listOf("loginId", "name").map { me(operatorBrowser)[it].stringValue() }).containsExactly(operatorLoginId, "새 이름") }
+	}
+
+	@Test
+	fun `마스터가 운영자 비밀번호를 재설정하면 같은 비밀번호여도 운영자의 기존 세션은 끊기고 새 비밀번호로 다시 로그인하며 마스터 세션은 유지된다`() {
+		val masterBrowser = loggedIn(masterLoginId, PASSWORD)
+		val operatorBrowser = loggedIn(operatorLoginId, PASSWORD)
+
+		assertThat(masterBrowser.put("${operatorPath()}/password", passwordBody(NEW_PASSWORD)).statusCode()).isEqualTo(HttpStatus.OK.value())
+
+		assertError(operatorBrowser.get(ME), CommonErrorCode.UNAUTHORIZED)
+		assertError(Browser().withXsrfToken().post(LOGIN, loginBody(operatorLoginId, PASSWORD)), AccountErrorCode.INVALID_CREDENTIALS)
+		val reloggedIn = loggedIn(operatorLoginId, NEW_PASSWORD)
+		assertThat(masterBrowser.put("${operatorPath()}/password", passwordBody(NEW_PASSWORD)).statusCode()).isEqualTo(HttpStatus.OK.value())
+		assertError(reloggedIn.get(ME), CommonErrorCode.UNAUTHORIZED)
+		assertThat(me(loggedIn(operatorLoginId, NEW_PASSWORD))["loginId"].stringValue()).isEqualTo(operatorLoginId)
+		assertThat(me(masterBrowser)["loginId"].stringValue()).isEqualTo(masterLoginId)
 	}
 
 	private fun encode(password: String): String = checkNotNull(passwordEncoder.encode(password))
@@ -128,6 +172,13 @@ class AccountHotelOperatorHotelAdminSessionTest {
 	private fun createBody(loginId: String, password: String): String =
 		jsonMapper.writeValueAsString(mapOf("loginId" to loginId, "name" to OPERATOR_NAME, "password" to password))
 
+	private fun updateBody(loginId: String, name: String, version: Long): String =
+		jsonMapper.writeValueAsString(mapOf("loginId" to loginId, "name" to name, "version" to version))
+
+	private fun passwordBody(password: String): String = jsonMapper.writeValueAsString(mapOf("password" to password))
+
+	private fun operatorPath(): String = "$OPERATORS/${operator.id}"
+
 	private fun assertError(response: HttpResponse<String>, errorCode: ErrorCode) {
 		assertThat(response.statusCode()).isEqualTo(errorCode.status.value())
 		assertThat(json(response.body())).isEqualTo(
@@ -148,6 +199,8 @@ class AccountHotelOperatorHotelAdminSessionTest {
 		fun get(path: String): HttpResponse<String> = send(request(path).GET())
 
 		fun post(path: String, body: String): HttpResponse<String> = send(jsonRequest(path).POST(HttpRequest.BodyPublishers.ofString(body)))
+
+		fun put(path: String, body: String): HttpResponse<String> = send(jsonRequest(path).PUT(HttpRequest.BodyPublishers.ofString(body)))
 
 		private fun jsonRequest(path: String): HttpRequest.Builder =
 			request(path)

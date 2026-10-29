@@ -2,6 +2,8 @@ package com.marco.assignment.handys.urbanstay.account.controller.hoteladmin
 
 import com.marco.assignment.handys.urbanstay.account.dto.hoteladmin.AccountHotelOperatorCreateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.account.dto.hoteladmin.AccountHotelOperatorHotelAdminResponse
+import com.marco.assignment.handys.urbanstay.account.dto.hoteladmin.AccountHotelOperatorPasswordResetHotelAdminRequest
+import com.marco.assignment.handys.urbanstay.account.dto.hoteladmin.AccountHotelOperatorUpdateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.account.exception.AccountApiErrors
 import com.marco.assignment.handys.urbanstay.account.exception.AccountErrorCode
 import com.marco.assignment.handys.urbanstay.account.service.HotelAdminPrincipal
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.InitBinder
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -89,6 +92,33 @@ class AccountHotelOperatorHotelAdminController(
 		@PathVariable operatorId: Long,
 	): ApiResponse<AccountHotelOperatorHotelAdminResponse> =
 		ApiResponse.success(AccountHotelOperatorHotelAdminResponse.from(hotelOperatorService.getOperator(master.hotelId, operatorId)))
+
+	@Operation(summary = "openapi.hotel-admin.operation.updateHotelOperator.summary", description = "openapi.hotel-admin.operation.updateHotelOperator.description")
+	@AccountApiErrors(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND, AccountErrorCode.LOGIN_ID_DUPLICATED, AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+	@PutMapping("/{operatorId}")
+	fun updateHotelOperator(
+		@AuthenticationPrincipal master: HotelAdminPrincipal,
+		@PathVariable operatorId: Long,
+		@Valid @RequestBody request: AccountHotelOperatorUpdateHotelAdminRequest,
+	): ApiResponse<AccountHotelOperatorHotelAdminResponse> {
+		val operator = hotelOperatorService.update(master.hotelId, operatorId, request.version, request.loginId, request.name)
+		return ApiResponse.success(AccountHotelOperatorHotelAdminResponse.from(operator))
+	}
+
+	@Operation(
+		summary = "openapi.hotel-admin.operation.resetHotelOperatorPassword.summary",
+		description = "openapi.hotel-admin.operation.resetHotelOperatorPassword.description",
+	)
+	@AccountApiErrors(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND, AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+	@PutMapping("/{operatorId}/password")
+	fun resetHotelOperatorPassword(
+		@AuthenticationPrincipal master: HotelAdminPrincipal,
+		@PathVariable operatorId: Long,
+		@Valid @RequestBody request: AccountHotelOperatorPasswordResetHotelAdminRequest,
+	): ApiResponse<Nothing?> {
+		hotelOperatorService.resetPassword(master.hotelId, operatorId, request.password)
+		return ApiResponse.success(null)
+	}
 
 	companion object {
 		const val KEYWORD_MAX_LENGTH = 100

@@ -1,7 +1,10 @@
 package com.marco.assignment.handys.urbanstay.account.service
 
 import com.marco.assignment.handys.urbanstay.TestcontainersConfiguration
+import com.marco.assignment.handys.urbanstay.account.entity.HotelAdmin
+import com.marco.assignment.handys.urbanstay.account.entity.HotelAdminRole
 import com.marco.assignment.handys.urbanstay.account.exception.AccountErrorCode
+import com.marco.assignment.handys.urbanstay.account.repository.HotelAdminRepository
 import com.marco.assignment.handys.urbanstay.common.exception.BusinessException
 import com.marco.assignment.handys.urbanstay.common.exception.ErrorCode
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
@@ -31,6 +34,9 @@ class HotelOperatorServiceTest {
 
 	@Autowired
 	private lateinit var hotelRepository: HotelRepository
+
+	@Autowired
+	private lateinit var hotelAdminRepository: HotelAdminRepository
 
 	@Autowired
 	private lateinit var transactionManager: PlatformTransactionManager
@@ -75,8 +81,63 @@ class HotelOperatorServiceTest {
 		assertThat(hotelIdsOfLoginId(loginId)).containsExactly(hotel.id)
 	}
 
+	@Test
+	fun `먼저 온 수정이 커밋되기 전이라 version 확인을 통과한 수정도 JPA 버전 검사에 막혀 HOTEL_ADMIN_MODIFIED로 거절된다`() {
+		val operator = saveOperator("operator-$suffix@test.local")
+
+		val second = runSecondWhileFirstUncommitted(
+			first = { hotelOperatorService.update(hotelIdOf(operator), checkNotNull(operator.id), 0, operator.loginId, FIRST_NAME) },
+			second = { hotelOperatorService.update(hotelIdOf(operator), checkNotNull(operator.id), 0, operator.loginId, SECOND_NAME) },
+			lockedTable = "hotel_admin",
+		)
+
+		assertErrorCode(second, AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+		val saved = reload(operator)
+		assertThat(listOf(saved.name, saved.version, saved.credentialVersion)).containsExactly(FIRST_NAME, 1L, 0L)
+	}
+
+	@Test
+	fun `먼저 온 아이디 변경이 커밋되기 전이라 중복 확인을 통과한 다른 운영자의 같은 아이디 변경도 DB 유일 제약에 막혀 LOGIN_ID_DUPLICATED로 거절된다`() {
+		val operator = saveOperator("operator-$suffix@test.local")
+		val otherOperator = saveOperator("other-operator-$suffix@test.local")
+		val newLoginId = "new-$suffix@test.local"
+
+		val second = runSecondWhileFirstUncommitted(
+			first = { hotelOperatorService.update(hotelIdOf(operator), checkNotNull(operator.id), 0, newLoginId, OPERATOR_NAME) },
+			second = { hotelOperatorService.update(hotelIdOf(otherOperator), checkNotNull(otherOperator.id), 0, " ${newLoginId.uppercase()} ", OPERATOR_NAME) },
+			lockedTable = "hotel_admin",
+		)
+
+		assertErrorCode(second, AccountErrorCode.LOGIN_ID_DUPLICATED)
+		assertThat(reload(operator).loginId).isEqualTo(newLoginId)
+		val unchanged = reload(otherOperator)
+		assertThat(listOf(unchanged.loginId, unchanged.version, unchanged.credentialVersion)).containsExactly(otherOperator.loginId, 0L, 0L)
+	}
+
+	@Test
+	fun `먼저 온 수정이 커밋되기 전에 읽은 비밀번호 재설정도 JPA 버전 검사에 막혀 HOTEL_ADMIN_MODIFIED로 거절되고 비밀번호는 그대로다`() {
+		val operator = saveOperator("operator-$suffix@test.local")
+
+		val second = runSecondWhileFirstUncommitted(
+			first = { hotelOperatorService.update(hotelIdOf(operator), checkNotNull(operator.id), 0, operator.loginId, FIRST_NAME) },
+			second = { hotelOperatorService.resetPassword(hotelIdOf(operator), checkNotNull(operator.id), PASSWORD) },
+			lockedTable = "hotel_admin",
+		)
+
+		assertErrorCode(second, AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+		val saved = reload(operator)
+		assertThat(listOf(saved.name, saved.passwordHash, saved.version, saved.credentialVersion)).containsExactly(FIRST_NAME, PASSWORD_HASH, 1L, 0L)
+	}
+
 	private fun saveHotel(name: String): Hotel =
 		hotelRepository.save(Hotel(name, "서울 $suffix", PHONE, null)).also { createdHotelIds += checkNotNull(it.id) }
+
+	private fun saveOperator(loginId: String): HotelAdmin =
+		hotelAdminRepository.save(HotelAdmin(hotel, loginId, PASSWORD_HASH, OPERATOR_NAME, HotelAdminRole.OPERATOR))
+
+	private fun hotelIdOf(hotelAdmin: HotelAdmin): Long = checkNotNull(hotelAdmin.hotel.id)
+
+	private fun reload(hotelAdmin: HotelAdmin): HotelAdmin = hotelAdminRepository.findById(checkNotNull(hotelAdmin.id)).orElseThrow()
 
 	private fun hotelIdsOfLoginId(loginId: String): List<Long> =
 		jdbcTemplate.queryForList(SELECT_HOTEL_IDS_OF_LOGIN_ID, Long::class.javaObjectType, loginId).filterNotNull()
@@ -116,6 +177,9 @@ class HotelOperatorServiceTest {
 		private const val PHONE = "02-1234-5678"
 		private const val OPERATOR_NAME = "운영자"
 		private const val PASSWORD = "operator-password-1"
+		private const val PASSWORD_HASH = "password-hash"
+		private const val FIRST_NAME = "먼저 바꾼 이름"
+		private const val SECOND_NAME = "나중에 바꾼 이름"
 		private const val TIMEOUT_SECONDS = 10L
 		private const val POLL_INTERVAL_MILLIS = 20L
 		private const val DELETE_HOTEL_ADMINS = "delete from hotel_admin where hotel_id = ?"
