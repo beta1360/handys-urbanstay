@@ -52,6 +52,7 @@ urbanstay/
   - enum은 상수 이름 문자열만 받는다(대소문자 구분). 숫자(예: `0`)와 없는 이름은 `validation.type`이다(`spring.jackson.datatype.enum.fail-on-numbers-for-enums=true`).
   - `LocalDate`, `LocalDateTime`, `OffsetDateTime`은 ISO 8601 문자열(예: `2026-10-29`, `2026-10-29T10:00:00`, `2026-10-29T10:00:00+09:00`)만 받는다. 숫자(타임스탬프), 배열, 숫자 문자열, 다른 형식은 `validation.type`이다(`JacksonConfig`의 `isoDateTimeModule`, `@JsonFormat` 패턴으로 바꿀 수 없다). `OffsetDateTime`은 UTC로 바꿔 읽는다. 다른 날짜·시간 타입(예: `Instant`)을 요청에 쓰려면 먼저 `isoDateTimeModule`에 등록한다.
   - Jackson의 스칼라 강제 변환은 끈다. 숫자·불리언을 문자열로, 문자열을 숫자·불리언으로, 실수를 정수로 바꾸지 않고 `validation.type`으로 응답한다. 문자열 대상은 `common/config/JacksonConfig`가, 나머지는 `application.properties`의 `spring.jackson.mapper.allow-coercion-of-scalars=false`, `spring.jackson.deserialization.accept-float-as-int=false`가 막는다.
+  - 요청 파라미터(쿼리·경로 변수 등)의 불리언은 소문자 `true`, `false`만 받고, 그 밖의 값(`1`·`yes`·`on`·`TRUE`, 빈 값, 앞뒤 공백이 붙은 값)은 `validation.type`이다. `common/request/RequestParameterBindingAdvice`가 모든 컨트롤러의 `@InitBinder`에 `StrictBooleanEditor`를 등록한다(`Converter`로 등록하면 실패했을 때 Spring이 기본 `CustomBooleanEditor`로 다시 변환해 이 값들을 받아 버린다). 기본값이 있는 파라미터의 빈 값은 Spring이 변환 전에 기본값으로 바꾼다.
   - 필드 이름은 Bean Validation과 같은 경로 형식이다. 예: `name`, `address.city`, `rooms[0].name`. 요청 파라미터는 파라미터 이름이다.
   - 중첩 요청 객체 필드에는 `@Valid`를 붙여 안쪽 필드까지 검증한다(예: 호텔 등록의 `master`, 오류 필드는 `master.loginId`).
   - 필드를 알 수 없는 오류(JSON 문법 오류, 빈 본문, 본문 전체의 타입 불일치, 지원하지 않는 미디어 타입)는 빈 `fieldErrors`다.
@@ -67,6 +68,11 @@ urbanstay/
 - `page`(0~99, 기본 0), `size`(1~100, 기본 10)는 `@RequestParam`으로 받고 `common/request/PageParams` 상수를 쓴다(`@Min`·`@Max`, 메시지 `validation.min`·`validation.max`). 범위를 벗어나면 메서드 검증으로 400 `INVALID_INPUT`이고 `fieldErrors`의 필드는 파라미터 이름이다. 100페이지 밖의 항목은 검색으로 좁혀 찾는다.
 - 정렬 기준은 서비스에서 정하고 operation 설명에 적는다.
 - 부분 일치 검색은 Spring Data 파생 쿼리(예: `findByNameContainingIgnoreCase`)로 한다. 파생 쿼리는 `\`, `%`, `_`를 이스케이프하고 `escape '\'`를 붙여 입력을 글자 그대로 찾는다. `@Query`로 LIKE를 직접 쓰면 이스케이프되지 않는다.
+- 여러 필드 중 하나에 들어 있으면 찾는 검색(OR)과 선택 필터가 함께 있어 파생 쿼리로 쓰기 어려우면 `Specification`(`JpaSpecificationExecutor`)으로 한다. 예: `account/repository/HotelAdminSpecifications.search`(이름 또는 아이디 검색 + 활성 여부 필터)
+  - 이스케이프는 파생 쿼리와 같게 직접 한다. 검색어를 `EscapeCharacter.DEFAULT.escape`로 바꿔 `%검색어%`를 만들고, `like(..., EscapeCharacter.DEFAULT.escapeCharacter)`로 `escape '\'`를 붙인다.
+  - 대소문자 구분 없는 비교는 파생 쿼리처럼 컬럼과 검색어 양쪽에 DB의 `upper`를 건다. 검색어만 Kotlin에서 대소문자를 바꾸면 DB의 `upper`와 결과가 달라지는 글자(예: `ß`)가 있을 수 있다.
+  - 검색어는 `HibernateCriteriaBuilder.value(...)`로 넘겨 바인딩 파라미터로 만든다. `CriteriaBuilder.literal(...)`은 검색어를 SQL 문자열에 그대로 넣는다.
+  - `%`, `_`, `\`가 글자 그대로 찾히는지 저장소 테스트와 API 테스트로 확인한다. 이스케이프를 빼면 실패하는지도 한 번 확인한다.
 
 ## 보안
 
@@ -74,6 +80,8 @@ urbanstay/
   - `ApiPaths.APP`: 로그인 없이 쓴다.
   - `ApiPaths.APP_ADMIN`: `Role.APP_ADMIN`만, `ApiPaths.HOTEL_ADMIN`: `Role.HOTEL_ADMIN`만 쓴다.
   - 호텔 계정은 모두 `Role.HOTEL_ADMIN`을 받고, 마스터는 `Role.HOTEL_MASTER`도 받는다. 마스터만 쓰는 API는 `Role.HOTEL_MASTER`로 막는다.
+    - 경로 규칙(`HOTEL_MASTER_PATTERN`)으로 막는다. 지금은 운영자 관리(`ApiPaths.HOTEL_ADMIN + ApiPaths.OPERATORS` 아래 전부)다. `HOTEL_ADMIN_PATTERN` 규칙보다 먼저 둔다(먼저 맞는 규칙을 쓴다). `/operators/**`는 `/operators`도 포함한다.
+    - 운영자 계정과 전체 어드민 계정은 403 `FORBIDDEN`, 로그인하지 않으면 401 `UNAUTHORIZED`다. 어드민 그룹 문서에 자동으로 붙는 401·403과 같으므로 문서에 따로 적을 에러는 없고, operation 설명에 마스터 전용임을 적는다.
   - 로그인 없이 여는 어드민 API는 `SecurityConfig.PUBLIC_ADMIN_APIS`(HTTP 메서드 + 경로)에만 적는다. 접근 규칙(permitAll)과 API 문서(401·403 자동 에러 제외)가 이 목록 하나를 함께 쓴다. 지금은 전체 어드민 로그인과 호텔 운영자 로그인이다. 열린 API에도 CSRF는 걸린다.
   - Swagger UI와 API 문서(`/swagger-ui.html`, `/swagger-ui/**`, `/v3/api-docs/**`): 로그인 없이 연다.
   - 그 밖의 경로(actuator 포함)는 막는다. 에러 디스패치는 원래 상태 코드를 유지하도록 연다.
@@ -91,7 +99,8 @@ urbanstay/
   - 호텔 계정은 `HotelAdminSessionVerifier`가 DB에서 다시 읽어, 없거나 비활성이거나 `credential_version`이 세션 값과 다르면 거절한다. 이름 변경은 세션을 끊지 않는다.
   - 전체 어드민 세션은 확인하지 않는다(어드민 계정을 바꾸는 API가 아직 없다).
 - 테스트
-  - 로그인 사용자는 `with(user("tester").roles(Role.APP_ADMIN.name))`로 만든다. 이 가짜 사용자는 호텔 계정 principal이 아니라서 요청마다 계정 확인을 거치지 않는다. 호텔 계정의 세션 동작은 실제 로그인으로 확인한다.
+  - 로그인 사용자는 `with(user("tester").roles(Role.APP_ADMIN.name))`로 만든다. 호텔 계정 principal이 필요한 API(세션의 호텔로 범위를 정하는 API)는 저장한 계정으로 만든 principal을 넣는다. 예: `with(user(HotelAdminPrincipal.from(master)))`
+  - `user(...)`로 넣은 인증은 테스트가 넣은 SecurityContext를 그대로 써서, principal이 `HotelAdminPrincipal`이어도 요청마다 하는 계정 확인을 거치지 않는다(DB에서 비활성으로 바꿔도 통과한다). 호텔 계정의 세션 동작은 실제 로그인으로 확인한다.
   - CSRF 토큰은 어드민 API 응답의 `XSRF-TOKEN` 쿠키를 받아 `cookie(xsrf)`와 `header("X-XSRF-TOKEN", xsrf.value)`로 보낸다. `csrf()` post-processor는 쓰지 않는다. 캐시된 컨텍스트의 CsrfFilter 저장소를 세션 저장소로 바꿔 다른 테스트에 영향을 준다.
   - `@WebMvcTest`는 `SecurityConfig`, `JacksonConfig`를 읽지 않으므로 `SecurityConfig`, `JacksonConfig`, `SecurityErrorHandler`, `ErrorResponseFactory`를 `@Import`한다. 테스트용 컨트롤러는 열린 경로나 검증할 앱 경로 아래에 둔다.
   - 세션 쿠키 속성과 에러 디스패치는 서블릿 컨테이너 동작이라 MockMvc로 확인할 수 없다. `RANDOM_PORT`로 띄운 서버에 HTTP로 요청한다.
@@ -106,6 +115,7 @@ urbanstay/
   - 로그인할 수 없는 계정(예: 비활성 호텔 계정)은 `UserDetailsService`가 찾지 못한 것으로(`UsernameNotFoundException`) 처리해 없는 아이디와 같은 응답, 같은 처리 시간 균등화를 탄다.
   - `ProviderManager`는 인증 뒤 입력한 비밀번호와 principal의 비밀번호 해시를 지운다(`CredentialsContainer`). 그래서 세션에 비밀번호가 남지 않는다. 직접 만든 principal(`HotelAdminPrincipal`)도 `CredentialsContainer`를 구현한다.
   - 호텔 계정의 principal(`HotelAdminPrincipal`)은 계정 id, 호텔 id, `credential_version`을 담는다. 응답에 쓰는 이름 같은 값은 세션이 아니라 DB에서 읽는다.
+  - 로그인한 호텔 계정의 호텔로 범위를 정하는 API는 컨트롤러에서 `@AuthenticationPrincipal HotelAdminPrincipal`을 받아 `hotelId`를 서비스에 넘긴다. 경로나 본문으로 호텔 id를 받지 않는다. springdoc은 이 파라미터를 문서에 넣지 않는다.
   - `UserDetailsService` 빈이 둘이라 시작할 때 Spring Security가 전역 매니저에 쓰지 않는다는 WARN 로그(`Found 2 UserDetailsService beans`)를 남긴다. 전역 매니저를 쓰지 않으므로 정상이다.
 - 세션 처리는 `common/security/LoginSessionHandler`가 Spring Security 구현체로 한다. `SecurityConfig`가 어드민 필터 체인과 같은 CSRF 토큰 저장소·SecurityContext 저장소를 넘겨 만든다.
   - 로그인: 세션이 이미 있으면 세션 ID를 바꾸고(`ChangeSessionIdAuthenticationStrategy`), CSRF 토큰을 새로 만들어 응답에 새 `XSRF-TOKEN` 쿠키를 싣고(`CsrfAuthenticationStrategy`), SecurityContext를 세션에 저장한다.
@@ -130,17 +140,23 @@ urbanstay/
   - 호텔(`hotel_id`)에 속하고 역할(`HotelAdminRole`: `MASTER`, `OPERATOR`), 활성 여부(`active`), 로그인 정보 버전(`credential_version`), 낙관적 잠금 버전(`version`)을 가진다. 이름은 앞뒤 공백을 지워 저장한다.
   - 로그인 아이디는 모든 호텔 계정을 통틀어 유일하다(`hotel_admin_login_id_key`). 사전 확인(수정은 자기 자신을 빼고 `existsByLoginIdAndIdNot`)과 함께 이 제약 위반도 `AccountErrorCode.LOGIN_ID_DUPLICATED`(409)로 바꾼다.
   - 호텔마다 마스터는 하나다(부분 유일 인덱스 `hotel_admin_master_key`).
-  - `credential_version`은 0에서 시작한다. 기존 세션을 끊어야 하는 변경(비활성화, 비밀번호 재설정, 아이디 변경)에서 올린다. 이름 변경은 올리지 않는다.
+  - `credential_version`은 0에서 시작한다. 기존 세션을 끊어야 하는 변경(비활성화, 비밀번호 재설정, 아이디 변경)에서 올린다. 이름 변경, 다시 활성화는 올리지 않는다.
+    - 활성 상태 변경은 활성 → 비활성일 때만 올린다. 다시 활성화는 비활성화 때 이미 세션이 끊겼으므로 올리지 않고, 끊긴 세션은 다시 활성화해도 되살아나지 않는다. 지금과 같은 상태로의 변경은 아무것도 바꾸지 않는다(version도 그대로).
     - 아이디 변경은 `LoginId.normalize`한 값이 지금과 다를 때만 올린다. 대소문자·앞뒤 공백만 다른 아이디는 같은 아이디라 올리지 않고 중복으로도 보지 않는다.
     - 비밀번호 재설정은 같은 비밀번호여도 항상 올린다.
-    - 엔티티 메서드(`HotelAdmin.update`, `HotelAdmin.resetPassword`)가 올린다. 서비스가 직접 셈하지 않는다.
+    - 엔티티 메서드(`HotelAdmin.update`, `HotelAdmin.resetPassword`, `HotelAdmin.changeActive`)가 올린다. 서비스가 직접 셈하지 않는다.
   - `version`은 호텔(`hotel.version`)과 같은 낙관적 잠금이다(`V4__add_hotel_admin_version.sql`). 정보 수정은 요청의 `version`이 다르면 409 `AccountErrorCode.HOTEL_ADMIN_MODIFIED`다.
     - 비밀번호 재설정도 엔티티를 바꾸므로 version이 올라간다. 그사이 열어 둔 정보 수정 화면의 저장은 409가 된다(의도한 동작).
-    - 재설정은 `version`을 받지 않는다. 같은 계정의 다른 변경과 동시에 처리돼 flush 때 막히면 같은 409 `HOTEL_ADMIN_MODIFIED`다.
-  - 호텔 계정의 변경은 `HotelAdminService`(`createMaster`, `update`, `resetPassword`)가 한다. 순서는 version 확인 → 아이디 중복 확인 → 엔티티 변경 → `saveAndFlush`이고, 유일 제약 위반과 `OptimisticLockingFailureException`의 변환(`translateConflicts`)을 함께 쓴다. version 충돌과 아이디 중복이 겹치면 version 충돌이 먼저다.
+    - 재설정과 활성 상태 변경은 `version`을 받지 않는다. 같은 계정의 다른 변경과 동시에 처리돼 flush 때 막히면 같은 409 `HOTEL_ADMIN_MODIFIED`다. 활성 상태 변경도 상태가 바뀌면 version이 올라간다.
+  - 호텔 계정의 변경은 `HotelAdminService`(`createMaster`, `createOperator`, `update`, `resetPassword`, `changeActive`)가 한다. 순서는 version 확인 → 아이디 중복 확인 → 엔티티 변경 → `saveAndFlush`이고, 유일 제약 위반과 `OptimisticLockingFailureException`의 변환(`translateConflicts`)을 함께 쓴다. version 충돌과 아이디 중복이 겹치면 version 충돌이 먼저다.
+    - `createOperator`는 아이디 중복 확인까지 한다. `createMaster`의 중복 확인은 호텔 중복 확인 뒤에 해야 해서 `HotelService.create`가 따로 한다.
   - 마스터는 호텔 등록(`HotelService.create`)이 계정 도메인의 `HotelAdminService`로 같은 트랜잭션에서 만든다. 사전 확인은 호텔 중복 → 아이디 중복 순서이고, 저장은 호텔 → 마스터 순서다. 마스터 저장이 실패하면 호텔도 남지 않는다.
   - 전체 어드민의 마스터 관리(`ApiPaths.APP_ADMIN + "/hotels/{hotelId}/master"`의 조회·정보 수정과 `/password` 재설정, `AccountHotelMasterAppAdminController`)는 `HotelMasterService`가 한다. 호텔이 없으면 `HotelService.getHotel`의 404 `HOTEL_NOT_FOUND`, 호텔은 있는데 마스터가 없으면 404 `AccountErrorCode.HOTEL_MASTER_NOT_FOUND`다. 찾은 마스터의 변경은 `HotelAdminService`에 맡긴다.
-    - 순환 의존을 피해 서비스를 나눈다. `HotelService`가 마스터 생성에 `HotelAdminService`를 쓰므로 `HotelAdminService`는 호텔 도메인 Service를 쓰지 않는다. 호텔 확인이 필요한 계정 기능은 `HotelMasterService`처럼 따로 두어 `HotelMasterService → HotelService → HotelAdminService`, `HotelMasterService → HotelAdminService` 방향만 둔다.
+    - 순환 의존을 피해 서비스를 나눈다. `HotelService`가 마스터 생성에 `HotelAdminService`를 쓰므로 `HotelAdminService`는 호텔 도메인 Service를 쓰지 않는다. 호텔 확인이 필요한 계정 기능은 `HotelMasterService`, `HotelOperatorService`처럼 따로 두어 `HotelMasterService → HotelService → HotelAdminService`, `HotelMasterService → HotelAdminService` 방향만 둔다. `HotelOperatorService`도 같은 방향이다.
+  - 마스터의 운영자 관리(`ApiPaths.HOTEL_ADMIN + ApiPaths.OPERATORS`의 등록·목록·조회·정보 수정과 `/password` 재설정, `/active` 활성 상태 변경, `AccountHotelOperatorHotelAdminController`)는 `HotelOperatorService`가 한다. 마스터만 쓴다(보안 절).
+    - 대상 호텔은 로그인한 마스터 세션의 `HotelAdminPrincipal.hotelId`다. 등록은 `HotelService.getHotel(hotelId)`로 호텔을 읽어 `HotelAdminService.createOperator`에 맡긴다.
+    - 조회·변경할 계정은 같은 호텔의 `OPERATOR`만 찾는다(`findByIdAndHotelIdAndRole`). 없는 id, 다른 호텔의 계정, 마스터(자기 자신 포함)의 id는 모두 404 `AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND`다. 다른 호텔 계정의 존재를 알리지 않고, 마스터 계정은 이 API로 바꾸지 않기 위해서다. 찾은 운영자의 변경은 `HotelAdminService`에 맡긴다.
+    - 목록은 같은 호텔의 `OPERATOR`만 활성·비활성 모두 id 내림차순으로 준다. `active`(선택)로 상태를 거르고, `keyword`(선택, 100자)는 이름 또는 아이디에서 찾는다(`HotelAdminSpecifications.search`, 목록 조회 절). 호텔별 조회에 `hotel_admin_hotel_id_idx`(`V5__add_hotel_admin_hotel_id_index.sql`)를 쓴다.
 - `AppAdminUserDetailsService`가 로그인 아이디로 전체 어드민을 읽고 `Role.APP_ADMIN`을 준다. `HotelAdminUserDetailsService`는 활성 호텔 계정만 읽고 `Role.HOTEL_ADMIN`(마스터는 `Role.HOTEL_MASTER`도)을 준다. 이 빈들이 있어서 Spring Boot의 기본 사용자(`user`, 생성 비밀번호)는 만들어지지 않는다.
 - 첫 전체 어드민은 백엔드가 뜰 때(`account/config/InitialAdminConfig`의 `ApplicationRunner`) `urbanstay.initial-admin.*`(`login-id`, `password`, `name`) 설정값으로 만든다.
   - 전체 어드민이 하나도 없을 때만 만들고, 하나라도 있으면 아무것도 하지 않는다. 기존 계정은 바꾸지 않는다.
@@ -150,8 +166,8 @@ urbanstay/
 - 테스트
   - `@SpringBootTest` 컨텍스트가 뜰 때도 첫 어드민 생성이 실행되므로 테스트 DB에 어드민이 남아 있을 수 있다. 어드민이 없는 상태가 필요하면 테스트 트랜잭션 안에서 지우고 롤백한다.
   - 호텔 계정이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔의 `hotel_admin`을 먼저 지운다.
-  - 비활성화처럼 아직 API가 없는 변경과, 세션 확인 규칙만 따로 볼 때의 `credential_version` 변경은 테스트에서 DB를 직접 바꿔 재현한다.
-  - 마스터의 아이디 변경·비밀번호 재설정이 세션을 끊는지는 전체 어드민과 마스터가 각자 실제로 로그인한 `RANDOM_PORT` 서버에서 확인한다(`AccountHotelMasterAppAdminSessionTest`).
+  - 세션 확인 규칙만 따로 볼 때의 비활성화와 `credential_version` 변경은 테스트에서 DB를 직접 바꿔 재현한다(`AccountHotelAdminControllerTest`). 그 밖의 테스트에서 비활성 계정이 필요하면 API나 `HotelAdmin.changeActive`로 만든다.
+  - 마스터의 아이디 변경·비밀번호 재설정이 세션을 끊는지는 전체 어드민과 마스터가 각자 실제로 로그인한 `RANDOM_PORT` 서버에서 확인한다(`AccountHotelMasterAppAdminSessionTest`). 운영자의 아이디 변경·비밀번호 재설정·비활성화도 마스터와 운영자가 각자 실제로 로그인해 확인하고, 마스터 자신의 세션이 유지되는지도 함께 본다(`AccountHotelOperatorHotelAdminSessionTest`).
 
 ## 상수
 
@@ -185,11 +201,11 @@ urbanstay/
 - 동시 수정은 낙관적 잠금으로 막는다. 엔티티에 `@Version var version: Long`(`version bigint not null`)을 두고 응답에 `version`을 싣고, 수정 요청은 `version`을 필수로 받는다.
   - 서비스는 읽은 엔티티의 version이 요청과 다르면 도메인 409를 던진다.
   - 같은 version으로 동시에 들어온 수정은 flush 때 JPA가 막는다. flush를 서비스 안(`saveAndFlush`)에서 해 `OptimisticLockingFailureException`도 같은 도메인 409로 바꾼다. 커밋 때 터지면 서비스 밖이라 500이 된다.
-  - 지금 낙관적 잠금을 쓰는 엔티티는 `Hotel`(`HOTEL_MODIFIED`)과 `HotelAdmin`(`HOTEL_ADMIN_MODIFIED`)이다. version을 받지 않는 변경(예: 비밀번호 재설정)도 같은 엔티티를 바꾸면 같은 변환을 거친다.
+  - 지금 낙관적 잠금을 쓰는 엔티티는 `Hotel`(`HOTEL_MODIFIED`)과 `HotelAdmin`(`HOTEL_ADMIN_MODIFIED`)이다. version을 받지 않는 변경(예: 비밀번호 재설정, 활성 상태 변경)도 같은 엔티티를 바꾸면 같은 변환을 거친다.
 - 중복 확인 같은 조회는 엔티티를 바꾸기 전에 한다. 바뀐 엔티티가 있으면 조회 전 자동 flush로 제약 위반이 변환 범위 밖에서 난다.
 - 테스트는 두 경로를 모두 확인한다.
   - 동시 요청: 두 스레드를 `CountDownLatch`로 함께 출발시킨다.
-  - 사전 확인을 통과한 뒤 DB에서 막히는 경로: 먼저 온 트랜잭션을 열어 둔 채 다음 요청이 잠금을 기다리는지(`pg_stat_activity`) 확인하고 커밋한다(`HotelServiceTest`, `HotelMasterServiceTest`).
+  - 사전 확인을 통과한 뒤 DB에서 막히는 경로: 먼저 온 트랜잭션을 열어 둔 채 다음 요청이 잠금을 기다리는지(`pg_stat_activity`) 확인하고 커밋한다(`HotelServiceTest`, `HotelMasterServiceTest`, `HotelOperatorServiceTest`).
   - 동시 요청 테스트는 실행마다 어느 경로를 탈지 정해지지 않는다. 변환 코드를 지켜 주는 것은 순서를 고정한 경로 테스트다.
 
 ## 테스트

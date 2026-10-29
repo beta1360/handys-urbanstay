@@ -59,6 +59,13 @@ class HotelAdmin(
 		credentialVersion++
 	}
 
+	fun changeActive(active: Boolean) {
+		if (this.active && !active) {
+			credentialVersion++
+		}
+		this.active = active
+	}
+
 	companion object {
 		const val LOGIN_ID_MAX_LENGTH = 254
 		const val NAME_MAX_LENGTH = 50

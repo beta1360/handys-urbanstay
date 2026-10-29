@@ -188,6 +188,30 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	fun `불리언 요청 파라미터는 소문자 true와 false를 읽고 보내지 않은 선택 파라미터는 null이다`() {
+		mockMvc.get("$TEST_PATH/flags?active=true&visible=false").andExpectEnvelope(200, """{"success":true,"data":[true,false],"error":null}""")
+		mockMvc.get("$TEST_PATH/flags?active=false&visible=true").andExpectEnvelope(200, """{"success":true,"data":[false,true],"error":null}""")
+		mockMvc.get("$TEST_PATH/flags").andExpectEnvelope(200, """{"success":true,"data":[null,false],"error":null}""")
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["1", "0", "yes", "no", "on", "off", "TRUE", "True", "FALSE", "", " ", " true", "false ", "t", "2"])
+	fun `불리언 요청 파라미터에 소문자 true와 false가 아닌 값을 보내면 빈 값과 앞뒤 공백을 포함해 파라미터 이름과 형식 메시지로 400 응답한다`(value: String) {
+		mockMvc.get("$TEST_PATH/flags") { param("active", value) }.andExpectError(CommonErrorCode.INVALID_INPUT, fieldErrors("active", TYPE))
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["1", "yes", "TRUE", " ", " true"])
+	fun `기본값이 있는 non-null 불리언 요청 파라미터도 소문자 true와 false가 아닌 값은 형식 메시지로 400 응답한다`(value: String) {
+		mockMvc.get("$TEST_PATH/flags") { param("visible", value) }.andExpectError(CommonErrorCode.INVALID_INPUT, fieldErrors("visible", TYPE))
+	}
+
+	@Test
+	fun `기본값이 있는 요청 파라미터에 빈 값을 보내면 Spring이 변환 전에 기본값으로 바꾼다`() {
+		mockMvc.get("$TEST_PATH/flags?visible=").andExpectEnvelope(200, """{"success":true,"data":[null,false],"error":null}""")
+	}
+
+	@Test
 	fun `필수 요청 파라미터가 없으면 파라미터 이름과 필수 입력 메시지로 400 응답한다`() {
 		mockMvc.get("$TEST_PATH/search")
 			.andExpectError(CommonErrorCode.INVALID_INPUT, fieldErrors("keyword", REQUIRED))
@@ -325,6 +349,12 @@ class GlobalExceptionHandlerTest {
 			@RequestParam keyword: String,
 			@RequestParam(defaultValue = "1") @Min(value = 1, message = "페이지는 1 이상이어야 합니다.") page: Int,
 		): ApiResponse<String> = ApiResponse.success(keyword)
+
+		@GetMapping("/flags")
+		fun flags(
+			@RequestParam(required = false) active: Boolean?,
+			@RequestParam(defaultValue = "false") visible: Boolean,
+		): ApiResponse<List<Boolean?>> = ApiResponse.success(listOf(active, visible))
 
 		@GetMapping("/business-error")
 		fun businessError(): ApiResponse<Unit> = throw BusinessException(TestErrorCode.TEST_CONFLICT)
