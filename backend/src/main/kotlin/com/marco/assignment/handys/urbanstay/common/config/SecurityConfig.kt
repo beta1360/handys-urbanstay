@@ -66,7 +66,10 @@ class SecurityConfig(private val securityErrorHandler: SecurityErrorHandler) {
 	data class PublicApi(val method: HttpMethod, val path: String)
 
 	companion object {
-		val PUBLIC_ADMIN_APIS = listOf(PublicApi(HttpMethod.POST, ApiPaths.APP_ADMIN + ApiPaths.AUTH + ApiPaths.LOGIN))
+		val PUBLIC_ADMIN_APIS = listOf(
+			PublicApi(HttpMethod.POST, ApiPaths.APP_ADMIN + ApiPaths.AUTH + ApiPaths.LOGIN),
+			PublicApi(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.AUTH + ApiPaths.LOGIN),
+		)
 		private const val APP_PATTERN = "${ApiPaths.APP}/**"
 		private const val APP_ADMIN_PATTERN = "${ApiPaths.APP_ADMIN}/**"
 		private const val HOTEL_ADMIN_PATTERN = "${ApiPaths.HOTEL_ADMIN}/**"

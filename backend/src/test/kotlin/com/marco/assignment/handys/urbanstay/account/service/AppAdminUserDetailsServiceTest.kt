@@ -46,10 +46,11 @@ class AppAdminUserDetailsServiceTest {
 	}
 
 	@Test
-	fun `UserDetailsService 빈은 전체 어드민용 하나뿐이라 Spring Boot 기본 사용자를 만들지 않는다`() {
+	fun `UserDetailsService 빈은 전체 어드민용과 호텔 계정용뿐이라 Spring Boot 기본 사용자를 만들지 않는다`() {
 		assertThat(applicationContext.getBeansOfType(UserDetailsService::class.java).values)
-			.singleElement()
-			.isInstanceOf(AppAdminUserDetailsService::class.java)
+			.hasSize(2)
+			.hasAtLeastOneElementOfType(AppAdminUserDetailsService::class.java)
+			.hasAtLeastOneElementOfType(HotelAdminUserDetailsService::class.java)
 	}
 
 	companion object {
