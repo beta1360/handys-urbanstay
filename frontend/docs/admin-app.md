@@ -18,6 +18,7 @@
 - 서버 상태: TanStack Query, HTTP 요청: axios
 - 스타일: Tailwind CSS 기본값. 게스트 앱과 같은 규칙으로, 별도 디자인 토큰을 두지 않는다. UI 라이브러리 없이 화면 컴포넌트를 직접 만든다.
 - 테스트: Vitest + React Testing Library (`frontend/CLAUDE.md`의 테스트 규칙을 따른다)
+  - 라우터가 필요한 컴포넌트는 테스트 파일 안에서 memory history로 만든 라우터에 넣어 테스트한다. 앱의 라우트 트리는 가져오지 않는다. widgets·pages가 app 레이어를 import하게 되어 FSD 규칙에 어긋나기 때문이다.
 - 앱은 TanStack Router 공식 CLI(`@tanstack/cli create --router-only`)로 만들고, 생성된 예제 파일은 걷어낸다.
 
 ## 구조

@@ -25,6 +25,8 @@ apps/app-admin/
 ├─ index.html          # 진입점: /src/app/entrypoint/main.tsx
 ├─ orval.config.ts     # API 코드 생성 설정
 ├─ tsr.config.json     # 라우트 생성 설정
+├─ vitest.config.mts   # 테스트 설정. vite.config.ts와 따로 둬서 라우터 플러그인·proxy를 읽지 않는다
+├─ vitest-setup.ts     # jest-dom 매처 등록, 테스트마다 cleanup
 └─ src/
    ├─ app/
    │  ├─ entrypoint/   # main.tsx, app-providers.tsx (Provider 조합)
@@ -64,5 +66,7 @@ TanStack Router 파일 기반 라우팅이 정한 이름은 kebab-case 규칙의
 - 빌드: `pnpm --filter app-admin build` (`tsr generate` → `tsc --noEmit` → `vite build`)
 - 린트: `pnpm --filter app-admin lint` (ESLint + Steiger)
 - 타입 검사: `pnpm --filter app-admin typecheck` (`tsc --noEmit`)
+- 테스트: `pnpm --filter app-admin test` (한 번 실행)
+- 테스트 감시 모드: `pnpm --filter app-admin test:watch`
 - API 코드 생성: `pnpm --filter app-admin codegen`. 백엔드가 실행 중이어야 한다.
 - 라우트 트리만 다시 만들기: `pnpm --filter app-admin exec tsr generate`. 개발 서버와 빌드는 라우트 트리를 자동으로 다시 만든다.
