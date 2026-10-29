@@ -105,6 +105,7 @@ class AccountHotelOperatorHotelAdminSessionTest {
 		assertError(operatorBrowser.post(OPERATORS, createBody("new-$suffix@test.local", NEW_PASSWORD)), CommonErrorCode.FORBIDDEN)
 		assertError(operatorBrowser.put(operatorPath(), updateBody("new-$suffix@test.local", OPERATOR_NAME, 0)), CommonErrorCode.FORBIDDEN)
 		assertError(operatorBrowser.put("${operatorPath()}/password", passwordBody(NEW_PASSWORD)), CommonErrorCode.FORBIDDEN)
+		assertError(operatorBrowser.put("${operatorPath()}/active", activeBody(false)), CommonErrorCode.FORBIDDEN)
 		assertThat(me(operatorBrowser)["loginId"].stringValue()).isEqualTo(operatorLoginId)
 		assertThat(hotelAdminRepository.findAll().filter { it.loginId == "new-$suffix@test.local" }).isEmpty()
 	}
@@ -150,6 +151,33 @@ class AccountHotelOperatorHotelAdminSessionTest {
 		assertThat(me(masterBrowser)["loginId"].stringValue()).isEqualTo(masterLoginId)
 	}
 
+	@Test
+	fun `마스터가 운영자를 비활성화하면 운영자 세션은 401로 끊기고 로그인할 수 없으며, 다시 활성화해도 끊긴 세션은 그대로이고 새로 로그인한다`() {
+		val masterBrowser = loggedIn(masterLoginId, PASSWORD)
+		val operatorBrowser = loggedIn(operatorLoginId, PASSWORD)
+
+		assertThat(masterBrowser.put("${operatorPath()}/active", activeBody(false)).statusCode()).isEqualTo(HttpStatus.OK.value())
+
+		assertError(operatorBrowser.get(ME), CommonErrorCode.UNAUTHORIZED)
+		assertError(Browser().withXsrfToken().post(LOGIN, loginBody(operatorLoginId, PASSWORD)), AccountErrorCode.INVALID_CREDENTIALS)
+
+		assertThat(masterBrowser.put("${operatorPath()}/active", activeBody(true)).statusCode()).isEqualTo(HttpStatus.OK.value())
+
+		assertError(operatorBrowser.get(ME), CommonErrorCode.UNAUTHORIZED)
+		assertThat(me(loggedIn(operatorLoginId, PASSWORD))["loginId"].stringValue()).isEqualTo(operatorLoginId)
+		assertThat(me(masterBrowser)["loginId"].stringValue()).isEqualTo(masterLoginId)
+	}
+
+	@Test
+	fun `마스터가 이미 활성인 운영자를 활성으로 바꾸면 운영자 세션은 유지된다`() {
+		val masterBrowser = loggedIn(masterLoginId, PASSWORD)
+		val operatorBrowser = loggedIn(operatorLoginId, PASSWORD)
+
+		assertThat(masterBrowser.put("${operatorPath()}/active", activeBody(true)).statusCode()).isEqualTo(HttpStatus.OK.value())
+
+		repeat(2) { assertThat(me(operatorBrowser)["loginId"].stringValue()).isEqualTo(operatorLoginId) }
+	}
+
 	private fun encode(password: String): String = checkNotNull(passwordEncoder.encode(password))
 
 	private fun loggedIn(loginId: String, password: String): Browser =
@@ -176,6 +204,8 @@ class AccountHotelOperatorHotelAdminSessionTest {
 		jsonMapper.writeValueAsString(mapOf("loginId" to loginId, "name" to name, "version" to version))
 
 	private fun passwordBody(password: String): String = jsonMapper.writeValueAsString(mapOf("password" to password))
+
+	private fun activeBody(active: Boolean): String = jsonMapper.writeValueAsString(mapOf("active" to active))
 
 	private fun operatorPath(): String = "$OPERATORS/${operator.id}"
 

@@ -247,11 +247,12 @@ class AccountHotelOperatorHotelAdminControllerTest {
 	}
 
 	@Test
-	fun `없는 id, 다른 호텔의 계정, 마스터 자신의 id로 조회, 수정, 비밀번호 재설정하면 모두 404 HOTEL_OPERATOR_NOT_FOUND로 응답하고 바꾸지 않는다`() {
+	fun `없는 id, 다른 호텔의 계정, 마스터 자신의 id로 조회, 수정, 비밀번호 재설정, 활성 상태 변경하면 모두 404 HOTEL_OPERATOR_NOT_FOUND로 응답하고 바꾸지 않는다`() {
 		listOf(MISSING_ID, checkNotNull(otherOperator.id), checkNotNull(otherMaster.id), checkNotNull(master.id)).forEach { id ->
 			getOperator(id).andExpectError(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND)
 			update(id, updateBody(0, "name" to "새 이름")).andExpectError(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND)
 			resetPassword(id, passwordBody()).andExpectError(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND)
+			changeActive(id, activeBody(false)).andExpectError(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND)
 		}
 		listOf(otherOperator, otherMaster, master).forEach(::assertUnchanged)
 	}
@@ -302,12 +303,12 @@ class AccountHotelOperatorHotelAdminControllerTest {
 	fun `비활성 운영자도 정보를 수정하고 비밀번호를 재설정할 수 있으며 비활성 상태는 그대로다`() {
 		val operator = saveOperator().also(::deactivate)
 
-		val data = update(operator.id!!, updateBody(0, "name" to "새 이름")).andExpectSuccess(HttpStatus.OK)
+		val data = update(operator.id!!, updateBody(1, "name" to "새 이름")).andExpectSuccess(HttpStatus.OK)
 		resetPassword(operator.id!!, passwordBody()).andExpectSuccess(HttpStatus.OK)
 
-		assertThat(data).isEqualTo(operatorJson(operator.id!!, operatorLoginId, "새 이름", false, 1))
+		assertThat(data).isEqualTo(operatorJson(operator.id!!, operatorLoginId, "새 이름", false, 2))
 		val saved = reload(operator)
-		assertThat(listOf(saved.active, saved.version, saved.credentialVersion)).containsExactly(false, 2L, 1L)
+		assertThat(listOf(saved.active, saved.version, saved.credentialVersion)).containsExactly(false, 3L, 2L)
 	}
 
 	@ParameterizedTest
@@ -456,6 +457,77 @@ class AccountHotelOperatorHotelAdminControllerTest {
 	}
 
 	@Test
+	fun `운영자를 비활성화하면 version과 로그인 정보 버전을 올리고 활성 여부가 false인 운영자를 200으로 응답한다`() {
+		val operator = saveOperator()
+
+		val data = changeActive(operator.id!!, activeBody(false)).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data).isEqualTo(operatorJson(operator.id!!, operatorLoginId, OPERATOR_NAME, false, 1))
+		val saved = reload(operator)
+		assertThat(listOf(saved.active, saved.version, saved.credentialVersion, saved.loginId, saved.passwordHash))
+			.containsExactly(false, 1L, 1L, operatorLoginId, PASSWORD_HASH)
+	}
+
+	@Test
+	fun `비활성 운영자를 다시 활성화하면 version만 올리고 로그인 정보 버전은 그대로 둔다`() {
+		val operator = saveOperator().also(::deactivate)
+
+		val data = changeActive(operator.id!!, activeBody(true)).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data).isEqualTo(operatorJson(operator.id!!, operatorLoginId, OPERATOR_NAME, true, 2))
+		assertThat(reload(operator).credentialVersion).isEqualTo(1)
+	}
+
+	@Test
+	fun `이미 요청한 상태로 바꾸면 아무것도 바꾸지 않고 version 그대로 200으로 응답한다`() {
+		val operator = saveOperator()
+
+		assertThat(changeActive(operator.id!!, activeBody(true)).andExpectSuccess(HttpStatus.OK)).isEqualTo(operatorJson(operator))
+		assertUnchanged(operator)
+		changeActive(operator.id!!, activeBody(false)).andExpectSuccess(HttpStatus.OK)
+		val deactivated = reload(operator)
+
+		assertThat(changeActive(operator.id!!, activeBody(false)).andExpectSuccess(HttpStatus.OK)).isEqualTo(operatorJson(deactivated))
+		assertUnchanged(deactivated)
+	}
+
+	@Test
+	fun `활성 상태를 바꾼 뒤 그 전에 조회한 version으로 정보를 수정하면 409 HOTEL_ADMIN_MODIFIED로 응답한다`() {
+		val operator = saveOperator()
+
+		changeActive(operator.id!!, activeBody(false)).andExpectSuccess(HttpStatus.OK)
+
+		update(operator.id!!, updateBody(0, "name" to "새 이름")).andExpectError(AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+		assertThat(reload(operator).name).isEqualTo(OPERATOR_NAME)
+	}
+
+	@Test
+	fun `같은 운영자를 동시에 두 번 비활성화해도 로그인 정보 버전은 한 번만 오르고 늦은 쪽은 이미 그 상태라 200이거나 409 HOTEL_ADMIN_MODIFIED다`() {
+		val operator = saveOperator()
+
+		val responses = concurrently { changeActive(operator.id!!, activeBody(false)).andReturn().response }
+
+		assertThat(responses.map { it.status }).contains(HttpStatus.OK.value()).isSubsetOf(HttpStatus.OK.value(), HttpStatus.CONFLICT.value())
+		responses.filter { it.status == HttpStatus.CONFLICT.value() }.forEach { assertError(it, AccountErrorCode.HOTEL_ADMIN_MODIFIED) }
+		val saved = reload(operator)
+		assertThat(listOf(saved.active, saved.version, saved.credentialVersion)).containsExactly(false, 1L, 1L)
+	}
+
+	@Test
+	fun `활성 상태 변경 요청의 active가 없거나 null이면 필수 입력, 불리언이 아니면 형식, version을 보내면 알 수 없는 항목 메시지로 400 응답한다`() {
+		val operator = saveOperator()
+
+		changeActive(operator.id!!, emptyMap()).andExpectError(CommonErrorCode.INVALID_INPUT, "active" to message(REQUIRED))
+		changeActive(operator.id!!, mapOf("active" to null)).andExpectError(CommonErrorCode.INVALID_INPUT, "active" to message(REQUIRED))
+		listOf("false", 0, listOf(false)).forEach { value ->
+			changeActive(operator.id!!, mapOf("active" to value)).andExpectError(CommonErrorCode.INVALID_INPUT, "active" to message(TYPE))
+		}
+		changeActive(operator.id!!, activeBody(false) + ("version" to 0))
+			.andExpectError(CommonErrorCode.INVALID_INPUT, "version" to message("validation.unknown-field"))
+		assertUnchanged(operator)
+	}
+
+	@Test
 	fun `목록은 기본값 page 0, size 10으로 마스터의 호텔 운영자만 활성·비활성 모두 최근 등록 순으로 조회한다`() {
 		val ids = saveOperators(11)
 		deactivate(hotelAdminRepository.findById(ids[3]).orElseThrow())
@@ -563,6 +635,7 @@ class AccountHotelOperatorHotelAdminControllerTest {
 		mockMvc.post(OPERATORS) { withCsrf(); jsonBody(createBody("loginId" to "new-$suffix@test.local")) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
 		mockMvc.put("$OPERATORS/${operator.id}") { withCsrf(); jsonBody(updateBody(0, "name" to "새 이름")) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
 		mockMvc.put("$OPERATORS/${operator.id}/password") { withCsrf(); jsonBody(passwordBody()) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
+		mockMvc.put("$OPERATORS/${operator.id}/active") { withCsrf(); jsonBody(activeBody(false)) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
 		assertThat(operatorIds()).containsExactly(operator.id)
 		assertUnchanged(operator)
 	}
@@ -579,13 +652,14 @@ class AccountHotelOperatorHotelAdminControllerTest {
 			create(createBody("loginId" to "new-$suffix@test.local"), principal).andExpectError(CommonErrorCode.FORBIDDEN)
 			update(operator.id!!, updateBody(0, "name" to "새 이름"), principal).andExpectError(CommonErrorCode.FORBIDDEN)
 			resetPassword(operator.id!!, passwordBody(), principal).andExpectError(CommonErrorCode.FORBIDDEN)
+			changeActive(operator.id!!, activeBody(false), principal).andExpectError(CommonErrorCode.FORBIDDEN)
 		}
 		assertThat(operatorIds()).containsExactly(operator.id)
 		assertUnchanged(operator)
 	}
 
 	@Test
-	fun `CSRF 토큰 없이 등록, 수정, 비밀번호 재설정하면 403 INVALID_CSRF_TOKEN으로 응답하고 바꾸지 않는다`() {
+	fun `CSRF 토큰 없이 등록, 수정, 비밀번호 재설정, 활성 상태 변경하면 403 INVALID_CSRF_TOKEN으로 응답하고 바꾸지 않는다`() {
 		val operator = saveOperator()
 
 		mockMvc.post(OPERATORS) { with(user(masterPrincipal)); jsonBody(createBody("loginId" to "new-$suffix@test.local")) }
@@ -593,6 +667,8 @@ class AccountHotelOperatorHotelAdminControllerTest {
 		mockMvc.put("$OPERATORS/${operator.id}") { with(user(masterPrincipal)); jsonBody(updateBody(0, "name" to "새 이름")) }
 			.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
 		mockMvc.put("$OPERATORS/${operator.id}/password") { with(user(masterPrincipal)); jsonBody(passwordBody()) }
+			.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
+		mockMvc.put("$OPERATORS/${operator.id}/active") { with(user(masterPrincipal)); jsonBody(activeBody(false)) }
 			.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
 		assertThat(operatorIds()).containsExactly(operator.id)
 		assertUnchanged(operator)
@@ -604,10 +680,12 @@ class AccountHotelOperatorHotelAdminControllerTest {
 		val operators = docs["paths"][OPERATORS]
 		val operator = docs["paths"]["$OPERATORS/{operatorId}"]
 		val reset = docs["paths"]["$OPERATORS/{operatorId}/password"]["put"]
-		val operations = listOf(operators["post"], operators["get"], operator["get"], operator["put"], reset)
+		val active = docs["paths"]["$OPERATORS/{operatorId}/active"]["put"]
+		val operations = listOf(operators["post"], operators["get"], operator["get"], operator["put"], reset, active)
 
-		assertThat(operations.map { it["operationId"].stringValue() })
-			.containsExactly("createHotelOperator", "getHotelOperators", "getHotelOperator", "updateHotelOperator", "resetHotelOperatorPassword")
+		assertThat(operations.map { it["operationId"].stringValue() }).containsExactly(
+			"createHotelOperator", "getHotelOperators", "getHotelOperator", "updateHotelOperator", "resetHotelOperatorPassword", "updateHotelOperatorActive",
+		)
 		assertThat(operations.map { op -> op["tags"].values().map { it.stringValue() } }).containsOnly(listOf("account"))
 		assertThat(docs["tags"].values().single { it["name"].stringValue() == "account" }["description"].stringValue())
 			.isEqualTo(message("openapi.hotel-admin.tag.account"))
@@ -619,14 +697,15 @@ class AccountHotelOperatorHotelAdminControllerTest {
 		assertThat(errorCodes(operators["post"], HttpStatus.CONFLICT)).containsExactly(AccountErrorCode.LOGIN_ID_DUPLICATED.code)
 		assertThat(operators["get"]["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "403", "500")
 		assertThat(operator["get"]["responses"].propertyNames()).doesNotContain("409")
-		listOf(operator["get"], operator["put"], reset).forEach { op ->
+		listOf(operator["get"], operator["put"], reset, active).forEach { op ->
 			assertThat(errorCodes(op, HttpStatus.NOT_FOUND)).containsExactly(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND.code)
 			assertThat(op["parameters"].values().map { it["name"].stringValue() }).containsExactly("operatorId")
 		}
 		assertThat(errorCodes(operator["put"], HttpStatus.CONFLICT))
 			.containsExactlyInAnyOrder(AccountErrorCode.LOGIN_ID_DUPLICATED.code, AccountErrorCode.HOTEL_ADMIN_MODIFIED.code)
-		assertThat(errorCodes(reset, HttpStatus.CONFLICT)).containsExactly(AccountErrorCode.HOTEL_ADMIN_MODIFIED.code)
+		listOf(reset, active).forEach { assertThat(errorCodes(it, HttpStatus.CONFLICT)).containsExactly(AccountErrorCode.HOTEL_ADMIN_MODIFIED.code) }
 		assertThat(reset["responses"]["200"]["content"][JSON]["schema"]).isEqualTo(schemaRef("EmptyApiResponse"))
+		assertThat(active["responses"]["200"]["content"][JSON]["schema"]).isEqualTo(schemaRef("ApiResponseAccountHotelOperatorHotelAdminResponse"))
 	}
 
 	@Test
@@ -664,6 +743,7 @@ class AccountHotelOperatorHotelAdminControllerTest {
 			"AccountHotelOperatorCreateHotelAdminRequest" to mapOf("loginId" to loginId, "name" to name, "password" to password),
 			"AccountHotelOperatorUpdateHotelAdminRequest" to mapOf("loginId" to loginId, "name" to name, "version" to listOf(null, null, null)),
 			"AccountHotelOperatorPasswordResetHotelAdminRequest" to mapOf("password" to password),
+			"AccountHotelOperatorActiveUpdateHotelAdminRequest" to mapOf("active" to listOf(null, null, null)),
 		)
 
 		assertThat(docs["paths"][OPERATORS]["post"]["responses"]["201"]["content"][JSON]["schema"])
@@ -678,6 +758,7 @@ class AccountHotelOperatorHotelAdminControllerTest {
 			assertThat(required(request)).describedAs(schemaName).containsExactlyInAnyOrderElementsOf(rules.keys)
 			assertThat(actual).describedAs(schemaName).containsExactlyInAnyOrderEntriesOf(rules)
 		}
+		assertThat(schemas["AccountHotelOperatorActiveUpdateHotelAdminRequest"]["properties"]["active"]["type"].stringValue()).isEqualTo("boolean")
 	}
 
 	private fun create(body: Map<String, Any?>, principal: UserDetails = masterPrincipal): ResultActionsDsl =
@@ -710,6 +791,13 @@ class AccountHotelOperatorHotelAdminControllerTest {
 			jsonBody(body)
 		}
 
+	private fun changeActive(id: Long, body: Map<String, Any?>, principal: UserDetails = masterPrincipal): ResultActionsDsl =
+		mockMvc.put("$OPERATORS/$id/active") {
+			with(user(principal))
+			withCsrf()
+			jsonBody(body)
+		}
+
 	private fun MockHttpServletRequestDsl.withCsrf() {
 		cookie(xsrf)
 		header(XSRF_HEADER, xsrf.value)
@@ -728,6 +816,8 @@ class AccountHotelOperatorHotelAdminControllerTest {
 
 	private fun passwordBody(password: String = NEW_PASSWORD): Map<String, Any?> = mapOf("password" to password)
 
+	private fun activeBody(active: Boolean): Map<String, Any?> = mapOf("active" to active)
+
 	private fun saveHotel(name: String): Hotel =
 		hotelRepository.save(Hotel(name, "서울 $suffix", PHONE, null)).also { createdHotelIds += checkNotNull(it.id) }
 
@@ -740,7 +830,7 @@ class AccountHotelOperatorHotelAdminControllerTest {
 		(1..count).map { checkNotNull(saveHotelAdmin(hotel, "list-$it-$suffix@test.local", "목록 $it", HotelAdminRole.OPERATOR).id) }
 
 	private fun deactivate(hotelAdmin: HotelAdmin) {
-		jdbcTemplate.update("update hotel_admin set active = false where id = ?", hotelAdmin.id)
+		changeActive(checkNotNull(hotelAdmin.id), activeBody(false)).andExpectSuccess(HttpStatus.OK)
 	}
 
 	private fun reload(hotelAdmin: HotelAdmin): HotelAdmin = hotelAdminRepository.findById(checkNotNull(hotelAdmin.id)).orElseThrow()

@@ -105,6 +105,27 @@ class HotelAdminRepositoryTest {
 	}
 
 	@Test
+	fun `비활성화할 때만 로그인 정보 버전이 커지고 다시 활성화나 지금과 같은 상태로의 변경은 그대로 두며 version은 상태가 바뀔 때만 커진다`() {
+		val hotelAdmin = hotelAdminRepository.saveAndFlush(admin(hotel, "active-$suffix@test.local", HotelAdminRole.OPERATOR))
+		val states = listOf(true, false, false, true, true).map { active ->
+			hotelAdmin.changeActive(active)
+			hotelAdminRepository.flush()
+			listOf(hotelAdmin.active, hotelAdmin.version, hotelAdmin.credentialVersion)
+		}
+		entityManager.clear()
+
+		assertThat(states).containsExactly(
+			listOf(true, 0L, 0L),
+			listOf(false, 1L, 1L),
+			listOf(false, 1L, 1L),
+			listOf(true, 2L, 1L),
+			listOf(true, 2L, 1L),
+		)
+		val found = hotelAdminRepository.findById(checkNotNull(hotelAdmin.id)).orElseThrow()
+		assertThat(listOf(found.active, found.version, found.credentialVersion)).containsExactly(true, 2L, 1L)
+	}
+
+	@Test
 	fun `대소문자와 앞뒤 공백만 다른 로그인 아이디는 다른 호텔이어도 이름 있는 DB 유일 제약이 저장을 막는다`() {
 		hotelAdminRepository.saveAndFlush(admin(hotel, "duplicate-$suffix@test.local", HotelAdminRole.MASTER))
 
@@ -233,8 +254,8 @@ class HotelAdminRepositoryTest {
 		hotelAdminRepository.saveAndFlush(HotelAdmin(hotel, loginId, PASSWORD_HASH, name, role))
 
 	private fun deactivate(hotelAdmin: HotelAdmin) {
-		jdbcTemplate.update("update hotel_admin set active = false where id = ?", hotelAdmin.id)
-		entityManager.clear()
+		hotelAdmin.changeActive(false)
+		hotelAdminRepository.flush()
 	}
 
 	private fun search(role: HotelAdminRole, active: Boolean?, keyword: String?): List<Long?> =

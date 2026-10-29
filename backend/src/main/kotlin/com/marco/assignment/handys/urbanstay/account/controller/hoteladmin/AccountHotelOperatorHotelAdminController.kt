@@ -1,5 +1,6 @@
 package com.marco.assignment.handys.urbanstay.account.controller.hoteladmin
 
+import com.marco.assignment.handys.urbanstay.account.dto.hoteladmin.AccountHotelOperatorActiveUpdateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.account.dto.hoteladmin.AccountHotelOperatorCreateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.account.dto.hoteladmin.AccountHotelOperatorHotelAdminResponse
 import com.marco.assignment.handys.urbanstay.account.dto.hoteladmin.AccountHotelOperatorPasswordResetHotelAdminRequest
@@ -118,6 +119,21 @@ class AccountHotelOperatorHotelAdminController(
 	): ApiResponse<Nothing?> {
 		hotelOperatorService.resetPassword(master.hotelId, operatorId, request.password)
 		return ApiResponse.success(null)
+	}
+
+	@Operation(
+		summary = "openapi.hotel-admin.operation.updateHotelOperatorActive.summary",
+		description = "openapi.hotel-admin.operation.updateHotelOperatorActive.description",
+	)
+	@AccountApiErrors(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND, AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+	@PutMapping("/{operatorId}/active")
+	fun updateHotelOperatorActive(
+		@AuthenticationPrincipal master: HotelAdminPrincipal,
+		@PathVariable operatorId: Long,
+		@Valid @RequestBody request: AccountHotelOperatorActiveUpdateHotelAdminRequest,
+	): ApiResponse<AccountHotelOperatorHotelAdminResponse> {
+		val operator = hotelOperatorService.changeActive(master.hotelId, operatorId, request.active)
+		return ApiResponse.success(AccountHotelOperatorHotelAdminResponse.from(operator))
 	}
 
 	companion object {

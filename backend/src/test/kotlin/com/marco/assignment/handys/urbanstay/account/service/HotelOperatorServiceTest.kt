@@ -129,6 +129,36 @@ class HotelOperatorServiceTest {
 		assertThat(listOf(saved.name, saved.passwordHash, saved.version, saved.credentialVersion)).containsExactly(FIRST_NAME, PASSWORD_HASH, 1L, 0L)
 	}
 
+	@Test
+	fun `먼저 온 수정이 커밋되기 전에 읽은 비활성화도 JPA 버전 검사에 막혀 HOTEL_ADMIN_MODIFIED로 거절되고 활성 상태는 그대로다`() {
+		val operator = saveOperator("operator-$suffix@test.local")
+
+		val second = runSecondWhileFirstUncommitted(
+			first = { hotelOperatorService.update(hotelIdOf(operator), checkNotNull(operator.id), 0, operator.loginId, FIRST_NAME) },
+			second = { hotelOperatorService.changeActive(hotelIdOf(operator), checkNotNull(operator.id), false) },
+			lockedTable = "hotel_admin",
+		)
+
+		assertErrorCode(second, AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+		val saved = reload(operator)
+		assertThat(listOf(saved.name, saved.active, saved.version, saved.credentialVersion)).containsExactly(FIRST_NAME, true, 1L, 0L)
+	}
+
+	@Test
+	fun `먼저 온 비활성화가 커밋되기 전에 읽은 같은 비활성화도 JPA 버전 검사에 막혀 로그인 정보 버전은 한 번만 오른다`() {
+		val operator = saveOperator("operator-$suffix@test.local")
+
+		val second = runSecondWhileFirstUncommitted(
+			first = { hotelOperatorService.changeActive(hotelIdOf(operator), checkNotNull(operator.id), false) },
+			second = { hotelOperatorService.changeActive(hotelIdOf(operator), checkNotNull(operator.id), false) },
+			lockedTable = "hotel_admin",
+		)
+
+		assertErrorCode(second, AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+		val saved = reload(operator)
+		assertThat(listOf(saved.active, saved.version, saved.credentialVersion)).containsExactly(false, 1L, 1L)
+	}
+
 	private fun saveHotel(name: String): Hotel =
 		hotelRepository.save(Hotel(name, "서울 $suffix", PHONE, null)).also { createdHotelIds += checkNotNull(it.id) }
 

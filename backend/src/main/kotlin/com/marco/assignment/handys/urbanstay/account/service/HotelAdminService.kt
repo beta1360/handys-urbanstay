@@ -59,6 +59,12 @@ class HotelAdminService(
 		translateConflicts { hotelAdminRepository.saveAndFlush(hotelAdmin) }
 	}
 
+	@Transactional
+	fun changeActive(hotelAdmin: HotelAdmin, active: Boolean): HotelAdmin {
+		hotelAdmin.changeActive(active)
+		return translateConflicts { hotelAdminRepository.saveAndFlush(hotelAdmin) }
+	}
+
 	private fun create(hotel: Hotel, loginId: String, name: String, password: String, role: HotelAdminRole): HotelAdmin {
 		val passwordHash = checkNotNull(passwordEncoder.encode(password))
 		return translateConflicts { hotelAdminRepository.saveAndFlush(HotelAdmin(hotel, loginId, passwordHash, name, role)) }
