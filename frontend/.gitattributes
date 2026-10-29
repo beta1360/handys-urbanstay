@@ -1,0 +1,2 @@
+apps/*/src/app/router/route-tree.gen.ts text eol=lf
+apps/*/src/shared/api/generated/** text eol=lf
