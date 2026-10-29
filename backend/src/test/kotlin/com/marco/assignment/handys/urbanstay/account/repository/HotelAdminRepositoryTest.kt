@@ -17,6 +17,8 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.context.annotation.Import
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.jdbc.core.JdbcTemplate
 import java.util.UUID
 
@@ -169,6 +171,78 @@ class HotelAdminRepositoryTest {
 		assertThat(hotelAdminRepository.findAll().map { it.loginId }).contains("insert-$suffix@test.local")
 	}
 
+	@Test
+	fun `호텔별 계정 목록을 찾도록 hotel_id에 이름 있는 인덱스를 둔다`() {
+		val definition = jdbcTemplate.queryForObject(INDEX_DEFINITION, String::class.java, "hotel_admin_hotel_id_idx")
+
+		assertThat(definition).isEqualTo("CREATE INDEX hotel_admin_hotel_id_idx ON public.hotel_admin USING btree (hotel_id)")
+	}
+
+	@Test
+	fun `계정 검색은 같은 호텔의 요청한 역할만 찾고 활성 여부를 주면 그 상태만 찾는다`() {
+		val master = save(hotel, "master-$suffix@test.local", NAME, HotelAdminRole.MASTER)
+		val active = save(hotel, "active-$suffix@test.local", NAME, HotelAdminRole.OPERATOR)
+		val inactive = save(hotel, "inactive-$suffix@test.local", NAME, HotelAdminRole.OPERATOR)
+		save(otherHotel, "other-$suffix@test.local", NAME, HotelAdminRole.OPERATOR)
+		deactivate(inactive)
+
+		assertThat(search(HotelAdminRole.OPERATOR, null, null)).containsExactly(inactive.id, active.id)
+		assertThat(search(HotelAdminRole.OPERATOR, true, null)).containsExactly(active.id)
+		assertThat(search(HotelAdminRole.OPERATOR, false, null)).containsExactly(inactive.id)
+		assertThat(search(HotelAdminRole.MASTER, null, null)).containsExactly(master.id)
+	}
+
+	@Test
+	fun `검색어가 이름이나 아이디에 들어 있는 계정을 대소문자 구분 없이 찾고 활성 여부와 함께 거른다`() {
+		val byName = save(hotel, "first-$suffix@test.local", "Front Desk", HotelAdminRole.OPERATOR)
+		val byLoginId = save(hotel, "front-$suffix@test.local", NAME, HotelAdminRole.OPERATOR)
+		val inactive = save(hotel, "night-$suffix@test.local", "FRONT 야간", HotelAdminRole.OPERATOR)
+		save(hotel, "clean-$suffix@test.local", "청소", HotelAdminRole.OPERATOR)
+		save(hotel, "front-master-$suffix@test.local", "Front 마스터", HotelAdminRole.MASTER)
+		save(otherHotel, "front-other-$suffix@test.local", "Front", HotelAdminRole.OPERATOR)
+		deactivate(inactive)
+
+		assertThat(search(HotelAdminRole.OPERATOR, null, "fRoNt")).containsExactly(inactive.id, byLoginId.id, byName.id)
+		assertThat(search(HotelAdminRole.OPERATOR, true, "FRONT")).containsExactly(byLoginId.id, byName.id)
+		assertThat(search(HotelAdminRole.OPERATOR, false, "front")).containsExactly(inactive.id)
+		assertThat(search(HotelAdminRole.OPERATOR, null, "없는 검색어")).isEmpty()
+	}
+
+	@ParameterizedTest
+	@CsvSource(
+		"name, '50%', '50원'",
+		"name, 'a_b', 'axb'",
+		"name, 'c\\d', 'cd'",
+		"loginId, '50%', '50x'",
+		"loginId, 'a_b', 'axb'",
+		"loginId, 'c\\d', 'cd'",
+	)
+	fun `검색어의 퍼센트, 밑줄, 역슬래시는 이름과 아이디 모두 와일드카드가 아니라 글자 그대로 찾는다`(field: String, literal: String, decoy: String) {
+		val (target, _) = listOf(literal, decoy).mapIndexed { index, value ->
+			if (field == "name") {
+				save(hotel, "name-$index-$suffix@test.local", "$suffix $value", HotelAdminRole.OPERATOR)
+			} else {
+				save(hotel, "$value-$suffix@test.local", NAME, HotelAdminRole.OPERATOR)
+			}
+		}
+
+		assertThat(search(HotelAdminRole.OPERATOR, null, literal)).containsExactly(target.id)
+	}
+
+	private fun save(hotel: Hotel, loginId: String, name: String, role: HotelAdminRole): HotelAdmin =
+		hotelAdminRepository.saveAndFlush(HotelAdmin(hotel, loginId, PASSWORD_HASH, name, role))
+
+	private fun deactivate(hotelAdmin: HotelAdmin) {
+		jdbcTemplate.update("update hotel_admin set active = false where id = ?", hotelAdmin.id)
+		entityManager.clear()
+	}
+
+	private fun search(role: HotelAdminRole, active: Boolean?, keyword: String?): List<Long?> =
+		hotelAdminRepository.findAll(
+			HotelAdminSpecifications.search(checkNotNull(hotel.id), role, active, keyword),
+			PageRequest.of(0, 100, Sort.by(Sort.Direction.DESC, "id")),
+		).content.map { it.id }
+
 	private fun admin(hotel: Hotel, loginId: String, role: HotelAdminRole): HotelAdmin =
 		HotelAdmin(hotel, loginId, PASSWORD_HASH, NAME, role)
 
@@ -190,5 +264,6 @@ class HotelAdminRepositoryTest {
 			from information_schema.columns
 			where table_schema = 'public' and table_name in ('hotel', 'hotel_admin') and column_name = 'version'
 		"""
+		private const val INDEX_DEFINITION = "select indexdef from pg_indexes where schemaname = 'public' and tablename = 'hotel_admin' and indexname = ?"
 	}
 }

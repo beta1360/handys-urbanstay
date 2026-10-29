@@ -41,6 +41,7 @@ class SecurityConfig(
 			.authorizeHttpRequests { registry ->
 				PUBLIC_ADMIN_APIS.forEach { registry.requestMatchers(it.method, it.path).permitAll() }
 				registry.requestMatchers(APP_ADMIN_PATTERN).hasRole(Role.APP_ADMIN.name)
+					.requestMatchers(HOTEL_MASTER_PATTERN).hasRole(Role.HOTEL_MASTER.name)
 					.requestMatchers(HOTEL_ADMIN_PATTERN).hasRole(Role.HOTEL_ADMIN.name)
 			}
 			.csrf { it.spa().csrfTokenRepository(adminCsrfTokenRepository) }
@@ -81,6 +82,7 @@ class SecurityConfig(
 		private const val APP_PATTERN = "${ApiPaths.APP}/**"
 		private const val APP_ADMIN_PATTERN = "${ApiPaths.APP_ADMIN}/**"
 		private const val HOTEL_ADMIN_PATTERN = "${ApiPaths.HOTEL_ADMIN}/**"
+		private const val HOTEL_MASTER_PATTERN = "${ApiPaths.HOTEL_ADMIN}${ApiPaths.OPERATORS}/**"
 		private val DOCS_PATTERNS = arrayOf("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**")
 
 		fun isPublicAdminApi(method: String, path: String): Boolean =

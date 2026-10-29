@@ -34,9 +34,13 @@ class HotelAdminService(
 	}
 
 	@Transactional
-	fun createMaster(hotel: Hotel, loginId: String, name: String, password: String): HotelAdmin {
-		val passwordHash = checkNotNull(passwordEncoder.encode(password))
-		return translateConflicts { hotelAdminRepository.saveAndFlush(HotelAdmin(hotel, loginId, passwordHash, name, HotelAdminRole.MASTER)) }
+	fun createMaster(hotel: Hotel, loginId: String, name: String, password: String): HotelAdmin =
+		create(hotel, loginId, name, password, HotelAdminRole.MASTER)
+
+	@Transactional
+	fun createOperator(hotel: Hotel, loginId: String, name: String, password: String): HotelAdmin {
+		checkLoginIdAvailable(loginId)
+		return create(hotel, loginId, name, password, HotelAdminRole.OPERATOR)
 	}
 
 	@Transactional
@@ -53,6 +57,11 @@ class HotelAdminService(
 	fun resetPassword(hotelAdmin: HotelAdmin, password: String) {
 		hotelAdmin.resetPassword(checkNotNull(passwordEncoder.encode(password)))
 		translateConflicts { hotelAdminRepository.saveAndFlush(hotelAdmin) }
+	}
+
+	private fun create(hotel: Hotel, loginId: String, name: String, password: String, role: HotelAdminRole): HotelAdmin {
+		val passwordHash = checkNotNull(passwordEncoder.encode(password))
+		return translateConflicts { hotelAdminRepository.saveAndFlush(HotelAdmin(hotel, loginId, passwordHash, name, role)) }
 	}
 
 	private fun translateConflicts(save: () -> HotelAdmin): HotelAdmin =

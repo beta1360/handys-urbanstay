@@ -8,4 +8,5 @@ enum class AccountErrorCode(override val status: HttpStatus) : ErrorCode {
 	LOGIN_ID_DUPLICATED(HttpStatus.CONFLICT),
 	HOTEL_MASTER_NOT_FOUND(HttpStatus.NOT_FOUND),
 	HOTEL_ADMIN_MODIFIED(HttpStatus.CONFLICT),
+	HOTEL_OPERATOR_NOT_FOUND(HttpStatus.NOT_FOUND),
 }
