@@ -57,6 +57,17 @@ class HotelAdminRepositoryTest {
 	}
 
 	@Test
+	fun `호텔 계정의 version은 0에서 시작하고 컬럼은 호텔의 version처럼 기본값 없는 bigint not null이다`() {
+		val saved = hotelAdminRepository.saveAndFlush(admin(hotel, "version-$suffix@test.local", HotelAdminRole.MASTER))
+		entityManager.clear()
+
+		val columns = jdbcTemplate.query(VERSION_COLUMNS) { rs, _ -> rs.getString(1) to rs.getString(2) }.toMap()
+
+		assertThat(hotelAdminRepository.findById(checkNotNull(saved.id)).orElseThrow().version).isZero()
+		assertThat(columns).containsExactlyInAnyOrderEntriesOf(mapOf("hotel" to "bigint not null", "hotel_admin" to "bigint not null"))
+	}
+
+	@Test
 	fun `대소문자와 앞뒤 공백만 다른 로그인 아이디는 다른 호텔이어도 이름 있는 DB 유일 제약이 저장을 막는다`() {
 		hotelAdminRepository.saveAndFlush(admin(hotel, "duplicate-$suffix@test.local", HotelAdminRole.MASTER))
 
@@ -136,8 +147,13 @@ class HotelAdminRepositoryTest {
 		private const val PASSWORD_HASH = "password-hash"
 		private const val NAME = "홍길동"
 		private const val INSERT_HOTEL_ADMIN = """
-			insert into hotel_admin (hotel_id, login_id, password_hash, name, role, active, credential_version, created_at, updated_at)
-			values (?, ?, ?, ?, ?, true, 0, now(), now())
+			insert into hotel_admin (hotel_id, login_id, password_hash, name, role, active, credential_version, version, created_at, updated_at)
+			values (?, ?, ?, ?, ?, true, 0, 0, now(), now())
+		"""
+		private const val VERSION_COLUMNS = """
+			select table_name, concat_ws(' ', data_type, case when is_nullable = 'NO' then 'not null' end, 'default ' || column_default)
+			from information_schema.columns
+			where table_schema = 'public' and table_name in ('hotel', 'hotel_admin') and column_name = 'version'
 		"""
 	}
 }
