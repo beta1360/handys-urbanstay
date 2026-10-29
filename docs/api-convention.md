@@ -62,6 +62,31 @@
 - 대문자 스네이크 케이스로 쓴다. 예: `ROOM_NOT_FOUND`
 - 도메인별 에러 코드는 각 도메인을 개발할 때 정한다.
 
+## 검증
+
+요청과 응답은 서버와 클라이언트가 각자 스키마로 검증한다. 상대가 검증했다고 믿고 건너뛰지 않는다.
+
+### 서버
+
+- 요청 본문과 파라미터는 Bean Validation(`@Valid`)으로 검사한다.
+- 아래 경우는 모두 400 `INVALID_INPUT`이다.
+  - 검증 규칙을 어긴 값
+  - JSON 형식이 틀린 본문
+  - 빠진 필드, 타입이 틀린 필드
+  - 문서에 없는 필드
+- 어느 필드가 틀렸는지 알 수 있으면 `fieldErrors`에 필드 이름과 문구를 담는다.
+
+### 클라이언트
+
+- 서버로 보내는 요청 본문은 zod 스키마로 검증한 뒤 보낸다. 검증에 실패하면 요청을 보내지 않는다.
+- 서버에서 받은 응답은 zod 스키마로 검증한 뒤 쓴다. 스키마와 다르면 오류로 처리하고 받은 값을 쓰지 않는다.
+- zod 스키마는 orval이 자기 앱의 문서 그룹에서 생성한다. 손으로 따로 쓰지 않는다.
+- 화면 입력 검사는 생성된 스키마를 바탕으로 하고, 화면 문구만 덧붙인다.
+- 검증에 실패하면 전용 오류(요청 검증 실패, 응답 검증 실패)로 처리한다.
+  - 재시도하지 않는다.
+  - 화면에는 일반 오류 문구를 보여준다.
+  - 개발 콘솔에 어느 필드가 틀렸는지 남긴다.
+
 ## API 문서 (Swagger)
 
 - 백엔드는 springdoc으로 OpenAPI 문서를 제공한다. Swagger UI는 `/swagger-ui.html`이다.
@@ -113,9 +138,9 @@
 ## codegen
 
 - 각 앱은 orval로 자기 문서 그룹에서만 API 코드를 생성한다.
-  - 게스트 앱: `/v3/api-docs/app` → TanStack Query 훅 + fetch
-  - 전체 어드민 앱: `/v3/api-docs/app-admin` → TanStack Query 훅 + axios
-  - 호텔 운영자 앱: `/v3/api-docs/hotel-admin` → TanStack Query 훅 + axios
+  - 게스트 앱: `/v3/api-docs/app` → TanStack Query 훅 + fetch + zod 스키마
+  - 전체 어드민 앱: `/v3/api-docs/app-admin` → TanStack Query 훅 + axios + zod 스키마
+  - 호텔 운영자 앱: `/v3/api-docs/hotel-admin` → TanStack Query 훅 + axios + zod 스키마
 - `frontend/`에서 `pnpm codegen`을 실행한다. 백엔드가 실행 중이어야 한다.
 - 생성 코드는 각 앱의 `src/shared/api/generated`에 두고 커밋하며, 직접 수정하지 않는다.
 - 백엔드 API가 바뀌면 codegen을 다시 실행해 생성 코드를 갱신한다.
