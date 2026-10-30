@@ -14,6 +14,7 @@
 ## 구조
 
 - Next.js 라우팅은 `app/`에, FSD 레이어는 `src/`에 둔다.
+- 레이어·세그먼트·서버 상태·폼·화면 이동의 배치는 `frontend/CLAUDE.md`의 '구조 (FSD)'를 따른다. 서버 컴포넌트에서 하는 조회를 어느 세그먼트에 어떤 모양으로 둘지는 첫 게스트 화면을 만들 때 정한다.
 - `app/`의 라우트 파일은 `src/_pages`의 페이지를 가져와 내보내기만 한다.
 - Next.js 라우트 파일(page, layout 등)만 default export를 쓴다.
 - Steiger의 `fsd/typo-in-layer-name`은 `_app`·`_pages`에서만 끈다. 접두어가 붙은 레이어를 오타로 잘못 잡는 Steiger 버그(feature-sliced/steiger#282) 때문이며, 수정되면 예외를 없앤다.

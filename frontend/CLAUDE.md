@@ -30,25 +30,77 @@ frontend/
 
 ## 구조 (FSD)
 
-- 두 앱 모두 `src/` 아래를 FSD로 구성한다. `@/*`는 각 앱의 `src/*`를 가리킨다.
+- 세 앱 모두 `src/` 아래를 FSD로 구성한다. `@/*`는 각 앱의 `src/*`를 가리킨다.
+- 한 단위가 여러 관심사를 함께 갖지 않게 나누는 것이 목적이다. 화면 조립, 사용자 동작, 도메인 데이터, 도메인과 무관한 도구를 서로 다른 레이어에 둔다.
 
-| 레이어 | 역할 |
-|---|---|
-| app | Provider 등 앱 전체 설정 |
-| pages | 페이지 |
-| `widgets` | 단독으로 동작하는 미니앱 |
-| `features` | 기능 단위. 등록·조회·수정·삭제(CRUD)가 여기 속한다 |
-| `entities` | 도메인 정의 |
-| `shared` | 도메인과 무관한 공통 코드. API 생성 코드(`shared/api/generated`)도 여기 둔다 |
+### 레이어
 
+| 레이어 | 맡는 일 | 예 |
+|---|---|---|
+| app | 앱 전체 설정. Provider, 라우터, QueryClient, 인증 가드 연결 | `app/query`, `app/auth` |
+| pages | 라우트 하나의 화면. URL(경로 파라미터·search)을 읽고 widgets·features·entities를 배치만 한다. 상태와 요청 로직을 두지 않는다 | `pages/hotel-edit` |
+| widgets | 여러 기능·도메인을 묶은 화면 블록 | `widgets/admin-layout` |
+| features | 사용자 동작 하나. 그 동작의 폼, 제출, 변경 요청, 성공 뒤 동작을 둔다. 등록·수정·삭제·검색·로그인·로그아웃 같은 동작이 여기 속한다 | `features/hotel-create`, `features/auth-login` |
+| entities | 도메인 하나. 그 도메인의 조회, 쿼리 키와 캐시 규칙, 대상 식별(예: 경로 파라미터 검사), 도메인을 보여주는 컴포넌트를 둔다 | `entities/hotel`, `entities/account` |
+| shared | 도메인과 무관한 공통 코드. API 클라이언트(생성 코드, 검증을 거친 요청 함수), 폼 도우미, 라우터를 아는 공용 UI, 여러 곳에서 쓰는 문구 | `shared/api`, `shared/ui` |
+
+- 한 화면에서만 쓰는 동작도 features slice로 둔다. 동작을 pages에 두면 화면 하나가 URL, 폼, 요청, 캐시, 이동을 모두 갖게 되고, 다른 화면이 쓰게 될 때마다 아래 레이어로 옮겨야 하기 때문이다. 그래서 Steiger의 `fsd/insignificant-slice` 규칙은 끈다.
 - app·pages 레이어의 폴더 이름은 앱마다 정한다. web은 Next.js 라우팅과 겹치지 않게 `_app`, `_pages`를 쓴다.
 - 레이어는 위에서 아래로만 import한다: app → pages → widgets → features → entities → shared
 - 같은 레이어의 다른 slice는 import하지 않는다.
 - slice는 `index.ts`(public API)로만 외부에 내보내고, 다른 slice는 public API로만 가져온다.
 - 다른 slice를 `export { X } from "..."`로 재수출하지 않는다. 필요하면 import한 뒤 export한다. Steiger가 재수출은 검사하지 않기 때문이다. slice 자기 내부를 `index.ts`에서 재수출하는 것은 괜찮다.
 - app 레이어에는 UI 컴포넌트를 두지 않는다. 앱 틀(레이아웃) 같은 UI는 widgets에 둔다.
-- 세그먼트 이름은 역할이 아니라 목적으로 짓는다. `components`, `hooks`, `providers` 같은 이름은 쓰지 않는다.
 - FSD 규칙은 Steiger(FSD 공식 린터)로 검사한다. 설정은 각 앱의 `steiger.config.mjs`이고, `pnpm lint`에 포함된다.
+
+### 3계층: 표현·응용·데이터
+
+FSD 레이어(app~shared)가 코드를 '어디에 두는가'를 정한다면, 3계층은 한 slice 안에서 '누가 무엇을 맡는가'를 정한다. `docs/frontend-flow.md`의 '5. 책임 분리'(입력·표시는 컴포넌트, 진행과 상태 전이는 기능 로직, 요청과 응답 변환은 API 모듈)를 코드 구조로 옮긴 것이다. 백엔드의 Controller·Service·Repository처럼 계층마다 책임과 의존 방향을 나눈다.
+
+| 계층 | 세그먼트 | 맡는 일 | 하지 않는 일 |
+|---|---|---|---|
+| 표현 | `ui` | props로 받은 값을 그리고, 사용자 입력을 이벤트 콜백으로 올린다. 마크업, 접근성 속성, 배치 | 상태를 갖거나 바꾸기, 보여줄 내용 판단, 요청, 캐시, `navigate` |
+| 응용 | `model` | 화면 상태를 갖고 바꾼다(불러오는 중·실패·찾을 수 없음·제출 중 등). 흐름을 맡는다(검사 시점, 제출, 서버 오류를 입력창 오류와 알림으로 나누기, 성공 뒤 이동). 표현 계층에 넘길 값과 핸들러를 만든다 | 마크업, 요청 함수 직접 호출, 쿼리 키·캐시 직접 조작 |
+| 데이터 | `api`, `shared/api` | 서버 상태. 조회·변경 훅, 쿼리 키와 조회 설정, 캐시 규칙(`entities`·`features`의 `api`). 요청·응답의 검증과 변환(`shared/api`) | 화면 상태, 문구, 이동 |
+
+- 의존은 한 방향이다: 표현 → 응용 → 데이터. 표현 계층은 데이터 계층을 직접 부르지 않고, 데이터 계층은 응용·표현 계층을 모른다.
+- `lib`는 계층과 무관한 순수 함수(예: 값 변환, 검사 규칙), `config`는 화면 문구와 상수다.
+- 세그먼트 이름은 역할이 아니라 목적으로 짓는다. `components`, `hooks`, `providers` 같은 이름은 쓰지 않는다.
+
+#### 컴포넌트 나누기
+
+- slice의 화면은 연결 컴포넌트 하나와 표현 컴포넌트들로 나눈다.
+  - 연결 컴포넌트는 slice의 입구다. `model` 훅 하나를 부르고, 받은 값과 핸들러를 표현 컴포넌트에 넘기기만 한다. 계산과 판단은 하지 않고, `model`이 정한 화면 상태 값 하나로 어느 표현 컴포넌트를 그릴지만 고른다.
+  - 표현 컴포넌트는 props만 받아 그린다. 다른 slice의 훅이나 `model` 훅을 부르지 않는다.
+- `model` 훅은 함께 움직이는 상태를 여러 불리언으로 흩어 두지 않고 하나의 상태 값(예: `"loading" | "failed" | "notFound" | "ready"`)으로 돌려준다(`docs/frontend-flow.md` '4. 상태 설계').
+- pages의 화면 컴포넌트는 URL(경로 파라미터·search)을 읽고 widgets·features·entities의 연결 컴포넌트를 배치만 한다.
+- 테스트도 계층에 맞춘다.
+  - 표현 컴포넌트: props로 그린 결과와 이벤트
+  - `model` 훅: 상태 전이와 흐름(데이터 계층 훅은 mock)
+  - 데이터 계층: 요청·응답 검증, 쿼리 키, 캐시 규칙
+  - 화면을 끝까지 잇는 통합 테스트는 핵심 흐름만 둔다.
+
+### 서버 상태 (TanStack Query)
+
+- `shared/api`는 도메인을 모르는 API 클라이언트다. orval 생성 코드, `http`, 생성된 zod로 검증한 요청 함수와 요청 스키마·타입만 내보낸다. TanStack Query를 쓰지 않는다.
+- `entities/<도메인>/api`에 그 도메인의 조회 훅, 쿼리 키와 조회 설정(`staleTime`, `placeholderData` 등), 캐시 규칙 함수(예: 상세 캐시에 넣기, 목록 무효화, 내 정보 지우기)를 둔다. 같은 데이터의 캐시 규칙은 이 한 곳에만 둔다.
+- `features/<동작>/api`에 그 동작의 변경 훅을 둔다. 변경이 성공하면 entities의 캐시 규칙 함수를 부른다. 캐시 키를 직접 다루지 않는다.
+- app 레이어는 QueryClient 생성(재시도 규칙, 오류 처리기)과 인증 가드를 맡는다. 가드도 내 정보 조회·캐시는 entities의 함수로 한다.
+- `@tanstack/react-query`는 `entities/*/api`, `features/*/api`, app 레이어에서만 import한다. 그 밖의 곳은 ESLint `no-restricted-imports`로 막는다. orval이 만든 TanStack Query 훅은 쓰지 않는다.
+
+### 폼
+
+- 폼은 react-hook-form과 zod resolver로 만든다.
+- 폼 스키마(생성된 요청 스키마에 화면 문구를 덧붙인 것)와 제출 흐름(변경 훅 호출, 서버 오류 표시, 성공 뒤 동작)은 그 동작의 `features/<동작>/model`에, 폼 화면은 `features/<동작>/ui`에 둔다.
+- 여러 동작이 함께 쓰는 입력 묶음(예: 등록·수정의 호텔 정보 입력 칸)은 그 묶음의 features slice에 둔다.
+- 도메인과 무관한 폼 도우미(예: 서버 오류를 입력창 오류와 폼 알림으로 나누기)는 `shared/lib/form`에 둔다.
+- 검사 시점, 오류 표시, 초점 같은 화면 동작은 각 앱의 화면 규칙(어드민 앱은 `docs/admin-app.md`)을 따른다.
+
+### 공용 UI와 화면 이동
+
+- 라우터를 아는 공용 UI는 각 앱의 `shared/ui`에 둔다.
+- 화면 이동은 진짜 링크로 한다. 버튼처럼 보이는 이동은 `shared/ui`의 `ButtonLink`(버튼 모양의 라우터 `Link`), 글자 링크는 `TextLink`를 쓴다. `Button`에 `navigate`를 붙여 이동하지 않는다. 새 탭으로 열 수 있고 화면 낭독기에 링크로 읽히게 하기 위해서다.
+- 제출 성공 뒤 이동처럼 동작의 결과로 일어나는 이동은 `model`의 훅에서 `navigate`로 한다.
 
 ## 이름과 export
 
@@ -58,7 +110,7 @@ frontend/
 ## 상수
 
 - 화면 문구 등 상수는 `as const` 객체로 둔다.
-- slice 전용 상수는 그 slice의 `config/`에, 여러 곳에서 쓰는 상수는 `shared/config/`에 둔다.
+- slice 전용 상수는 그 slice의 `config/`에, 여러 곳에서 쓰는 상수는 `shared/config/`에 둔다. 여러 slice에 같은 문구(예: '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.', '불러오는 중입니다.', '다시 시도')를 따로 두지 않는다.
 
 ## Provider
 
