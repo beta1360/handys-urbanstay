@@ -61,7 +61,7 @@ apps/app-admin/
    │  │  │        └─ edit.tsx    # /hotels/$hotelId/edit (호텔 수정)
    │  │  └─ login.tsx            # /login (?redirect=)
    │  └─ styles/
-   ├─ pages/           # error(화면 오류), hotel-create(호텔 등록: 마스터 계정 폼, 폼 스키마), hotel-detail(호텔 상세: 경로 파라미터를 읽고 widgets/hotel-detail을 배치), hotel-edit(호텔 수정: 한 번만 채우는 폼, 수정 충돌 시 최신 내용 불러오기), hotel-list(호텔 목록: 검색·페이지·URL search 스키마, 호텔 등록 버튼), login(로그인 폼)
+   ├─ pages/           # error(화면 오류), hotel-create(호텔 등록: 마스터 계정 폼, 폼 스키마), hotel-detail(호텔 상세: 경로 파라미터를 읽고 widgets/hotel-detail을 배치), hotel-edit(호텔 수정: 한 번만 채우는 폼, 수정 충돌 시 최신 내용 불러오기), hotel-list(호텔 목록: 검색·페이지·URL search 스키마, 호텔 등록 버튼), login(로그인 화면 틀. redirect를 읽어 features/auth-login의 LoginForm 배치)
    ├─ widgets/
    │  ├─ admin-layout/ # 사이드바 메뉴(config/menu.ts), 위쪽 영역. model: useAdminHeader(화면 제목·계정 이름·로그아웃 상태). ui: AdminHeader(연결)·AdminHeaderBar(표현)
    │  └─ hotel-detail/ # 호텔 상세. HotelDetail(연결)이 useHotel의 상태 값으로 찾을 수 없음 또는 링크 줄 + 불러오는 중·실패·내용을 고른다
@@ -69,7 +69,7 @@ apps/app-admin/
    │  ├─ hotel-info-form/ # 호텔 정보 입력 칸(이름·주소·대표 전화번호·소개)과 폼 스키마 조각. 등록·수정이 쓴다
    │  ├─ hotel-create/    # api: 호텔 등록 변경 훅. 성공하면 entities/hotel의 캐시 규칙을 부른다
    │  ├─ hotel-update/    # api: 호텔 수정 변경 훅. 성공하면 entities/hotel의 캐시 규칙을 부른다
-   │  ├─ auth-login/      # api: 로그인. 성공하면 로그인 상태를 시작한다
+   │  ├─ auth-login/      # 로그인 폼. api: 로그인(성공하면 로그인 상태 시작). model: 폼 스키마, useLoginForm(react-hook-form, 성공하면 redirect로 이동). ui: LoginForm(연결)·LoginFormView(표현)
    │  └─ auth-logout/     # api: 로그아웃. 성공하거나 401이면 로그인 상태를 끝낸다
    ├─ entities/
    │  ├─ account/      # api: 내 정보 조회, 로그인 상태 캐시 규칙(시작·끝·내 정보 지우기)

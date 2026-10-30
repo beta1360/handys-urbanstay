@@ -24,9 +24,9 @@ import {
   RequestValidationError,
   ResponseValidationError,
 } from "@/shared/api";
+import { LOGIN_MESSAGES } from "@/features/auth-login";
 import { APP_INFO, COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
-import { LOGIN_MESSAGES } from "../config/messages";
 import { LoginPage } from "./login-page";
 
 vi.mock("@/shared/api", async (importOriginal) => ({
