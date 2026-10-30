@@ -229,6 +229,29 @@ urbanstay/
   - 이력의 이름 고정, 바꾼 시각의 응답 형식, 최신순·페이지는 API 테스트에서 확인한다. 정렬과 시각 형식은 바꾼 시각을 정해 JDBC로 넣은 이력으로 확인한다.
   - 마이그레이션의 기존 객실 채우기는 별도 스키마에 V6까지 적용해 객실을 넣은 뒤 V7을 적용해 확인한다(`RoomStatusMigrationTest`, 테스트 트랜잭션 없이, 끝나면 그 스키마를 `clean`).
 
+## 이용객
+
+- 이용객은 `guest` 도메인의 `guest` 테이블(`Guest`, `V8__create_guest.sql`)에 저장한다. 한 호텔에 속하고(`hotel_id`, `Hotel`과 JPA 연관관계) 이름, 전화번호, 이메일, 낙관적 잠금 버전(`version`)을 가진다.
+  - 이용객 삭제는 없다. 게스트 앱 계정과 연결하는 컬럼은 아직 두지 않는다.
+- 값의 규칙
+  - 이름은 앞뒤 공백을 지운 뒤 1~50자다. 같은 호텔에서도 겹쳐도 된다.
+  - 전화번호는 호텔 대표 전화번호와 같은 규칙과 검증 방식이다(`Hotel.PHONE_PATTERN`, 20자, `@PatternThenMaxLength`). 앞뒤 공백만 지우고 입력한 모양 그대로 저장한다.
+  - 이메일은 로그인 아이디와 같은 형식이다(`LoginId.PATTERN`, 254자, `@PatternThenMaxLength`). 앞뒤 공백만 지우고 대소문자를 바꾸지 않고 저장하며, 유일하지 않다.
+  - 엔티티(`Guest.normalize`)가 공백을 지워 저장한다. DB도 CHECK 제약으로 정리된 이름·이메일과 호텔과 같은 규칙의 전화번호만 받는다.
+- 전화번호는 같은 호텔 안에서 하이픈을 뺀 숫자로 유일하다. `010-1234-5678`과 `01012345678`은 같은 번호다. 다른 호텔과는 같아도 된다.
+  - DB는 식 유일 인덱스 `guest_hotel_id_phone_digits_key (hotel_id, replace(phone, '-', ''))`로 막는다. CHECK가 숫자와 `-`만 받으므로 하이픈을 뺀 값이 숫자만 뽑은 값이다.
+  - 사전 확인도 같은 식으로 비교하고(`GuestSpecifications.samePhone`, 수정은 자기 자신을 뺀다), 이 인덱스 위반도 `GuestErrorCode.GUEST_PHONE_DUPLICATED`(409)로 바꾼다. 인덱스 이름은 `Guest.HOTEL_PHONE_UNIQUE_CONSTRAINT`다.
+  - 이 인덱스가 호텔별 목록의 `hotel_id` 조건에도 쓰여 따로 인덱스를 두지 않는다.
+- 이용객 관리(`ApiPaths.HOTEL_ADMIN + "/guests"`의 등록·목록·조회·수정, `GuestHotelAdminController`)는 `GuestService`가 한다. 호텔 계정 모두(마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 보안 규칙은 따로 두지 않는다(`HOTEL_ADMIN_PATTERN`).
+  - 대상 호텔은 로그인한 계정의 `HotelAdminPrincipal.hotelId`다. 등록은 `HotelService.getHotel(hotelId)`로 호텔을 읽어 연관관계에 쓴다.
+  - 조회·수정할 이용객은 같은 호텔에서만 찾는다(`findByIdAndHotelId`). 없는 id와 다른 호텔의 이용객 id는 모두 404 `GuestErrorCode.GUEST_NOT_FOUND`다.
+  - 수정은 PUT으로 모든 항목을 바꾼다. 순서는 이용객 조회 → version 확인(`GUEST_MODIFIED`) → 전화번호 중복 확인 → 엔티티 변경 → `saveAndFlush`이고, 유일 인덱스 위반과 `OptimisticLockingFailureException`을 함께 변환한다. version 충돌과 전화번호 중복이 겹치면 version 충돌이 먼저다.
+  - 목록은 같은 호텔의 이용객을 최근 등록 순(id 내림차순)으로 준다. `keyword`(선택, 100자)는 이름 또는 전화번호에서 찾는다(`GuestSpecifications.search`, 이스케이프는 목록 조회 절). 이름은 대소문자 구분 없이, 전화번호는 저장값과 검색어 양쪽의 하이픈을 빼고 부분 일치로 찾는다(`01012345678`로 `010-1234-5678`을 찾는다).
+  - 하이픈만 있는 검색어는 하이픈을 빼면 비어 모든 전화번호에 맞으므로 이름에서만 찾는다.
+- 테스트
+  - 사전 확인을 통과한 뒤 유일 인덱스(하이픈 모양만 다른 번호)와 JPA 버전 검사가 막는 경로는 순서를 고정해 확인한다(`GuestServiceTest`).
+  - 이용객이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔의 `guest`를 먼저 지운다.
+
 ## 상수
 
 - 응답 메시지는 `src/main/resources/messages.properties`에 두고 MessageSource로 읽는다.
@@ -267,12 +290,12 @@ urbanstay/
 - 동시 수정은 낙관적 잠금으로 막는다. 엔티티에 `@Version var version: Long`(`version bigint not null`)을 두고 응답에 `version`을 싣고, 수정 요청은 `version`을 필수로 받는다.
   - 서비스는 읽은 엔티티의 version이 요청과 다르면 도메인 409를 던진다.
   - 같은 version으로 동시에 들어온 수정은 flush 때 JPA가 막는다. flush를 서비스 안(`saveAndFlush`)에서 해 `OptimisticLockingFailureException`도 같은 도메인 409로 바꾼다. 커밋 때 터지면 서비스 밖이라 500이 된다.
-  - 지금 낙관적 잠금을 쓰는 엔티티는 `Hotel`(`HOTEL_MODIFIED`), `HotelAdmin`(`HOTEL_ADMIN_MODIFIED`), `Room`(`ROOM_MODIFIED`)이다. version을 받지 않는 변경(예: 비밀번호 재설정, 활성 상태 변경)도 같은 엔티티를 바꾸면 같은 변환을 거친다.
+  - 지금 낙관적 잠금을 쓰는 엔티티는 `Hotel`(`HOTEL_MODIFIED`), `HotelAdmin`(`HOTEL_ADMIN_MODIFIED`), `Room`(`ROOM_MODIFIED`), `Guest`(`GUEST_MODIFIED`)이다. version을 받지 않는 변경(예: 비밀번호 재설정, 활성 상태 변경)도 같은 엔티티를 바꾸면 같은 변환을 거친다.
 - version과 따로 움직여야 하는 값(예: 객실 상태)은 요청에 화면에서 본 값을 함께 받아 "지금 값이 그것일 때만" 바꾸는 조건부 UPDATE로 막는다. 바뀐 행이 없으면 도메인 409다(`ROOM_STATUS_CHANGED`, 객실 상태 절).
 - 중복 확인 같은 조회는 엔티티를 바꾸기 전에 한다. 바뀐 엔티티가 있으면 조회 전 자동 flush로 제약 위반이 변환 범위 밖에서 난다.
 - 테스트는 두 경로를 모두 확인한다.
   - 동시 요청: 두 스레드를 `CountDownLatch`로 함께 출발시킨다.
-  - 사전 확인을 통과한 뒤 DB에서 막히는 경로: 먼저 온 트랜잭션을 열어 둔 채 다음 요청이 잠금을 기다리는지(`pg_stat_activity`) 확인하고 커밋한다(`HotelServiceTest`, `HotelMasterServiceTest`, `HotelOperatorServiceTest`, `RoomServiceTest`). 조건부 UPDATE도 같은 방식으로 늦은 쪽이 0행이 되는 경로를 확인한다(객실 상태 절).
+  - 사전 확인을 통과한 뒤 DB에서 막히는 경로: 먼저 온 트랜잭션을 열어 둔 채 다음 요청이 잠금을 기다리는지(`pg_stat_activity`) 확인하고 커밋한다(`HotelServiceTest`, `HotelMasterServiceTest`, `HotelOperatorServiceTest`, `RoomServiceTest`, `GuestServiceTest`). 조건부 UPDATE도 같은 방식으로 늦은 쪽이 0행이 되는 경로를 확인한다(객실 상태 절).
   - 동시 요청 테스트는 실행마다 어느 경로를 탈지 정해지지 않는다. 변환 코드를 지켜 주는 것은 순서를 고정한 경로 테스트다.
 
 ## 테스트
