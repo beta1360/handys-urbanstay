@@ -17,7 +17,7 @@ export {
   createHotelInfoFormShape,
   HOTEL_INFO_FIELDS,
 } from "./model/hotel-info-form";
-export type { HotelInfoField, HotelInfoValues } from "./model/hotel-info-form";
+export type { HotelInfoField } from "./model/hotel-info-form";
 export {
   parseHotelPathParams,
   stringifyHotelPathParams,
