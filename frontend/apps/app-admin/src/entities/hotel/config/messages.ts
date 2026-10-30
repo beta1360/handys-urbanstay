@@ -12,3 +12,7 @@ export const HOTEL_LOAD_MESSAGES = {
 export const HOTEL_NOT_FOUND_MESSAGES = {
   description: "호텔을 찾을 수 없습니다.",
 } as const;
+
+export const HOTEL_INFORMATION_MESSAGES = {
+  emptyDescription: "소개 없음",
+} as const;
