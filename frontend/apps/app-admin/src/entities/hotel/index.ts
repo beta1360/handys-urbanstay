@@ -8,9 +8,14 @@ export {
   HOTEL_NOT_FOUND_MESSAGES,
 } from "./config/messages";
 export {
+  HOTEL_KEYWORD_MAX_LENGTH,
+  normalizeHotelKeyword,
+} from "./lib/hotel-keyword";
+export {
   getLastPage,
   HOTEL_LIST_FIRST_PAGE,
   isBeyondLastPage,
+  isRequestablePage,
   toApiPage,
 } from "./lib/hotel-page";
 export {

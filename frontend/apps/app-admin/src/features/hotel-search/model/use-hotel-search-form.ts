@@ -1,0 +1,35 @@
+import type { FormEvent } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useNavigate } from "@tanstack/react-router";
+import { z } from "zod";
+import { HOTEL_LIST_FIRST_PAGE, normalizeHotelKeyword } from "@/entities/hotel";
+import { SUBMIT_ONLY_VALIDATION, toFieldProps } from "@/shared/lib/form";
+
+const hotelSearchFormSchema = z.object({
+  keyword: z.string().transform(normalizeHotelKeyword),
+});
+
+export function useHotelSearchForm(keyword: string | undefined) {
+  const navigate = useNavigate();
+  const form = useForm({
+    ...SUBMIT_ONLY_VALIDATION,
+    resolver: zodResolver(hotelSearchFormSchema),
+    values: { keyword: keyword ?? "" },
+  });
+  const keywordField = toFieldProps(form, "keyword");
+
+  const submit = form.handleSubmit(({ keyword: nextKeyword }) => {
+    form.setValue("keyword", nextKeyword ?? "");
+    void navigate({
+      to: "/hotels",
+      search: { keyword: nextKeyword, page: HOTEL_LIST_FIRST_PAGE },
+    });
+  });
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    void submit(event);
+  }
+
+  return { keywordField, handleSubmit };
+}
