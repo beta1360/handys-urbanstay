@@ -1,6 +1,7 @@
 package com.marco.assignment.handys.urbanstay.common.exception
 
 import com.marco.assignment.handys.urbanstay.account.exception.AccountErrorCode
+import com.marco.assignment.handys.urbanstay.guest.exception.GuestErrorCode
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelErrorCode
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import org.assertj.core.api.Assertions.assertThat
@@ -18,6 +19,7 @@ class ErrorCodeMessageTest {
 		AccountErrorCode.entries,
 		HotelErrorCode.entries,
 		RoomErrorCode.entries,
+		GuestErrorCode.entries,
 	).flatten()
 
 	@Test
