@@ -86,7 +86,7 @@ apps/app-admin/
       │     └─ zod/    # orval 생성 zod 스키마
       ├─ config/       # APP_INFO (앱 이름), FORM_VALIDATION_MESSAGES (서버와 같은 입력 검증 문구), COMMON_MESSAGES (여러 화면이 함께 쓰는 문구)
       ├─ lib/
-      │  ├─ form/          # 필수·선택 문자열·비밀번호 검사, zod 오류·서버 fieldErrors를 칸별 오류로 나누기, 첫 오류 칸 초점
+      │  ├─ form/          # 필수·선택 문자열·비밀번호 검사(폼 스키마 조각). react-hook-form 공통: 제출할 때만 검사(SUBMIT_ONLY_VALIDATION), 칸 props와 고치면 그 칸 오류 지우기(toFieldProps), 서버 오류를 칸 오류(첫 칸 초점)와 폼 알림(root.server)으로 나누기(showSubmitError). 옛 도우미(toFieldErrors 등)는 폼을 모두 옮긴 뒤 지운다
       │  └─ search-params/ # URL search 직렬화(일반 쿼리 문자열). 라우터와 테스트용 라우터가 쓴다
       └─ ui/           # ButtonLink (버튼 모양의 링크), TextLink (글자 링크)
 ```
