@@ -6,6 +6,7 @@
   "exports": {
     "./styles.css": "./src/styles.css",
     "./button": "./src/button.tsx",
+    "./button-class-name": "./src/button-class-name.ts",
     "./card": "./src/card.tsx",
     "./description-list": "./src/description-list.tsx",
     "./form-section": "./src/form-section.tsx",

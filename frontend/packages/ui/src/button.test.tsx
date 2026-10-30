@@ -2,28 +2,29 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { Button } from "./button";
+import { buttonClassName } from "./button-class-name";
 
 describe("Button", () => {
   it("variant를 지정하지 않으면 primary 스타일로 보여준다", () => {
     render(<Button>저장</Button>);
 
     const button = screen.getByRole("button", { name: "저장" });
-    expect(button).toHaveClass("bg-neutral-900", "text-white");
+    expect(button).toHaveAttribute("class", buttonClassName("primary"));
     expect(button).toBeEnabled();
     expect(button).not.toHaveAttribute("aria-busy");
   });
 
-  it.each([
-    ["primary", ["bg-neutral-900", "text-white"]],
-    ["secondary", ["border-neutral-200", "bg-white", "text-neutral-900"]],
-    ["ghost", ["text-neutral-900", "enabled:hover:bg-neutral-100"]],
-  ] as const)("%s variant는 그에 맞는 스타일로 보여준다", (variant, classNames) => {
-    render(<Button variant={variant}>저장</Button>);
+  it.each(["primary", "secondary", "ghost"] as const)(
+    "%s variant는 buttonClassName이 정한 스타일로 보여준다",
+    (variant) => {
+      render(<Button variant={variant}>저장</Button>);
 
-    expect(screen.getByRole("button", { name: "저장" })).toHaveClass(
-      ...classNames,
-    );
-  });
+      expect(screen.getByRole("button", { name: "저장" })).toHaveAttribute(
+        "class",
+        buttonClassName(variant),
+      );
+    },
+  );
 
   it("className을 넘기면 기본 스타일에 덧붙인다", () => {
     render(<Button className="w-full">저장</Button>);
