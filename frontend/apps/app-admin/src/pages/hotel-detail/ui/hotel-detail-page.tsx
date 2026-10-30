@@ -1,23 +1,37 @@
-import { getRouteApi, Link } from "@tanstack/react-router";
+import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { Button } from "@repo/ui/button";
 import { Card } from "@repo/ui/card";
 import {
   DescriptionList,
   DescriptionListItem,
 } from "@repo/ui/description-list";
+import { HotelLoadState, HotelNotFound, useHotel } from "@/entities/hotel";
 import type { Hotel } from "@/shared/api";
 import { HOTEL_DETAIL_MESSAGES } from "../config/messages";
-import { useHotelDetail } from "../model/use-hotel-detail";
-import { HotelNotFound } from "./hotel-not-found";
 
 const hotelDetailRoute = getRouteApi("/_authenticated/hotels/$hotelId");
 
 const BACK_LINK_CLASS_NAME =
   "rounded-sm text-sm font-medium text-neutral-900 underline decoration-neutral-300 underline-offset-4 hover:decoration-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900";
 
-function BackToListLink() {
+function EditHotelButton({ hotelId }: { hotelId: number }) {
+  const navigate = useNavigate();
+
   return (
-    <div className="flex items-center">
+    <Button
+      variant="primary"
+      onClick={() =>
+        void navigate({ to: "/hotels/$hotelId/edit", params: { hotelId } })
+      }
+    >
+      {HOTEL_DETAIL_MESSAGES.edit}
+    </Button>
+  );
+}
+
+function DetailActions({ hotel }: { hotel: Hotel | undefined }) {
+  return (
+    <div className="flex min-h-10 items-center justify-between gap-4">
       <Link
         to="/hotels"
         activeOptions={{ exact: true }}
@@ -25,6 +39,7 @@ function BackToListLink() {
       >
         {HOTEL_DETAIL_MESSAGES.backToList}
       </Link>
+      {hotel === undefined ? null : <EditHotelButton hotelId={hotel.id} />}
     </div>
   );
 }
@@ -54,7 +69,7 @@ function HotelInformation({ hotel }: { hotel: Hotel }) {
   );
 }
 
-type HotelDetailStateProps = ReturnType<typeof useHotelDetail>;
+type HotelDetailStateProps = ReturnType<typeof useHotel>;
 
 function HotelDetailState({
   hotel,
@@ -64,35 +79,18 @@ function HotelDetailState({
   if (hotel !== undefined) {
     return <HotelInformation hotel={hotel} />;
   }
-  return isLoadFailed ? (
-    <Card>
-      <div className="flex flex-col items-center gap-4">
-        <p role="alert" className="text-sm text-neutral-700">
-          {HOTEL_DETAIL_MESSAGES.loadFailed}
-        </p>
-        <Button variant="secondary" onClick={retry}>
-          {HOTEL_DETAIL_MESSAGES.retry}
-        </Button>
-      </div>
-    </Card>
-  ) : (
-    <Card>
-      <p role="status" className="text-center text-sm text-neutral-500">
-        {HOTEL_DETAIL_MESSAGES.loading}
-      </p>
-    </Card>
-  );
+  return <HotelLoadState isLoadFailed={isLoadFailed} onRetry={retry} />;
 }
 
 function HotelDetailContent({ hotelId }: { hotelId: number }) {
-  const detail = useHotelDetail(hotelId);
+  const detail = useHotel(hotelId);
 
   if (detail.hotel === undefined && detail.isNotFound) {
     return <HotelNotFound />;
   }
   return (
     <>
-      <BackToListLink />
+      <DetailActions hotel={detail.hotel} />
       <HotelDetailState {...detail} />
     </>
   );

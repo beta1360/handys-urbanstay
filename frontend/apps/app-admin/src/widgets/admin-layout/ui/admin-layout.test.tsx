@@ -86,6 +86,10 @@ function renderAdminLayout(initialPath: string) {
     getParentRoute: () => hotelsRoute,
     path: "$hotelId",
   });
+  const hotelEditRoute = createRoute({
+    getParentRoute: () => hotelDetailRoute,
+    path: "edit",
+  });
   const untitledRoute = createRoute({
     getParentRoute: () => layoutRoute,
     path: "untitled",
@@ -98,7 +102,10 @@ function renderAdminLayout(initialPath: string) {
     routeTree: rootRoute.addChildren([
       layoutRoute.addChildren([
         homeRoute,
-        hotelsRoute.addChildren([hotelCreateRoute, hotelDetailRoute]),
+        hotelsRoute.addChildren([
+          hotelCreateRoute,
+          hotelDetailRoute.addChildren([hotelEditRoute]),
+        ]),
         untitledRoute,
       ]),
       loginRoute,
@@ -155,7 +162,7 @@ describe("AdminLayout", () => {
     expect(links[0]).toHaveAttribute("href", "/hotels");
   });
 
-  it.each(["/hotels", "/hotels/new", "/hotels/1"])(
+  it.each(["/hotels", "/hotels/new", "/hotels/1", "/hotels/1/edit"])(
     "%s 경로에서는 호텔 메뉴를 현재 페이지로 표시한다",
     async (path) => {
       renderAdminLayout(path);

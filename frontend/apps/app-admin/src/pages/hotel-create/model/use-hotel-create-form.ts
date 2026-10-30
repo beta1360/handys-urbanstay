@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import type { HotelInfoField } from "@/features/hotel-info-form";
 import {
   API_ERROR_CODES,
   createHotel,
@@ -27,7 +28,6 @@ import type {
   HotelCreateFieldErrors,
   MasterField,
 } from "./hotel-create-form-schema";
-import type { HotelInfoField } from "./hotel-info-form";
 
 export function useHotelCreateForm() {
   const queryClient = useQueryClient();

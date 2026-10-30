@@ -4,7 +4,7 @@ const HOTEL_ID_PATTERN = /^\d+$/;
 
 const HOTEL_ID_MIN = 1;
 
-type HotelDetailParams = {
+type HotelPathParams = {
   hotelId: number | undefined;
 };
 
@@ -20,12 +20,12 @@ function toHotelId(value: string) {
 }
 
 // 오류를 던지면 루트 오류 화면으로 가므로 잘못된 id는 undefined로 바꿔 찾을 수 없음을 보여준다.
-export function parseHotelDetailParams(params: {
+export function parseHotelPathParams(params: {
   hotelId: string;
-}): HotelDetailParams {
+}): HotelPathParams {
   return { hotelId: toHotelId(params.hotelId) };
 }
 
-export function stringifyHotelDetailParams({ hotelId }: HotelDetailParams) {
+export function stringifyHotelPathParams({ hotelId }: HotelPathParams) {
   return { hotelId: String(hotelId) };
 }

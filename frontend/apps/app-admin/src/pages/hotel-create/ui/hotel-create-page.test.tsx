@@ -15,6 +15,7 @@ import userEvent from "@testing-library/user-event";
 import type { UserEvent } from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { HOTEL_INFO_MESSAGES } from "@/features/hotel-info-form";
 import {
   API_ERROR_CODES,
   createHotel,
@@ -26,7 +27,7 @@ import {
 import type { Hotel, HotelPage } from "@/shared/api";
 import { FORM_VALIDATION_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
-import { HOTEL_CREATE_MESSAGES, HOTEL_INFO_MESSAGES } from "../config/messages";
+import { HOTEL_CREATE_MESSAGES } from "../config/messages";
 import { HotelCreatePage } from "./hotel-create-page";
 
 vi.mock("@/shared/api", async (importOriginal) => ({

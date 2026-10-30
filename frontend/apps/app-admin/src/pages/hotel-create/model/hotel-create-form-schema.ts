@@ -1,10 +1,13 @@
 import type { z } from "zod";
+import {
+  createHotelInfoFormShape,
+  HOTEL_INFO_FIELDS,
+} from "@/features/hotel-info-form";
+import type { HotelInfoField } from "@/features/hotel-info-form";
 import { createHotelBodySchema } from "@/shared/api";
 import { FORM_VALIDATION_MESSAGES } from "@/shared/config";
 import { passwordSchema, requiredTextSchema } from "@/shared/lib/form";
 import type { FieldErrors } from "@/shared/lib/form";
-import { createHotelInfoFormShape, HOTEL_INFO_FIELDS } from "./hotel-info-form";
-import type { HotelInfoField } from "./hotel-info-form";
 
 const masterRules = createHotelBodySchema.shape.master;
 

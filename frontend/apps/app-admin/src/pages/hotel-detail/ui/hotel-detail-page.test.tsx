@@ -10,17 +10,16 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  HOTEL_LOAD_MESSAGES,
+  HOTEL_NOT_FOUND_MESSAGES,
+  parseHotelPathParams,
+  stringifyHotelPathParams,
+} from "@/entities/hotel";
 import { API_ERROR_CODES } from "@/shared/api";
 import type { Hotel } from "@/shared/api";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
-import {
-  HOTEL_DETAIL_MESSAGES,
-  HOTEL_NOT_FOUND_MESSAGES,
-} from "../config/messages";
-import {
-  parseHotelDetailParams,
-  stringifyHotelDetailParams,
-} from "../model/hotel-detail-params";
+import { HOTEL_DETAIL_MESSAGES } from "../config/messages";
 import { HotelDetailPage } from "./hotel-detail-page";
 
 const { fetchHotel } = vi.hoisted(() => ({ fetchHotel: vi.fn() }));
@@ -46,6 +45,8 @@ const HOTEL: Hotel = {
 };
 
 const MULTILINE_DESCRIPTION = "바다가 보이는 호텔입니다.\n\n조식을 제공합니다.";
+
+const EDIT_PAGE_TEXT = "호텔 수정 화면";
 
 function hotelPath(hotelId: number | string) {
   return `/hotels/${hotelId}`;
@@ -80,18 +81,30 @@ function renderHotelDetailPage(initialEntries = [hotelPath(HOTEL.id)]) {
     getParentRoute: () => layoutRoute,
     path: "hotels/",
   });
-  const hotelDetailRoute = createRoute({
+  const hotelRoute = createRoute({
     getParentRoute: () => layoutRoute,
     path: "hotels/$hotelId",
     params: {
-      parse: parseHotelDetailParams,
-      stringify: stringifyHotelDetailParams,
+      parse: parseHotelPathParams,
+      stringify: stringifyHotelPathParams,
     },
+  });
+  const hotelDetailRoute = createRoute({
+    getParentRoute: () => hotelRoute,
+    path: "/",
     component: HotelDetailPage,
+  });
+  const hotelEditRoute = createRoute({
+    getParentRoute: () => hotelRoute,
+    path: "edit",
+    component: () => <p>{EDIT_PAGE_TEXT}</p>,
   });
   const router = createRouter({
     routeTree: rootRoute.addChildren([
-      layoutRoute.addChildren([hotelListRoute, hotelDetailRoute]),
+      layoutRoute.addChildren([
+        hotelListRoute,
+        hotelRoute.addChildren([hotelDetailRoute, hotelEditRoute]),
+      ]),
     ]),
     history: createMemoryHistory({
       initialEntries,
@@ -191,7 +204,7 @@ describe("HotelDetailPage 정보", () => {
     renderHotelDetailPage();
 
     expect(await screen.findByRole("status")).toHaveTextContent(
-      HOTEL_DETAIL_MESSAGES.loading,
+      HOTEL_LOAD_MESSAGES.loading,
     );
     expect(getBackLink()).toBeInTheDocument();
     expect(screen.queryByRole("definition")).not.toBeInTheDocument();
@@ -207,7 +220,7 @@ describe("HotelDetailPage 찾을 수 없음", () => {
 
     await expectNotFound();
     expect(
-      screen.queryByRole("button", { name: HOTEL_DETAIL_MESSAGES.retry }),
+      screen.queryByRole("button", { name: HOTEL_LOAD_MESSAGES.retry }),
     ).not.toBeInTheDocument();
   });
 
@@ -264,17 +277,57 @@ describe("HotelDetailPage 오류", () => {
     renderHotelDetailPage();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      HOTEL_DETAIL_MESSAGES.loadFailed,
+      HOTEL_LOAD_MESSAGES.loadFailed,
     );
     expect(getBackLink()).toBeInTheDocument();
 
     await user.click(
-      screen.getByRole("button", { name: HOTEL_DETAIL_MESSAGES.retry }),
+      screen.getByRole("button", { name: HOTEL_LOAD_MESSAGES.retry }),
     );
 
     expect(await screen.findByText(HOTEL.name)).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(fetchHotel).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("HotelDetailPage 수정 버튼", () => {
+  it("호텔 정보를 보여줄 때 목록으로 링크 줄의 오른쪽 끝에 수정 버튼을 두고, 누르면 수정 화면으로 이동한다", async () => {
+    const user = userEvent.setup();
+    const router = renderHotelDetailPage();
+
+    const editButton = await screen.findByRole("button", {
+      name: HOTEL_DETAIL_MESSAGES.edit,
+    });
+    expect(editButton.parentElement).toBe(getBackLink().parentElement);
+    expect(editButton.parentElement?.lastElementChild).toBe(editButton);
+
+    await user.click(editButton);
+
+    expect(await screen.findByText(EDIT_PAGE_TEXT)).toBeInTheDocument();
+    expect(router.state.location.href).toBe(`${hotelPath(HOTEL.id)}/edit`);
+  });
+
+  it.each([
+    ["불러오는 중", "status", () => new Promise<never>(() => {})],
+    [
+      "불러오지 못했을 때",
+      "alert",
+      () => Promise.reject(createApiError(500, "INTERNAL_SERVER_ERROR")),
+    ],
+    [
+      "찾을 수 없을 때",
+      "alert",
+      () => Promise.reject(createApiError(404, API_ERROR_CODES.hotelNotFound)),
+    ],
+  ])("%s에는 수정 버튼을 보여주지 않는다", async (_, role, fetchResult) => {
+    fetchHotel.mockImplementation(fetchResult);
+    renderHotelDetailPage();
+
+    expect(await screen.findByRole(role)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: HOTEL_DETAIL_MESSAGES.edit }),
+    ).not.toBeInTheDocument();
   });
 });
 

@@ -11,13 +11,3 @@ export const HOTEL_CREATE_MESSAGES = {
   cancel: "취소",
   requestFailed: "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
 } as const;
-
-export const HOTEL_INFO_MESSAGES = {
-  legend: "호텔 정보",
-  nameLabel: "이름",
-  addressLabel: "주소",
-  phoneLabel: "대표 전화번호",
-  phoneHint: "숫자와 -만, 숫자 8~11개",
-  descriptionLabel: "소개",
-  optional: "(선택)",
-} as const;
