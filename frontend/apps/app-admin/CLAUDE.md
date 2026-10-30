@@ -61,13 +61,13 @@ apps/app-admin/
    │  │  │        └─ edit.tsx    # /hotels/$hotelId/edit (호텔 수정)
    │  │  └─ login.tsx            # /login (?redirect=)
    │  └─ styles/
-   ├─ pages/           # error(화면 오류), hotel-create(호텔 등록: features/hotel-create의 HotelCreateForm 배치), hotel-detail(호텔 상세: 경로 파라미터를 읽고 widgets/hotel-detail을 배치), hotel-edit(호텔 수정: 한 번만 채우는 폼, 수정 충돌 시 최신 내용 불러오기), hotel-list(호텔 목록: 검색·페이지·URL search 스키마, 호텔 등록 버튼), login(로그인 화면 틀. redirect를 읽어 features/auth-login의 LoginForm 배치)
+   ├─ pages/           # error(화면 오류), hotel-create(호텔 등록: features/hotel-create의 HotelCreateForm 배치), hotel-detail(호텔 상세: 경로 파라미터를 읽고 widgets/hotel-detail을 배치), hotel-edit(호텔 수정: 경로 파라미터를 읽고 features/hotel-update의 HotelUpdate 배치), hotel-list(호텔 목록: 검색·페이지·URL search 스키마, 호텔 등록 버튼), login(로그인 화면 틀. redirect를 읽어 features/auth-login의 LoginForm 배치)
    ├─ widgets/
    │  ├─ admin-layout/ # 사이드바 메뉴(config/menu.ts), 위쪽 영역. model: useAdminHeader(화면 제목·계정 이름·로그아웃 상태). ui: AdminHeader(연결)·AdminHeaderBar(표현)
    │  └─ hotel-detail/ # 호텔 상세. HotelDetail(연결)이 useHotel의 상태 값으로 찾을 수 없음 또는 링크 줄 + 불러오는 중·실패·내용을 고른다
    ├─ features/
    │  ├─ hotel-create/    # 호텔 등록 폼. api: 등록 변경 훅(성공하면 entities/hotel의 캐시 규칙). model: 폼 스키마(마스터 계정 포함), useHotelCreateForm(react-hook-form, 성공하면 상세로 이동). ui: HotelCreateForm(연결)·HotelCreateFormView·MasterAccountFields(표현)
-   │  ├─ hotel-update/    # api: 호텔 수정 변경 훅. 성공하면 entities/hotel의 캐시 규칙을 부른다
+   │  ├─ hotel-update/    # 호텔 수정. api: 수정 변경 훅(성공하면 entities/hotel의 캐시 규칙). model: 폼 스키마(version 포함), useHotelUpdateForm(react-hook-form, 처음 값으로 한 번만 채움, 수정 충돌 시 최신 내용 불러오기, 성공하면 상세로 이동). ui: HotelUpdate(연결: useHotel 상태로 불러오는 중·실패·찾을 수 없음·폼을 고름)·HotelUpdateForm(연결)·HotelUpdateFormView(표현)
    │  ├─ auth-login/      # 로그인 폼. api: 로그인(성공하면 로그인 상태 시작). model: 폼 스키마, useLoginForm(react-hook-form, 성공하면 redirect로 이동). ui: LoginForm(연결)·LoginFormView(표현)
    │  └─ auth-logout/     # api: 로그아웃. 성공하거나 401이면 로그인 상태를 끝낸다
    ├─ entities/
@@ -85,7 +85,7 @@ apps/app-admin/
       │     └─ zod/    # orval 생성 zod 스키마
       ├─ config/       # APP_INFO (앱 이름), FORM_VALIDATION_MESSAGES (서버와 같은 입력 검증 문구), COMMON_MESSAGES (여러 화면이 함께 쓰는 문구)
       ├─ lib/
-      │  ├─ form/          # 필수·선택 문자열·비밀번호 검사(폼 스키마 조각). react-hook-form 공통: 제출할 때만 검사(SUBMIT_ONLY_VALIDATION), 칸 props와 고치면 그 칸 오류 지우기(toFieldProps), 서버 오류를 칸 오류(첫 칸 초점)와 폼 알림(root.server)으로 나누기(showSubmitError). 옛 도우미(toFieldErrors 등)는 폼을 모두 옮긴 뒤 지운다
+      │  ├─ form/          # 필수·선택 문자열·비밀번호 검사(폼 스키마 조각). react-hook-form 공통: 제출할 때만 검사(SUBMIT_ONLY_VALIDATION), 칸 props와 고치면 그 칸 오류 지우기(toFieldProps), 서버 오류를 칸 오류(첫 칸 초점)와 폼 알림(root.server)으로 나누기(showSubmitError)
       │  └─ search-params/ # URL search 직렬화(일반 쿼리 문자열). 라우터와 테스트용 라우터가 쓴다
       └─ ui/           # ButtonLink (버튼 모양의 링크), TextLink (글자 링크)
 ```

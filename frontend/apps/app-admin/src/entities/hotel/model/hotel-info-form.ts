@@ -11,8 +11,6 @@ export const HOTEL_INFO_FIELDS = [
 
 export type HotelInfoField = (typeof HOTEL_INFO_FIELDS)[number];
 
-export type HotelInfoValues = Record<HotelInfoField, string>;
-
 export function createHotelInfoFormShape(
   rules: Record<HotelInfoField, z.ZodType>,
 ) {

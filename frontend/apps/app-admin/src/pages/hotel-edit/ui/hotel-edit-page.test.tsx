@@ -25,6 +25,7 @@ import {
   stringifyHotelPathParams,
 } from "@/entities/hotel";
 import type { HotelInfoField } from "@/entities/hotel";
+import { HOTEL_UPDATE_FORM_MESSAGES } from "@/features/hotel-update";
 import {
   API_ERROR_CODES,
   hotelListQueryKey,
@@ -34,7 +35,6 @@ import {
 import type { Hotel, HotelPage } from "@/shared/api";
 import { COMMON_MESSAGES, FORM_VALIDATION_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
-import { HOTEL_EDIT_MESSAGES } from "../config/messages";
 import { HotelEditPage } from "./hotel-edit-page";
 
 const { fetchHotel } = vi.hoisted(() => ({ fetchHotel: vi.fn() }));
@@ -223,7 +223,9 @@ function getInvalidFields() {
 }
 
 function getSubmitButton() {
-  return screen.getByRole("button", { name: HOTEL_EDIT_MESSAGES.submit });
+  return screen.getByRole("button", {
+    name: HOTEL_UPDATE_FORM_MESSAGES.submit,
+  });
 }
 
 function getCancelLink() {
@@ -231,11 +233,15 @@ function getCancelLink() {
 }
 
 function queryReloadButton() {
-  return screen.queryByRole("button", { name: HOTEL_EDIT_MESSAGES.reload });
+  return screen.queryByRole("button", {
+    name: HOTEL_UPDATE_FORM_MESSAGES.reload,
+  });
 }
 
 function getReloadButton() {
-  return screen.getByRole("button", { name: HOTEL_EDIT_MESSAGES.reload });
+  return screen.getByRole("button", {
+    name: HOTEL_UPDATE_FORM_MESSAGES.reload,
+  });
 }
 
 function expectAboveButtons(alert: HTMLElement) {
@@ -664,7 +670,9 @@ describe("HotelEditPage 수정 충돌", () => {
     expect(fetchHotel).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(getInvalidFields()).toEqual([]);
-    expect(getFields().name).toHaveFocus();
+    await vi.waitFor(() => {
+      expect(getFields().name).toHaveFocus();
+    });
 
     await user.click(getSubmitButton());
 
