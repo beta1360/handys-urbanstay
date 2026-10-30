@@ -1,7 +1,8 @@
 import type { z } from "zod";
 import { createHotelBodySchema } from "@/shared/api";
-import { FORM_VALIDATION_MESSAGES } from "../config/messages";
-import { passwordSchema, requiredTextSchema } from "./form-field-schema";
+import { FORM_VALIDATION_MESSAGES } from "@/shared/config";
+import { passwordSchema, requiredTextSchema } from "@/shared/lib/form";
+import type { FieldErrors } from "@/shared/lib/form";
 import { createHotelInfoFormShape, HOTEL_INFO_FIELDS } from "./hotel-info-form";
 import type { HotelInfoField } from "./hotel-info-form";
 
@@ -38,7 +39,7 @@ export type MasterField = keyof HotelCreateFormValues["master"];
 
 export type HotelCreateField = HotelInfoField | `master.${MasterField}`;
 
-export type HotelCreateFieldErrors = Partial<Record<HotelCreateField, string>>;
+export type HotelCreateFieldErrors = FieldErrors<HotelCreateField>;
 
 export const HOTEL_CREATE_FIELDS = [
   ...HOTEL_INFO_FIELDS,
@@ -54,26 +55,3 @@ export const EMPTY_HOTEL_CREATE_VALUES: HotelCreateFormValues = {
   description: "",
   master: { loginId: "", name: "", password: "" },
 };
-
-type FieldMessage = { field: string; message: string };
-
-function isHotelCreateField(field: string): field is HotelCreateField {
-  return HOTEL_CREATE_FIELDS.some((createField) => createField === field);
-}
-
-export function toHotelCreateFieldErrors(fieldMessages: FieldMessage[]) {
-  const errors: HotelCreateFieldErrors = {};
-  for (const { field, message } of fieldMessages) {
-    if (isHotelCreateField(field)) {
-      errors[field] ??= message;
-    }
-  }
-  return errors;
-}
-
-export function toIssueFieldMessages(error: z.ZodError): FieldMessage[] {
-  return error.issues.map((issue) => ({
-    field: issue.path.map(String).join("."),
-    message: issue.message,
-  }));
-}

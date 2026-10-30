@@ -8,6 +8,7 @@
     "./button": "./src/button.tsx",
     "./card": "./src/card.tsx",
     "./description-list": "./src/description-list.tsx",
+    "./form-section": "./src/form-section.tsx",
     "./pagination": "./src/pagination.tsx",
     "./sidebar": "./src/sidebar.tsx",
     "./table": "./src/table.tsx",

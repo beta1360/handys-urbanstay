@@ -24,12 +24,9 @@ import {
   ResponseValidationError,
 } from "@/shared/api";
 import type { Hotel, HotelPage } from "@/shared/api";
+import { FORM_VALIDATION_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
-import {
-  FORM_VALIDATION_MESSAGES,
-  HOTEL_CREATE_MESSAGES,
-  HOTEL_INFO_MESSAGES,
-} from "../config/messages";
+import { HOTEL_CREATE_MESSAGES, HOTEL_INFO_MESSAGES } from "../config/messages";
 import { HotelCreatePage } from "./hotel-create-page";
 
 vi.mock("@/shared/api", async (importOriginal) => ({

@@ -1,3 +1,4 @@
+import { FormSection } from "@repo/ui/form-section";
 import { TextField } from "@repo/ui/text-field";
 import { HOTEL_CREATE_MESSAGES } from "../config/messages";
 import { MASTER_PASSWORD_LENGTH } from "../model/hotel-create-form-schema";
@@ -6,7 +7,6 @@ import type {
   HotelCreateFormValues,
   MasterField,
 } from "../model/hotel-create-form-schema";
-import { FormSection } from "./form-section";
 
 type MasterAccountFieldsProps = {
   values: HotelCreateFormValues["master"];

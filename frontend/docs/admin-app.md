@@ -138,6 +138,7 @@
 | `@repo/ui/text-field` | `TextField` | label·입력창·안내 문구·오류 문구를 묶는다. 선택 `hint`(안내 문구)는 입력창 아래에 보여준다. 입력창의 `aria-describedby`는 안내 문구와 오류 문구 중 있는 것을 모두 가리킨다. `error`가 있으면 `aria-invalid`를 붙인다 |
 | `@repo/ui/textarea-field` | `TextareaField` | `TextField`의 여러 줄 입력창(`textarea`)판. label·`hint`·`error` 연결과 색·테두리가 `TextField`와 같다 |
 | `@repo/ui/card` | `Card` | 테두리가 있는 흰색 상자. 선택 `header` 영역 |
+| `@repo/ui/form-section` | `FormSection` | 관련 있는 입력창을 `fieldset`으로 묶어 `Card` 안에 보여준다. `legend`가 묶음의 이름이 된다 |
 | `@repo/ui/description-list` | `DescriptionList`, `DescriptionListItem` | 항목 이름과 값의 목록(`dl`). `DescriptionListItem`은 `term`을 항목 이름(`dt`)으로, children을 값(`dd`)으로 한 줄에 보여준다. 값은 줄바꿈을 살리고, 긴 낱말은 칸 안에서 줄을 바꾼다 |
 | `@repo/ui/sidebar` | `Sidebar`, `SidebarItem` | 왼쪽 메뉴. `Sidebar`는 `aria-label`이 필수인 `nav`다 |
 | `@repo/ui/table` | `Table` | 열 정의(`columns`: 머리글, 칸을 그리는 함수)와 `rows`로 표를 그린다. 머리글은 `scope="col"`이다. `aria-busy`면 흐리게 보여준다. `className`은 표를 감싼 상자에 붙는다. 빈 상태는 쓰는 쪽이 표 대신 보여준다 |
