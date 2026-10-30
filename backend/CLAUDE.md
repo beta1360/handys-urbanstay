@@ -69,6 +69,8 @@ urbanstay/
 - 문자열 요청 파라미터(예: 검색어)는 컨트롤러의 `@InitBinder`에서 `TrimmedStringEditor`(`common/request`)를 등록해 앞뒤 공백을 지우고, 비면 null로 받는다. `@Size` 같은 제약은 지운 값에 걸린다.
 - 필수 문자열(`@NotBlank`)은 문서에 `minLength: 1`로 나온다. `@Size`는 문서의 minLength를 `min`(기본 0)으로 덮으므로 필수 문자열의 최대 길이는 `@Size` 대신 Hibernate Validator의 `@Length(max = ..., message = "{validation.max-length}")`로 검사하고 문서 길이는 `@Schema(maxLength = ...)`로 적는다. 선택 문자열은 `@Size(max)`를 그대로 쓴다.
 - 형식이 있는 필수 문자열(예: 전화번호)은 `@NotBlank`와 `@PatternThenMaxLength`(`common/validation`)를 붙이고 `@Pattern`·`@Size`는 쓰지 않는다. 필드마다 오류가 하나만 난다. 빈 값은 `validation.required`, 형식이 틀리면 길이와 관계없이 형식 메시지, 형식이 맞는데 길면 `validation.max-length`다. 문서의 형식과 길이는 `@Schema(pattern = ..., maxLength = ...)`로 적는다.
+- 요청만으로 검사할 수 없는 입력 규칙(예: 오늘 이후 날짜, 객실 최대 인원)은 서비스가 검사해 `BusinessException(CommonErrorCode.INVALID_INPUT, fieldErrors)`로 던진다. 틀린 항목을 모아 한 번에 던진다(이용 절).
+  - `InvalidField(field, messageKey, arguments)`의 `arguments`가 문구의 `{이름}` 자리를 채운다. 예: `validation.max`의 `{value}`에 객실 최대 인원
 
 ## 목록 조회
 
@@ -215,7 +217,7 @@ urbanstay/
   - 상태 변경은 `version`을 올리지 않는다(벌크 UPDATE라 JPA 버전 검사를 타지 않는다). 상태가 바뀌어도 열어 둔 객실 수정(PUT)은 거절되지 않는다.
   - 반대로 객실 수정이 상태를 덮어쓰지 않도록 `Room.status`는 `@Column(updatable = false)`로 JPA UPDATE에서 뺀다. JPA는 엔티티를 저장할 때 모든 컬럼을 UPDATE하므로, 수정이 객실을 읽은 뒤 상태 변경이 커밋되면 version은 그대로라 통과한 수정의 flush가 읽어 둔 옛 상태로 되돌린다.
   - 벌크 UPDATE는 영속성 컨텍스트를 거치지 않으므로 `@Modifying(flushAutomatically = true, clearAutomatically = true)`로 앞의 변경을 먼저 flush하고 뒤에 비운다. 응답과 이력에 쓸 객실은 비운 뒤 다시 읽는다. 비우지 않으면 응답에 옛 상태가 나간다.
-  - 벌크 UPDATE는 JPA Auditing을 거치지 않으므로 `updated_at`을 같은 문장에서 함께 바꾼다(서비스의 `Instant.now()`).
+  - 벌크 UPDATE는 JPA Auditing을 거치지 않으므로 `updated_at`을 같은 문장에서 함께 바꾼다(서비스의 `Instant.now(clock)`, 엔티티 절).
   - 성공하면 바뀐 상태의 객실 응답(`RoomHotelAdminResponse`, version 그대로)을 준다.
 - 이력은 `room_status_history`(`RoomStatusHistory`)에 상태가 바뀔 때마다 한 줄, 상태 변경과 같은 트랜잭션에서 저장한다. 변경이 거절되거나 실패하면 이력도 남지 않는다.
   - 항목은 이전 상태(`from_status`, 등록이면 null), 바뀐 상태(`to_status`), 바꾼 호텔 계정(`changed_by_id`, `HotelAdmin`과 JPA 연관관계)과 그때의 이름(`changed_by_name`), 바꾼 시각이다. 바꾼 시각은 따로 두지 않고 공통 컬럼 `created_at`을 쓴다(이력은 바꾸지 않으므로 `updated_at`도 같다).
@@ -252,6 +254,30 @@ urbanstay/
   - 사전 확인을 통과한 뒤 유일 인덱스(하이픈 모양만 다른 번호)와 JPA 버전 검사가 막는 경로는 순서를 고정해 확인한다(`GuestServiceTest`).
   - 이용객이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔의 `guest`를 먼저 지운다.
 
+## 이용
+
+- 이용은 `stay` 도메인의 `stay` 테이블(`Stay`, `V9__create_stay.sql`)에 저장한다. 객실(`room_id`, `Room`)과 이용객(`guest_id`, `Guest`)을 JPA 연관관계로 가리키고 체크인 날짜, 체크아웃 날짜(`LocalDate`, `date`), 인원을 가진다.
+  - 호텔 컬럼은 두지 않는다. 호텔은 객실로 정해지고(객실의 호텔은 바뀌지 않는다) 객실과 이용객이 같은 호텔인지는 서비스가 확인한다.
+  - 수정이 없어 `version`을 두지 않고 응답에도 싣지 않는다. 취소는 아직 없다.
+- 기간은 날짜 단위의 반열린 구간 [체크인, 체크아웃)이다. 체크아웃 날은 비어 있다고 보아 1일~3일과 3일~5일은 겹치지 않는다.
+- 값의 규칙. 어기면 400 `INVALID_INPUT`이고 틀린 항목을 모두 `fieldErrors`에 담는다(응답과 예외 절).
+  - 체크인 날짜는 오늘(`Clock` 빈, Asia/Seoul)이거나 그 뒤다. `checkInDate`, `validation.today-or-later`
+  - 체크아웃 날짜는 체크인 날짜보다 뒤이고(최소 1박) 최대 30박이다(`Stay.MAX_NIGHTS`). `checkOutDate`, `validation.after-check-in` 또는 `validation.max-nights`
+  - 인원은 1 이상(요청의 `@Min`, `validation.min`)이고 객실의 최대 인원 이하다. `guestCount`, `validation.max`(`{value}`는 객실 최대 인원)
+  - DB도 CHECK로 1~30박, 1~20명만 받는다. 오늘 규칙은 DB가 막지 않는다.
+- 같은 객실에 기간이 겹치는 이용은 둘 수 없다. 사전 확인(`existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfter`)과 배제 제약(`stay_room_id_period_excl`, `btree_gist`로 `room_id WITH =`, `daterange(check_in_date, check_out_date, '[)') WITH &&`)이 막고, 둘 다 409 `StayErrorCode.STAY_PERIOD_OVERLAPPED`다(동시성과 충돌 절).
+  - 취소가 생기면 같은 이름으로 제약을 다시 만들어 취소되지 않은 이용에만 건다.
+  - 객실별 조회는 배제 제약의 gist 인덱스를 쓰고, 이용객별 조회는 `stay_guest_id_check_in_date_id_idx`를 쓴다.
+- 이용 관리(`ApiPaths.HOTEL_ADMIN + "/stays"`의 등록·목록·조회, `StayHotelAdminController`)는 `StayService`가 한다. 호텔 계정 모두(마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 수정은 없다.
+  - 등록은 객실 조회(`RoomService.getRoom`, 404 `ROOM_NOT_FOUND`) → 이용객 조회(`GuestService.getGuest`, 404 `GUEST_NOT_FOUND`) → 기간·인원(400) → 겹침(409) 순으로 판단한다. 객실 상태와 관계없고 상태를 바꾸지 않는다.
+  - 조회할 이용은 객실의 호텔로 찾는다(`findByIdAndRoomHotelId`). 없는 id와 다른 호텔의 이용 id는 모두 404 `STAY_NOT_FOUND`다.
+  - 목록은 같은 호텔의 이용을 체크인 날짜 내림차순, 같으면 id 내림차순으로 준다. `roomId`·`guestId`(선택)로 거르고 함께 보내면 AND다(조합별 파생 쿼리). 없거나 다른 호텔의 id로 거르면 빈 목록이다.
+  - 응답은 객실 `{ id, name }`, 이용객 `{ id, name, phone }`을 조회 시점의 값으로 담는다. 목록과 조회는 `@EntityGraph`로 객실과 이용객을 함께 읽는다.
+- 테스트
+  - 사전 확인을 통과한 뒤 배제 제약이 막는 경로는 순서를 고정해 확인한다(`StayServiceTest`).
+  - 오늘 규칙은 UTC로는 전날인 한국 시각으로 고정한 Clock(`FixedClockConfiguration`)으로 확인한다.
+  - 이용이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔 객실의 `stay`를 먼저 지운다.
+
 ## 상수
 
 - 응답 메시지는 `src/main/resources/messages.properties`에 두고 MessageSource로 읽는다.
@@ -263,8 +289,8 @@ urbanstay/
   - 상태를 바꾸는 핸들러에는 모두 붙이고 GET 핸들러에는 붙이지 않는다(GET의 `message`는 null). `SuccessMessageConventionTest`가 확인한다.
   - 실패 응답의 `message`는 null이다. 어노테이션이 붙은 핸들러가 예외를 던져도 예외 처리기의 응답에는 문구를 채우지 않는다.
 - 입력 검증 메시지는 제약마다 하나인 공용 키(`validation.{제약}`)를 `messages.properties`에 두고 어노테이션에서 `{키}`로 쓴다. 예: `@NotBlank(message = "{validation.required}")`
-  - 키 이름: `validation.required`(필수), `validation.email`(이메일 형식), `validation.max-length`(최대 길이, 문구에 `{max}`를 넣는다), `validation.min`·`validation.max`(숫자 범위, 문구에 `{value}`를 넣는다), `validation.phone`(전화번호 형식), `validation.password`(비밀번호 규칙), `validation.type`(타입이 틀린 값), `validation.unknown-field`(문서에 없는 필드)
-  - `validation.type`, `validation.unknown-field`는 어노테이션이 아니라 `GlobalExceptionHandler`가 본문·파라미터 오류에 쓴다.
+  - 키 이름: `validation.required`(필수), `validation.email`(이메일 형식), `validation.max-length`(최대 길이, 문구에 `{max}`를 넣는다), `validation.min`·`validation.max`(숫자 범위, 문구에 `{value}`를 넣는다), `validation.phone`(전화번호 형식), `validation.password`(비밀번호 규칙), `validation.type`(타입이 틀린 값), `validation.unknown-field`(문서에 없는 필드), `validation.today-or-later`(오늘 이후 날짜), `validation.after-check-in`(체크인 뒤 날짜), `validation.max-nights`(최대 숙박 수, 문구에 `{max}`를 넣는다)
+  - `validation.type`, `validation.unknown-field`는 어노테이션이 아니라 `GlobalExceptionHandler`가 본문·파라미터 오류에 쓴다. `validation.today-or-later`, `validation.after-check-in`, `validation.max-nights`는 서비스가 쓴다(이용 절).
   - Spring Boot의 MessageSource 기반 interpolator가 키를 풀고, `{max}` 같은 제약 속성은 Hibernate Validator가 채운다. 응답의 `fieldErrors[].message`에 풀린 문구가 들어간다.
   - 실제로 쓰는 키만 추가한다.
 - 설정값은 `application.properties`에 둔다.
@@ -274,6 +300,7 @@ urbanstay/
 - 모든 엔티티는 공통 엔티티(`common/entity/BaseEntity`)를 상속한다.
   - `id`: `Long`, IDENTITY 전략
   - `createdAt`, `updatedAt`: `Instant`, JPA Auditing으로 관리
+- 현재 시각과 날짜는 `Clock` 빈(`common/config/ClockConfig`, Asia/Seoul)으로 구한다(`Instant.now(clock)`, `LocalDate.now(clock)`). JPA Auditing도 이 Clock을 쓴다(`JpaAuditingConfig`의 `dateTimeProviderRef`). 시각을 고정할 테스트는 `@Primary` 고정 Clock(`FixedClockConfiguration`)을 `@Import`한다.
 - 테이블 DDL에는 공통 컬럼을 아래와 같이 둔다.
   - `id bigint generated by default as identity primary key`
   - `created_at timestamptz not null`
@@ -287,6 +314,8 @@ urbanstay/
 - 유일해야 하는 값은 서비스의 사전 확인과 함께 마이그레이션의 이름 있는 유일 제약(예: `constraint hotel_name_address_key unique (name, address)`)으로 막는다. 사전 확인만으로는 동시에 온 요청이 둘 다 통과한다.
   - 서비스는 저장을 `saveAndFlush`로 서비스 안에서 실행하고, `DataIntegrityViolationException`이 그 제약을 가리키면(`common/exception`의 `violates(제약 이름)`) 도메인 409로 바꾼다. 다른 제약 위반은 그대로 던진다(500).
   - 제약 이름은 엔티티 상수로 둔다. 예: `Hotel.NAME_ADDRESS_UNIQUE_CONSTRAINT`
+- 범위가 겹치면 안 되는 값(예: 같은 객실의 이용 기간)은 사전 확인과 함께 PostgreSQL 배제 제약(`exclude using gist`)으로 막고, 그 위반도 `violates(제약 이름)`으로 찾아 도메인 409로 바꾼다(이용 절).
+  - Hibernate의 PostgreSQL 방언은 배제 제약 위반(SQLState `23P01`)의 제약 이름을 뽑지 않아 `violates`가 다른 제약과 같은 형식의 오류 메시지에서 직접 뽑는다.
 - 동시 수정은 낙관적 잠금으로 막는다. 엔티티에 `@Version var version: Long`(`version bigint not null`)을 두고 응답에 `version`을 싣고, 수정 요청은 `version`을 필수로 받는다.
   - 서비스는 읽은 엔티티의 version이 요청과 다르면 도메인 409를 던진다.
   - 같은 version으로 동시에 들어온 수정은 flush 때 JPA가 막는다. flush를 서비스 안(`saveAndFlush`)에서 해 `OptimisticLockingFailureException`도 같은 도메인 409로 바꾼다. 커밋 때 터지면 서비스 밖이라 500이 된다.
@@ -295,7 +324,7 @@ urbanstay/
 - 중복 확인 같은 조회는 엔티티를 바꾸기 전에 한다. 바뀐 엔티티가 있으면 조회 전 자동 flush로 제약 위반이 변환 범위 밖에서 난다.
 - 테스트는 두 경로를 모두 확인한다.
   - 동시 요청: 두 스레드를 `CountDownLatch`로 함께 출발시킨다.
-  - 사전 확인을 통과한 뒤 DB에서 막히는 경로: 먼저 온 트랜잭션을 열어 둔 채 다음 요청이 잠금을 기다리는지(`pg_stat_activity`) 확인하고 커밋한다(`HotelServiceTest`, `HotelMasterServiceTest`, `HotelOperatorServiceTest`, `RoomServiceTest`, `GuestServiceTest`). 조건부 UPDATE도 같은 방식으로 늦은 쪽이 0행이 되는 경로를 확인한다(객실 상태 절).
+  - 사전 확인을 통과한 뒤 DB에서 막히는 경로: 먼저 온 트랜잭션을 열어 둔 채 다음 요청이 잠금을 기다리는지(`pg_stat_activity`) 확인하고 커밋한다(`HotelServiceTest`, `HotelMasterServiceTest`, `HotelOperatorServiceTest`, `RoomServiceTest`, `GuestServiceTest`, `StayServiceTest`). 조건부 UPDATE도 같은 방식으로 늦은 쪽이 0행이 되는 경로를 확인한다(객실 상태 절).
   - 동시 요청 테스트는 실행마다 어느 경로를 탈지 정해지지 않는다. 변환 코드를 지켜 주는 것은 순서를 고정한 경로 테스트다.
 
 ## 테스트
