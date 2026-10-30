@@ -8,6 +8,7 @@ import com.marco.assignment.handys.urbanstay.common.response.ApiResponse
 import com.marco.assignment.handys.urbanstay.common.response.PageResponse
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomCreateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomHotelAdminResponse
+import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomStatusUpdateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomUpdateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.room.exception.RoomApiErrors
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
@@ -55,6 +56,7 @@ class RoomHotelAdminController(
 	): ApiResponse<RoomHotelAdminResponse> {
 		val room = roomService.create(
 			hotelId = hotelAdmin.hotelId,
+			hotelAdminId = hotelAdmin.id,
 			name = request.name,
 			type = request.type,
 			capacity = request.capacity,
@@ -115,6 +117,24 @@ class RoomHotelAdminController(
 			description = request.description,
 			checkInTime = request.checkInTime,
 			checkOutTime = request.checkOutTime,
+		)
+		return ApiResponse.success(RoomHotelAdminResponse.from(room))
+	}
+
+	@Operation(summary = "openapi.hotel-admin.operation.updateRoomStatus.summary", description = "openapi.hotel-admin.operation.updateRoomStatus.description")
+	@RoomApiErrors(RoomErrorCode.ROOM_NOT_FOUND, RoomErrorCode.ROOM_STATUS_TRANSITION_NOT_ALLOWED, RoomErrorCode.ROOM_STATUS_CHANGED)
+	@PutMapping("/{roomId}/status")
+	fun updateRoomStatus(
+		@AuthenticationPrincipal hotelAdmin: HotelAdminPrincipal,
+		@PathVariable roomId: Long,
+		@Valid @RequestBody request: RoomStatusUpdateHotelAdminRequest,
+	): ApiResponse<RoomHotelAdminResponse> {
+		val room = roomService.changeStatus(
+			hotelId = hotelAdmin.hotelId,
+			roomId = roomId,
+			hotelAdminId = hotelAdmin.id,
+			from = request.from,
+			to = request.to,
 		)
 		return ApiResponse.success(RoomHotelAdminResponse.from(room))
 	}

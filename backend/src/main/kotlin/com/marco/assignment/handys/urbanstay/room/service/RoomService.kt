@@ -1,11 +1,15 @@
 package com.marco.assignment.handys.urbanstay.room.service
 
+import com.marco.assignment.handys.urbanstay.account.service.HotelAdminService
 import com.marco.assignment.handys.urbanstay.common.exception.BusinessException
 import com.marco.assignment.handys.urbanstay.common.exception.violates
 import com.marco.assignment.handys.urbanstay.hotel.service.HotelService
 import com.marco.assignment.handys.urbanstay.room.entity.Room
+import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
+import com.marco.assignment.handys.urbanstay.room.entity.RoomStatusHistory
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import com.marco.assignment.handys.urbanstay.room.repository.RoomRepository
+import com.marco.assignment.handys.urbanstay.room.repository.RoomStatusHistoryRepository
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.OptimisticLockingFailureException
 import org.springframework.data.domain.Page
@@ -13,17 +17,21 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 import java.time.LocalTime
 
 @Service
 class RoomService(
 	private val roomRepository: RoomRepository,
+	private val roomStatusHistoryRepository: RoomStatusHistoryRepository,
 	private val hotelService: HotelService,
+	private val hotelAdminService: HotelAdminService,
 ) {
 
 	@Transactional
 	fun create(
 		hotelId: Long,
+		hotelAdminId: Long,
 		name: String,
 		type: String,
 		capacity: Int,
@@ -34,9 +42,12 @@ class RoomService(
 	): Room {
 		val hotel = hotelService.getHotel(hotelId)
 		checkNotDuplicated(hotelId, name, null)
-		return translateConflicts {
+		val createdBy = hotelAdminService.getHotelAdmin(hotelAdminId)
+		val room = translateConflicts {
 			roomRepository.saveAndFlush(Room(hotel, name, type, capacity, floor, description, checkInTime, checkOutTime))
 		}
+		roomStatusHistoryRepository.save(RoomStatusHistory(room, null, room.status, createdBy))
+		return room
 	}
 
 	@Transactional(readOnly = true)
@@ -69,6 +80,21 @@ class RoomService(
 		checkNotDuplicated(hotelId, name, roomId)
 		room.update(name, type, capacity, floor, description, checkInTime, checkOutTime)
 		return translateConflicts { roomRepository.saveAndFlush(room) }
+	}
+
+	@Transactional
+	fun changeStatus(hotelId: Long, roomId: Long, hotelAdminId: Long, from: RoomStatus, to: RoomStatus): Room {
+		findRoom(hotelId, roomId)
+		if (!from.canChangeTo(to)) {
+			throw BusinessException(RoomErrorCode.ROOM_STATUS_TRANSITION_NOT_ALLOWED)
+		}
+		if (roomRepository.updateStatus(roomId, hotelId, from, to, Instant.now()) == 0) {
+			throw BusinessException(RoomErrorCode.ROOM_STATUS_CHANGED)
+		}
+		val changedBy = hotelAdminService.getHotelAdmin(hotelAdminId)
+		val room = findRoom(hotelId, roomId)
+		roomStatusHistoryRepository.save(RoomStatusHistory(room, from, to, changedBy))
+		return room
 	}
 
 	private fun findRoom(hotelId: Long, roomId: Long): Room =
