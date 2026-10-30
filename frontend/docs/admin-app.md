@@ -106,7 +106,8 @@
 | 경로 | 컴포넌트 | 내용 |
 |---|---|---|
 | `@repo/ui/button` | `Button` | variant `primary`·`secondary`·`ghost`. `loading`이면 비활성화하고 `aria-busy`를 붙인다 |
-| `@repo/ui/text-field` | `TextField` | label·입력창·오류 문구를 묶는다. `error`가 있으면 입력창에 `aria-invalid`와 오류 문구를 가리키는 `aria-describedby`를 붙인다 |
+| `@repo/ui/text-field` | `TextField` | label·입력창·안내 문구·오류 문구를 묶는다. 선택 `hint`(안내 문구)는 입력창 아래에 보여준다. 입력창의 `aria-describedby`는 안내 문구와 오류 문구 중 있는 것을 모두 가리킨다. `error`가 있으면 `aria-invalid`를 붙인다 |
+| `@repo/ui/textarea-field` | `TextareaField` | `TextField`의 여러 줄 입력창(`textarea`)판. label·`hint`·`error` 연결과 색·테두리가 `TextField`와 같다 |
 | `@repo/ui/card` | `Card` | 테두리가 있는 흰색 상자. 선택 `header` 영역 |
 | `@repo/ui/description-list` | `DescriptionList`, `DescriptionListItem` | 항목 이름과 값의 목록(`dl`). `DescriptionListItem`은 `term`을 항목 이름(`dt`)으로, children을 값(`dd`)으로 한 줄에 보여준다. 값은 줄바꿈을 살리고, 긴 낱말은 칸 안에서 줄을 바꾼다 |
 | `@repo/ui/sidebar` | `Sidebar`, `SidebarItem` | 왼쪽 메뉴. `Sidebar`는 `aria-label`이 필수인 `nav`다 |

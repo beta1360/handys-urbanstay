@@ -52,6 +52,30 @@ describe("TextField", () => {
     expect(input).toHaveAccessibleDescription("이메일을 입력해 주세요.");
   });
 
+  it("안내 문구가 있으면 입력창 아래에 보여주고 입력창과 연결한다", () => {
+    render(<TextField label="전화번호" hint="숫자와 -만 입력합니다." />);
+
+    const input = screen.getByRole("textbox", { name: "전화번호" });
+    expect(input).not.toHaveAttribute("aria-invalid");
+    expect(input).toHaveAccessibleDescription("숫자와 -만 입력합니다.");
+  });
+
+  it("안내 문구와 오류가 함께 있으면 입력창이 안내와 오류를 모두 가리킨다", () => {
+    render(
+      <TextField
+        label="전화번호"
+        hint="숫자와 -만 입력합니다."
+        error="형식이 올바르지 않습니다."
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "전화번호" });
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input).toHaveAccessibleDescription(
+      "숫자와 -만 입력합니다. 형식이 올바르지 않습니다.",
+    );
+  });
+
   it("입력한 값을 입력창에 보여준다", async () => {
     const user = userEvent.setup();
     render(<TextField label="이메일" />);
