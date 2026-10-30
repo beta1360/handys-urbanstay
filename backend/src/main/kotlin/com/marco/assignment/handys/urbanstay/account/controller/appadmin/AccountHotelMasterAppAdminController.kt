@@ -8,6 +8,7 @@ import com.marco.assignment.handys.urbanstay.account.exception.AccountErrorCode
 import com.marco.assignment.handys.urbanstay.account.service.HotelMasterService
 import com.marco.assignment.handys.urbanstay.common.ApiPaths
 import com.marco.assignment.handys.urbanstay.common.response.ApiResponse
+import com.marco.assignment.handys.urbanstay.common.response.SuccessMessage
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelApiErrors
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelErrorCode
 import io.swagger.v3.oas.annotations.Operation
@@ -37,6 +38,7 @@ class AccountHotelMasterAppAdminController(
 	@Operation(summary = "openapi.app-admin.operation.updateHotelMaster.summary", description = "openapi.app-admin.operation.updateHotelMaster.description")
 	@HotelApiErrors(HotelErrorCode.HOTEL_NOT_FOUND)
 	@AccountApiErrors(AccountErrorCode.HOTEL_MASTER_NOT_FOUND, AccountErrorCode.LOGIN_ID_DUPLICATED, AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+	@SuccessMessage("success.hotel-master.updated")
 	@PutMapping
 	fun updateHotelMaster(
 		@PathVariable hotelId: Long,
@@ -52,6 +54,7 @@ class AccountHotelMasterAppAdminController(
 	)
 	@HotelApiErrors(HotelErrorCode.HOTEL_NOT_FOUND)
 	@AccountApiErrors(AccountErrorCode.HOTEL_MASTER_NOT_FOUND, AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+	@SuccessMessage("success.password.reset")
 	@PutMapping("/password")
 	fun resetHotelMasterPassword(
 		@PathVariable hotelId: Long,

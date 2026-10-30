@@ -204,9 +204,12 @@ class AccountAppAdminControllerTest {
 	private fun adminJson(): String = """{"id":${admin.id},"loginId":"$LOGIN_ID","name":"$NAME"}"""
 
 	private fun assertSuccess(response: HttpResponse<String>, data: String) {
+		val expectedMessage = jsonMapper.writeValueAsString(successMessage(response.request()))
 		assertThat(response.statusCode()).isEqualTo(HttpStatus.OK.value())
-		assertThat(json(response.body())).isEqualTo(json("""{"success":true,"data":$data,"message":null,"error":null}"""))
+		assertThat(json(response.body())).isEqualTo(json("""{"success":true,"data":$data,"message":$expectedMessage,"error":null}"""))
 	}
+
+	private fun successMessage(request: HttpRequest): String? = SUCCESS_MESSAGE_KEYS["${request.method()} ${request.uri().path}"]?.let(::message)
 
 	private fun assertError(response: HttpResponse<String>, errorCode: ErrorCode, fieldErrors: Map<String, String> = emptyMap()) {
 		val body = json(response.body())
@@ -274,5 +277,6 @@ class AccountAppAdminControllerTest {
 		private const val XSRF_COOKIE = "XSRF-TOKEN"
 		private const val XSRF_HEADER = "X-XSRF-TOKEN"
 		private const val FIELD_ERRORS = "fieldErrors"
+		private val SUCCESS_MESSAGE_KEYS = mapOf("POST $LOGIN" to "success.auth.login", "POST $LOGOUT" to "success.auth.logout")
 	}
 }

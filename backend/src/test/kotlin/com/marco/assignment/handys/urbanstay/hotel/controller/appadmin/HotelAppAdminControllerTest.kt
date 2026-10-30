@@ -33,6 +33,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
@@ -851,15 +852,18 @@ class HotelAppAdminControllerTest {
 	}
 
 	private fun ResultActionsDsl.andExpectSuccess(status: HttpStatus): JsonNode {
-		val response = andReturn().response
-		val body = json(response)
-		assertThat(response.status).isEqualTo(status.value())
+		val result = andReturn()
+		val body = json(result.response)
+		assertThat(result.response.status).isEqualTo(status.value())
 		assertThat(body.properties().map { it.key }).containsExactly("success", "data", "message", "error")
 		assertThat(body["success"].booleanValue()).isTrue()
-		assertThat(body["message"].isNull).isTrue()
+		assertThat(body["message"].stringValue(null)).isEqualTo(successMessage(result.request))
 		assertThat(body["error"].isNull).isTrue()
 		return body["data"]
 	}
+
+	private fun successMessage(request: MockHttpServletRequest): String? =
+		SUCCESS_MESSAGE_KEYS.entries.firstOrNull { it.key.matches("${request.method} ${request.requestURI}") }?.value?.let(::message)
 
 	private fun ResultActionsDsl.andExpectError(errorCode: ErrorCode, vararg fieldErrors: Pair<String, String>) =
 		assertError(andReturn().response, errorCode, *fieldErrors)
@@ -937,6 +941,10 @@ class HotelAppAdminControllerTest {
 		private const val SELECT_MASTER =
 			"select login_id, name, role, active, credential_version, password_hash from hotel_admin where hotel_id = ? and role = 'MASTER'"
 		private const val SELECT_MASTER_HOTEL_IDS = "select hotel_id from hotel_admin where role = 'MASTER' and login_id = ?"
+		private val SUCCESS_MESSAGE_KEYS = mapOf(
+			Regex("POST $HOTELS") to "success.hotel.created",
+			Regex("PUT $HOTELS/\\d+") to "success.hotel.updated",
+		)
 
 		@JvmStatic
 		fun phoneErrors(): List<Arguments> = listOf(
