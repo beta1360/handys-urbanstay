@@ -1,8 +1,8 @@
 import { Table } from "@repo/ui/table";
 import type { TableColumn } from "@repo/ui/table";
+import { TextLink } from "@repo/admin-kit/link";
 import { HOTEL_FIELD_LABELS } from "@/entities/hotel";
 import type { Hotel } from "@/shared/api";
-import { TextLink } from "@/shared/ui";
 
 const HOTEL_COLUMNS: readonly TableColumn<Hotel>[] = [
   {

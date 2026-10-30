@@ -22,7 +22,8 @@ frontend/
 ├─ docs/
 │  └─ admin-app.md  # 두 어드민 앱의 공통 규칙
 └─ packages/        # 앱 간 공유 코드
-   └─ ui/           # 두 어드민 앱이 함께 쓰는 화면 컴포넌트 (@repo/ui). 규칙: packages/ui/CLAUDE.md
+   ├─ ui/           # 두 어드민 앱이 함께 쓰는 화면 컴포넌트 (@repo/ui). 규칙: packages/ui/CLAUDE.md
+   └─ admin-kit/    # 두 어드민 앱이 함께 쓰는 도메인 무관 코드 (@repo/admin-kit). 규칙: packages/admin-kit/CLAUDE.md
 ```
 
 - 세 앱은 정책이 다르므로 각자 전용 API만 쓴다. API 코드는 앱마다 orval로 따로 생성한다.
@@ -44,6 +45,7 @@ frontend/
 | entities | 도메인 하나. 그 도메인의 조회, 쿼리 키와 캐시 규칙, 대상 식별(예: 경로 파라미터 검사), 도메인을 보여주는 컴포넌트를 둔다 | `entities/hotel`, `entities/account` |
 | shared | 도메인과 무관한 공통 코드. API 클라이언트(생성 코드, 검증을 거친 요청 함수), 폼 도우미, 라우터를 아는 공용 UI, 여러 곳에서 쓰는 문구 | `shared/api`, `shared/ui` |
 
+- 두 어드민 앱이 함께 쓰는 도메인 무관 코드(요청·응답 검증, 오류 해석, 폼 도우미, 토스트 상태, 화면 이동 링크)는 앱의 shared 대신 `@repo/admin-kit`에 둔다(`docs/admin-app.md`의 'UI 컴포넌트와 공유 코드').
 - 한 화면에서만 쓰는 동작도 features slice로 둔다. 동작을 pages에 두면 화면 하나가 URL, 폼, 요청, 캐시, 이동을 모두 갖게 되고, 다른 화면이 쓰게 될 때마다 아래 레이어로 옮겨야 하기 때문이다. 그래서 Steiger의 `fsd/insignificant-slice` 규칙은 끈다.
 - app·pages 레이어의 폴더 이름은 앱마다 정한다. web은 Next.js 라우팅과 겹치지 않게 `_app`, `_pages`를 쓴다.
 - 레이어는 위에서 아래로만 import한다: app → pages → widgets → features → entities → shared
@@ -86,14 +88,14 @@ FSD 레이어(app~shared)가 코드를 '어디에 두는가'를 정한다면, 3�
 - `entities/<도메인>/api`에 그 도메인의 조회 훅, 쿼리 키와 조회 설정(`staleTime`, `placeholderData` 등), 캐시 규칙 함수(예: 상세 캐시에 넣기, 목록 무효화, 내 정보 지우기)를 둔다. 같은 데이터의 캐시 규칙은 이 한 곳에만 둔다.
 - `features/<동작>/api`에 그 동작의 변경 훅을 둔다. 변경이 성공하면 entities의 캐시 규칙 함수를 부른다. 캐시 키를 직접 다루지 않는다.
 - app 레이어는 QueryClient 생성(재시도 규칙, 오류 처리기)과 인증 가드를 맡는다. 가드도 내 정보 조회·캐시는 entities의 함수로 한다.
-- `@tanstack/react-query`는 `entities/*/api`, `features/*/api`, app 레이어에서만 import한다. 그 밖의 곳은 ESLint `no-restricted-imports`로 막는다. orval이 만든 TanStack Query 훅은 쓰지 않는다.
+- `@tanstack/react-query`는 `entities/*/api`, `features/*/api`, app 레이어에서만 import한다. 그 밖의 곳과 `@repo/admin-kit`은 ESLint `no-restricted-imports`로 막는다. orval이 만든 TanStack Query 훅은 쓰지 않는다.
 
 ### 폼
 
 - 폼은 react-hook-form과 zod resolver로 만든다.
 - 폼 스키마(생성된 요청 스키마에 화면 문구를 덧붙인 것)와 제출 흐름(변경 훅 호출, 서버 오류 표시, 성공 뒤 동작)은 그 동작의 `features/<동작>/model`에, 폼 화면은 `features/<동작>/ui`에 둔다.
 - 여러 동작이 함께 쓰는 입력 묶음(예: 등록·수정의 호텔 정보 입력 칸)은 그 도메인의 entities slice에 둔다. 같은 레이어의 slice끼리는 import하지 않으므로 features에 두면 다른 동작이 가져다 쓸 수 없다. 입력 칸은 칸마다 입력창 props를 받아 펼치는 표현 컴포넌트로, 스키마 조각은 그 도메인의 입력 규칙으로 둔다.
-- 도메인과 무관한 폼 도우미(예: 서버 오류를 입력창 오류와 폼 알림으로 나누기)는 `shared/lib/form`에 둔다.
+- 도메인과 무관한 폼 도우미(예: 서버 오류를 입력창 오류와 폼 알림으로 나누기)는 `shared/lib/form`에 둔다. 어드민 앱은 `@repo/admin-kit/form`을 쓴다.
 - 폼 알림(입력창과 묶이지 않는 서버 오류)은 react-hook-form의 `errors.root.server`에 둔다. 다시 제출하거나 `reset`하면 함께 지워진다.
   - 폼 안에 보여줄지 토스트로 보여줄지는 각 앱의 화면 규칙을 따른다. 토스트로 보여줘도 `errors.root.server`에 둔다. 제출이 실패한 상태로 남아야 아래 제출 중 상태가 풀리기 때문이다.
 - 제출 중 상태는 `formState.isSubmitting || formState.isSubmitSuccessful`로 정한다. 요청이 끝날 때까지와, 성공한 뒤 화면을 떠날 때까지 로딩이다.
@@ -102,8 +104,8 @@ FSD 레이어(app~shared)가 코드를 '어디에 두는가'를 정한다면, 3�
 
 ### 공용 UI와 화면 이동
 
-- 라우터를 아는 공용 UI는 각 앱의 `shared/ui`에 둔다.
-- 화면 이동은 진짜 링크로 한다. 버튼처럼 보이는 이동은 `shared/ui`의 `ButtonLink`(버튼 모양의 라우터 `Link`), 글자 링크는 `TextLink`를 쓴다. `Button`에 `navigate`를 붙여 이동하지 않는다. 새 탭으로 열 수 있고 화면 낭독기에 링크로 읽히게 하기 위해서다.
+- 라우터를 아는 공용 UI는 각 앱의 `shared/ui`에 둔다. 두 어드민 앱이 함께 쓰는 것은 `@repo/admin-kit/link`에 둔다.
+- 화면 이동은 진짜 링크로 한다. 버튼처럼 보이는 이동은 `ButtonLink`(버튼 모양의 라우터 `Link`), 글자 링크는 `TextLink`를 쓴다(어드민 앱은 `@repo/admin-kit/link`). `Button`에 `navigate`를 붙여 이동하지 않는다. 새 탭으로 열 수 있고 화면 낭독기에 링크로 읽히게 하기 위해서다.
 - 제출 성공 뒤 이동처럼 동작의 결과로 일어나는 이동은 `model`의 훅에서 `navigate`로 한다.
 
 ## 이름과 export
@@ -118,7 +120,7 @@ FSD 레이어(app~shared)가 코드를 '어디에 두는가'를 정한다면, 3�
 
 ## 토스트
 
-- 토스트는 UI 라이브러리 없이 직접 만든다. 표현 컴포넌트(어드민 앱은 `@repo/ui/toast`), 도메인과 무관한 상태와 `showToast`(각 앱의 `shared/lib/toast`), 영역을 그리는 Provider(app 레이어)로 나눈다.
+- 토스트는 UI 라이브러리 없이 직접 만든다. 표현 컴포넌트(어드민 앱은 `@repo/ui/toast`), 도메인과 무관한 상태와 `showToast`(어드민 앱은 `@repo/admin-kit/toast`), 영역을 그리는 Provider(app 레이어)로 나눈다.
 - `showToast`는 동작의 결과를 아는 `model`(features·widgets)에서 부른다. `ui`는 props만 받는다.
 - 무엇을 토스트로 보여줄지, 위치와 동작은 각 앱의 화면 규칙(어드민 앱은 `docs/admin-app.md`의 '토스트')을 따른다.
 
@@ -151,7 +153,7 @@ FSD 레이어(app~shared)가 코드를 '어디에 두는가'를 정한다면, 3�
 ## 명령어 (`frontend/`에서 실행)
 
 - 모든 앱: `pnpm dev`, `pnpm build`, `pnpm lint`(ESLint + Steiger), `pnpm test`(한 번 실행), `pnpm codegen` (turbo로 실행)
-- 타입 검사: `pnpm typecheck` (`tsc --noEmit`). `typecheck` 스크립트가 있는 `app-admin`, `hotel-admin`, `@repo/ui`에서 실행한다. web은 `next build`가 타입을 검사한다.
+- 타입 검사: `pnpm typecheck` (`tsc --noEmit`). `typecheck` 스크립트가 있는 `app-admin`, `hotel-admin`, `@repo/ui`, `@repo/admin-kit`에서 실행한다. web은 `next build`가 타입을 검사한다.
 - 특정 앱만: `pnpm --filter web dev`처럼 `--filter`로 지정한다. 패키지는 `pnpm --filter @repo/ui test`처럼 패키지 이름으로 지정한다.
 - 테스트 감시 모드: `pnpm --filter web test:watch`
 - API 코드 생성은 백엔드가 실행 중이어야 한다.

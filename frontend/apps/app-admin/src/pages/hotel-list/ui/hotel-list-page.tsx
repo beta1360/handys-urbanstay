@@ -1,6 +1,6 @@
 import { getRouteApi } from "@tanstack/react-router";
+import { ButtonLink } from "@repo/admin-kit/link";
 import { HotelSearchForm } from "@/features/hotel-search";
-import { ButtonLink } from "@/shared/ui";
 import { HotelList } from "@/widgets/hotel-list";
 import { HOTEL_LIST_MESSAGES } from "../config/messages";
 

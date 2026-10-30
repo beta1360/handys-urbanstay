@@ -21,9 +21,9 @@
 - QueryClient와 라우터는 `src/app/router/router.ts`에서 함께 만든다. 라우터 context에 QueryClient를 넣고, QueryClient의 오류 처리기에 라우터를 넘기기 위해서다. `QueryProvider`도 여기서 만든 QueryClient를 쓴다.
 - 라우터의 URL search 직렬화는 `src/shared/lib/search-params`의 `parseSearch`·`stringifySearch`를 쓴다(일반 쿼리 문자열). 테스트용 memory 라우터도 같은 함수를 넣는다. 규칙은 `frontend/docs/admin-app.md`의 '구조'를 따른다.
 - 경로 파라미터(`$hotelId`)는 라우트의 `params.parse`·`params.stringify`로 읽고 쓴다. 두 함수는 `entities/hotel`에 두고, 상세·수정 라우트를 감싸는 `hotels/$hotelId/route.tsx`가 한 번 연결한다. 상세(`index.tsx`)와 수정(`edit.tsx`) 화면은 이 라우트의 `useParams`로 검사한 id를 읽는다. 규칙은 `frontend/docs/admin-app.md`의 '상세 화면'을 따른다.
-- 여러 화면이 함께 쓰는 코드는 `frontend/docs/admin-app.md`의 '구조'에 따라 역할별로 둔다. 도메인과 무관한 폼 도우미는 `shared/lib/form`, 호텔 id 검사, 호텔 하나 조회(`useHotel`: 상태 값 `loading`·`failed`·`notFound`·`ready` 하나를 돌려준다), 상태별 화면(`HotelLoading`·`HotelLoadFailed`·`HotelNotFound`)과 상세 내용 목록(`HotelInformation`), 호텔 항목 이름(`HOTEL_FIELD_LABELS`: 입력 칸·상세·목록 표가 함께 쓴다), 등록·수정이 함께 쓰는 호텔 정보 입력 칸(`HotelInfoFields`: 칸마다 입력창 props를 받는 표현 컴포넌트)과 그 폼 스키마 조각(`createHotelInfoFormShape`)은 `entities/hotel`에 둔다. 여러 화면이 함께 쓰는 문구(`COMMON_MESSAGES`)는 `shared/config`, 화면 이동 링크(`ButtonLink`·`TextLink`)는 `shared/ui`에 둔다.
+- 여러 화면이 함께 쓰는 코드는 `frontend/docs/admin-app.md`의 '구조'에 따라 역할별로 둔다. 호텔 id 검사, 호텔 하나 조회(`useHotel`: 상태 값 `loading`·`failed`·`notFound`·`ready` 하나를 돌려준다), 상태별 화면(`HotelLoading`·`HotelLoadFailed`·`HotelNotFound`)과 상세 내용 목록(`HotelInformation`), 호텔 항목 이름(`HOTEL_FIELD_LABELS`: 입력 칸·상세·목록 표가 함께 쓴다), 등록·수정이 함께 쓰는 호텔 정보 입력 칸(`HotelInfoFields`: 칸마다 입력창 props를 받는 표현 컴포넌트)과 그 폼 스키마 조각(`createHotelInfoFormShape`)은 `entities/hotel`에 둔다. 여러 화면이 함께 쓰는 문구(`COMMON_MESSAGES`)는 `shared/config`에 둔다. 도메인과 무관한 폼 도우미, 토스트 상태, 화면 이동 링크(`ButtonLink`·`TextLink`), 요청·응답 검증과 서버와 같은 입력 검증 문구는 `@repo/admin-kit`의 것을 쓴다(`frontend/docs/admin-app.md`의 'packages/admin-kit를 쓰는 법').
 - 서버 상태는 `frontend/CLAUDE.md`의 '서버 상태'를 따른다.
-  - `shared/api`: 검증을 거친 요청 함수(`fetchMe`, `fetchHotels`, `fetchHotel`, 로그인·로그아웃, 등록·수정)와 쿼리 키 함수(`meQueryKey`, `hotelListQueryKey`, `hotelQueryKey`)
+  - `shared/api`: 검증을 거친 요청 함수(`fetchMe`, `fetchHotels`, `fetchHotel`, 로그인·로그아웃, 등록·수정)와 쿼리 키 함수(`meQueryKey`, `hotelListQueryKey`, `hotelQueryKey`), 서버 오류 정보 읽기(`getApiError`)와 오류 코드(`API_ERROR_CODES`)
   - `entities/account/api`: 내 정보 조회(`useMe`, `ensureMe`)와 로그인 상태 캐시 규칙(`startSession`, `endSession`, `forgetMe`, `isPendingMeQuery`)
   - `entities/hotel/api`: 호텔 조회 훅(`useHotelQuery`, `useHotelListQuery`)과 캐시 규칙(`cacheSavedHotel`, `refetchHotel`·`useRefetchHotel`). 목록 페이지 계산(`getLastPage`, `isBeyondLastPage` 등)은 `entities/hotel/lib`에 둔다
   - `features/<동작>/api`: 변경 훅. `hotel-create`(`useCreateHotel`), `hotel-update`(`useUpdateHotel`), `auth-login`(`useLogin`), `auth-logout`(`useLogout`)
@@ -80,18 +80,13 @@ apps/app-admin/
       ├─ api/          # 검증된 API만 index.ts로 내보낸다. TanStack Query를 쓰지 않는다
       │  ├─ account.ts          # 내 정보 조회와 쿼리 키, 로그인, 로그아웃, 로그인 요청 스키마
       │  ├─ hotel.ts            # 호텔 목록·상세 조회와 쿼리 키(목록 전체 포함), 등록, 수정, 목록·상세 파라미터·등록·수정 요청 스키마
-      │  ├─ api-error.ts        # 서버 오류 정보 읽기 (getApiError), 오류 코드 (API_ERROR_CODES)
-      │  ├─ validate.ts         # 요청(본문·파라미터)·응답 zod 검증, 개발 콘솔 로그
-      │  ├─ validation-error.ts # RequestValidationError, ResponseValidationError
+      │  ├─ api-error.ts        # 서버 오류 정보 읽기 (getApiError: 생성된 ErrorApiResponse를 @repo/admin-kit의 createApiErrorReader에 넣는다), 오류 코드 (API_ERROR_CODES: 공통 코드 + 도메인 코드)
       │  ├─ http.ts             # orval mutator
       │  └─ generated/ # orval 생성 코드. 직접 수정하지 않고 shared/api 밖에서 import하지 않는다
       │     └─ zod/    # orval 생성 zod 스키마
-      ├─ config/       # APP_INFO (앱 이름), FORM_VALIDATION_MESSAGES (서버와 같은 입력 검증 문구), COMMON_MESSAGES (여러 화면이 함께 쓰는 문구), TOAST_MESSAGES (토스트 영역·닫기 버튼 이름)
-      ├─ lib/
-      │  ├─ form/          # 필수·선택 문자열·비밀번호 검사(폼 스키마 조각). react-hook-form 공통: 제출할 때만 검사(SUBMIT_ONLY_VALIDATION), 칸 props와 고치면 그 칸 오류 지우기(toFieldProps), 서버 오류를 칸 오류(첫 칸 초점)와 폼 알림(root.server, onAlert로 토스트도)으로 나누기(showSubmitError), 그 폼이 띄운 오류 토스트를 다시 제출할 때 지우기(useFormErrorToast)
-      │  ├─ search-params/ # URL search 직렬화(일반 쿼리 문자열). 라우터와 테스트용 라우터가 쓴다
-      │  └─ toast/         # 토스트 store(showToast·dismissToast·useToasts). 성공 4초 뒤 사라짐, 최대 3개
-      └─ ui/           # ButtonLink (버튼 모양의 링크), TextLink (글자 링크)
+      ├─ config/       # APP_INFO (앱 이름), COMMON_MESSAGES (여러 화면이 함께 쓰는 문구), TOAST_MESSAGES (토스트 영역·닫기 버튼 이름)
+      └─ lib/
+         └─ search-params/ # URL search 직렬화(일반 쿼리 문자열). 라우터와 테스트용 라우터가 쓴다
 ```
 
 ## 라우트 파일 이름
@@ -108,7 +103,6 @@ TanStack Router 파일 기반 라우팅이 정한 이름은 kebab-case 규칙의
 ## 린트
 
 - ESLint는 Vite 공식 React-TS 템플릿 구성(`@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`)에 `@tanstack/eslint-plugin-router` 권장 설정을 더해 쓴다.
-- `eslint-plugin-react-refresh`의 `only-export-components`에 `extraHOCs: ["createLink"]`를 준다. `shared/ui`의 링크를 TanStack Router `createLink(...)`의 결과로 바로 내보내기 때문이다.
 - `src/shared/api` 밖의 파일은 `no-restricted-imports`로 `shared/api/generated` import를 막는다.
 - `@tanstack/react-query`는 `src/app`, `src/entities/*/api`, `src/features/*/api`, 테스트 파일, `vitest-setup.ts`에서만 import한다. 그 밖의 파일(생성 코드를 뺀 `src/shared/api` 포함)은 `no-restricted-imports`로 막는다.
   - 두 제한은 파일 묶음마다 합친 설정 하나로 둔다. 같은 규칙을 두 설정에 두면 뒤 설정이 앞 설정을 덮기 때문이다.

@@ -9,7 +9,6 @@ import {
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
-import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { ButtonLink } from "./button-link";
 
 const LINK_TEXT = "수정";
@@ -28,8 +27,6 @@ function renderInRouter(link: ReactNode) {
   const router = createRouter({
     routeTree: rootRoute.addChildren([indexRoute, hotelEditRoute]),
     history: createMemoryHistory({ initialEntries: ["/"] }),
-    parseSearch,
-    stringifySearch,
   });
 
   render(<RouterProvider router={router} />);

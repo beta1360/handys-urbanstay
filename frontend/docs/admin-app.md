@@ -29,7 +29,8 @@
   - widgets: 여러 도메인·동작을 묶은 화면 블록. 예: `admin-layout`(사이드바·위쪽 영역), `hotel-detail`(호텔 상세: 상태별 내용과 '목록으로'·'수정' 링크 줄), `hotel-list`(호텔 목록: 상태별 내용, 표, 페이지 이동)
   - features: 사용자 동작 하나. 예: `hotel-create`(호텔 등록), `hotel-update`(호텔 수정), `hotel-search`(호텔 목록 검색), `auth-login`(로그인), `auth-logout`(로그아웃). 여러 동작이 함께 쓰는 입력 묶음은 entities에 둔다(아래 `hotel`의 호텔 정보 입력 칸)
   - entities: 도메인 하나. 예: `hotel`(호텔 조회 훅, 쿼리 키·캐시 규칙, 경로 파라미터 검사, 호텔 하나의 상태 값(불러오는 중·실패·찾을 수 없음·내용), 상태별 화면과 상세 내용 목록, 등록·수정이 함께 쓰는 호텔 정보 입력 칸과 그 폼 스키마 조각, 그 문구), `account`(내 정보 조회와 로그인 상태 캐시 규칙)
-  - shared: `api`(검증을 거친 요청 함수), `lib/form`(도메인 무관 폼 도우미), `lib/search-params`(URL search 직렬화), `lib/toast`(토스트 상태와 `showToast`), `ui`(`ButtonLink`·`TextLink`), `config`(앱 이름, 서버와 같은 입력 검증 문구, 여러 곳에서 쓰는 문구, 토스트 문구)
+  - shared: `api`(검증을 거친 요청 함수, `getApiError`, 오류 코드), `lib/search-params`(URL search 직렬화), `config`(앱 이름, 여러 곳에서 쓰는 문구, 토스트 문구)
+  - 도메인과 무관한 폼 도우미, 토스트 상태와 `showToast`, `ButtonLink`·`TextLink`, 요청·응답 검증, 서버와 같은 입력 검증 문구는 앱의 shared에 두지 않고 `@repo/admin-kit`의 것을 쓴다(아래 'UI 컴포넌트와 공유 코드')
 - app·pages 레이어 폴더 이름은 `app`, `pages`를 그대로 쓴다.
 - 라우트 파일은 app 레이어의 `routes` 세그먼트(`src/app/routes`)에 두고, FSD의 pages 레이어를 가져와 연결만 한다. 라우트 파일도 app 레이어 안에 있으므로 Steiger가 import 규칙을 검사한다.
 - 라우터 생성 코드와 생성된 라우트 트리(`route-tree.gen.ts`)는 `src/app/router/`에, 진입점(`main.tsx`)은 `src/app/entrypoint/`에 둔다.
@@ -60,10 +61,10 @@
 - 토스트는 화면 오른쪽 위에 오래된 것부터 위에서 아래로 쌓는다. 한 번에 3개까지 보여주고, 넘으면 가장 오래된 것을 뺀다. 화면을 옮겨도 남는다.
   - 성공은 `role="status"`이고 4초 뒤 사라진다. 오류는 `role="alert"`이고 닫을 때까지 남는다.
   - 모든 토스트에 닫기 버튼(접근 가능한 이름 '알림 닫기')을 둔다. 영역의 이름은 '알림'이다.
-- 표현은 `@repo/ui/toast`, 상태는 각 앱의 `shared/lib/toast`, 영역은 app 레이어의 `ToastProvider`가 맡는다.
-  - `shared/lib/toast`는 앱에 하나인 store다. `showToast({ type, message })`·`dismissToast(id)`와 구독 훅(`useToasts`)을 둔다. 4초 타이머와 개수 제한도 store가 맡으므로 표현 컴포넌트는 상태가 없다.
+- 표현은 `@repo/ui/toast`, 상태는 `@repo/admin-kit/toast`, 영역은 각 앱 app 레이어의 `ToastProvider`가 맡는다.
+  - `@repo/admin-kit/toast`는 모듈에 하나인 store다. 앱마다 따로 번들되므로 앱에 하나다. `showToast({ type, message })`·`dismissToast(id)`와 구독 훅(`useToasts`)을 둔다. 4초 타이머와 개수 제한도 store가 맡으므로 표현 컴포넌트는 상태가 없다.
   - `ToastProvider`는 라우터 바깥에서 영역을 그린다. 그래서 로그인 뒤 이동처럼 화면이 바뀌어도 토스트가 남는다.
-  - `showToast`는 features·widgets의 `model`에서 성공·실패 뒤에 부른다. 폼 전체 오류는 `shared/lib/form`의 `showSubmitError`에 `onAlert`를 넘겨 `useFormErrorToast`로 띄운다.
+  - `showToast`는 features·widgets의 `model`에서 성공·실패 뒤에 부른다. 폼 전체 오류는 `@repo/admin-kit/form`의 `showSubmitError`에 `onAlert`를 넘겨 `useFormErrorToast`로 띄운다.
 - hotel-admin은 API를 연결할 때 같은 구조로 붙인다.
 
 ### 목록 화면
@@ -159,10 +160,11 @@
 ## UI 컴포넌트와 공유 코드
 
 - 두 앱이 함께 쓰는 화면 컴포넌트(버튼, 입력창, 사이드바 등)는 처음부터 `packages/ui`(`@repo/ui`)에 둔다. Tailwind 기본 class로 직접 만든다.
-- 라우터를 아는 공용 UI는 각 앱의 `shared/ui`에 둔다. 버튼 모양의 링크 `ButtonLink`는 `packages/ui`가 내보내는 버튼 모양 class를 라우터 `Link`에 붙여 만들고, 글자 링크 `TextLink`는 밑줄과 초점 테두리 모양을 정해 둔다. 패키지는 라우터를 모르므로 이 둘은 패키지에 두지 않는다.
+- 두 앱이 함께 쓰는 도메인 무관 코드는 `packages/admin-kit`(`@repo/admin-kit`)에 둔다. 요청·응답 검증, 오류 해석, 폼 도우미, 토스트 상태, 라우터를 아는 링크다(아래 'packages/admin-kit를 쓰는 법').
+- 버튼 모양의 링크 `ButtonLink`는 `packages/ui`가 내보내는 버튼 모양 class를 라우터 `Link`에 붙여 만들고, 글자 링크 `TextLink`는 밑줄과 초점 테두리 모양을 정해 둔다. `packages/ui`는 라우터를 모르게 두므로 이 둘은 `@repo/admin-kit/link`에 둔다. 한 앱만 쓰는 라우터를 아는 공용 UI는 그 앱의 `shared/ui`에 둔다.
   - 둘 다 TanStack Router `createLink`로 만들어 `Link`처럼 `to`·`params`를 타입 검사한다. 넘긴 `className`은 기본 모양 뒤에 덧붙는다.
   - 지금 화면의 상위 경로로 가는 링크(예: 상세에서 목록, 수정에서 상세)는 `activeOptions={{ exact: true }}`를 넘긴다. `Link`는 경로 앞부분이 같으면 현재 위치(`aria-current="page"`)로 표시하기 때문이다.
-- 그 밖의 코드는 지금은 공유하지 않는다. axios 설정, 로그인 만료 처리 등은 각 앱의 `shared`에 둔다. 실제로 중복이 생기면 그때 `packages/`로 옮긴다.
+- 그 밖의 코드는 각 앱에 둔다. axios mutator(`shared/api/http.ts`)와 orval 생성 코드, 도메인 오류 코드, 화면 문구, 로그인 확인·만료 처리, `ToastProvider`다. 실제로 중복이 생기면 그때 `packages/`로 옮긴다.
 
 ### packages/ui를 쓰는 법
 
@@ -190,7 +192,7 @@
 ### packages/ui에 둘 것과 앱에 둘 것
 
 - 패키지에는 도메인 규칙과 화면 문구가 없는 표현용 컴포넌트만 둔다. 문구는 모두 props·children으로 받는다.
-- 메뉴 구성, 로그인 상태처럼 앱마다 다른 화면 블록은 각 앱의 widgets에, 라우터를 아는 공용 UI는 각 앱의 `shared/ui`에 둔다.
+- 메뉴 구성, 로그인 상태처럼 앱마다 다른 화면 블록은 각 앱의 widgets에, 라우터를 아는 공용 UI는 `@repo/admin-kit/link`나 각 앱의 `shared/ui`에 둔다.
 - 패키지는 라우터(`@tanstack/react-router`)에 의존하지 않는다.
   - `SidebarItem`은 자식 링크를 꾸미기만 한다. 현재 메뉴는 링크의 `aria-current="page"`로 표시하고, 활성 스타일도 이 속성을 따른다.
   - TanStack Router의 `Link`는 활성일 때 `aria-current="page"`를 스스로 붙인다. 활성 여부는 경로를 `/` 단위(세그먼트)로 비교한다.
@@ -205,6 +207,22 @@
 1. `packages/ui/src/`에 kebab-case 파일(`<이름>.tsx`, named export)과 옆에 테스트(`<이름>.test.tsx`)를 만든다.
 2. 패키지 `package.json`의 `exports`에 `"./<이름>": "./src/<이름>.tsx"`를 추가한다.
 3. `frontend/`에서 `pnpm --filter @repo/ui test`, `lint`, `typecheck`로 확인한다.
+
+### packages/admin-kit를 쓰는 법
+
+- packages/ui처럼 빌드하지 않고 소스를 그대로 내보낸다. 쓰는 앱의 Vite가 함께 컴파일하고, 앱의 `tsc`가 함께 타입 검사한다.
+- 아래 경로에서 바로 import한다. 앱의 `shared`에 다시 감싸지 않는다. import할 수 있는 경로는 패키지 `package.json`의 `exports`에 적은 것뿐이다.
+- 앱마다 다른 것은 앱의 `shared/api`가 패키지에 넣어 만든다. 생성된 오류 응답 스키마로 `getApiError = createApiErrorReader(ErrorApiResponse)`를, 공통 오류 코드에 도메인 오류 코드를 더해 `API_ERROR_CODES = { ...COMMON_API_ERROR_CODES, ... }`를 만든다. 패키지는 zod 스키마를 손으로 쓰지 않는다.
+- 패키지는 TanStack Query를 쓰지 않는다. ESLint `no-restricted-imports`로 막는다.
+- 테스트에서 토스트를 mock할 때는 `@repo/admin-kit/toast`를 mock한다. 패키지 안의 `useFormErrorToast`도 같은 모듈을 부르므로 함께 mock된다.
+
+| 경로 | 내보내는 것 | 내용 |
+|---|---|---|
+| `@repo/admin-kit/api` | `parseRequest`, `parseResponseBody`, `RequestValidationError`, `ResponseValidationError`, `createApiErrorReader`, `COMMON_API_ERROR_CODES`, `ApiError` | 요청·응답 zod 검증과 검증 오류(아래 'API 호출'). `createApiErrorReader`는 오류 응답 스키마를 받아 서버 오류 정보를 읽는 함수를 만든다. 공통 오류 코드는 백엔드 `CommonErrorCode`와 같다 |
+| `@repo/admin-kit/form` | `SUBMIT_ONLY_VALIDATION`, `toFieldProps`, `toFieldPropsMap`, `FormFieldProps`, `showSubmitError`, `FORM_ALERT`, `FormAlert`, `useFormErrorToast`, `requiredTextSchema`, `optionalTextSchema`, `passwordSchema` | 제출할 때만 검사, 칸 props와 고치면 그 칸 오류 지우기, 서버 오류를 칸 오류와 폼 알림으로 나누기(`getApiError`로 읽은 오류를 받는다), 그 폼이 띄운 오류 토스트 지우기, 필수·선택 문자열·비밀번호 검사 |
+| `@repo/admin-kit/toast` | `showToast`, `dismissToast`, `useToasts`, `ToastId`, `ToastItem` | 토스트 store(위 '토스트'). 성공 4초 뒤 사라짐, 최대 3개 |
+| `@repo/admin-kit/link` | `ButtonLink`, `TextLink` | TanStack Router `createLink`로 만든 버튼 모양 링크와 글자 링크 |
+| `@repo/admin-kit/config` | `FORM_VALIDATION_MESSAGES`, `FORM_ALERT_MESSAGES` | 서버(`validation.*`)와 같은 입력 검증 문구, 본문을 쓸 수 없는 오류의 일반 오류 문구 |
 
 ## API 호출
 
@@ -229,7 +247,7 @@
   - 조회 훅의 `queryFn`은 `shared/api`의 요청 함수를 부른다. 파라미터 검증이 요청 함수 안에 있으므로 검증 실패는 그 쿼리의 오류가 된다.
   - 쿼리 하나는 그 쿼리의 키로, 여러 쿼리(예: 검색어·페이지가 다른 목록 전체)는 파라미터 없이 만든 키로 가리킨다. 이 키를 쓰는 캐시 갱신은 entities의 캐시 규칙 함수 안에서만 한다.
 - `shared/api` 밖에서는 `shared/api/generated`를 import하지 않는다. ESLint `no-restricted-imports`로 막는다. Steiger는 다른 레이어의 import만 막고 재수출과 같은 shared 레이어의 import는 막지 않기 때문이다.
-- 검증에 실패하면 전용 오류를 던진다. AxiosError와 구분된다.
+- 검증에 실패하면 전용 오류(`@repo/admin-kit/api`)를 던진다. AxiosError와 구분된다.
   - 요청 검증 실패는 `RequestValidationError`다. 요청을 보내지 않는다.
   - 응답 검증 실패는 `ResponseValidationError`다. 받은 값을 쓰지 않는다.
   - 응답에 스키마에 없는 필드가 더 있으면 오류로 보지 않고 버린다. 빠진 필드와 타입이 틀린 필드만 오류다. 서버가 응답 필드를 추가해도 codegen 전까지 화면이 깨지지 않게 하기 위해서다.

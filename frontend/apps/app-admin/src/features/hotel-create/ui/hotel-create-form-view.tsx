@@ -1,9 +1,9 @@
 import type { FormEvent } from "react";
 import { Button } from "@repo/ui/button";
 import type { FormFieldProps } from "@repo/admin-kit/form";
+import { ButtonLink } from "@repo/admin-kit/link";
 import { HotelInfoFields } from "@/entities/hotel";
 import { COMMON_MESSAGES } from "@/shared/config";
-import { ButtonLink } from "@/shared/ui";
 import { HOTEL_CREATE_FORM_MESSAGES } from "../config/messages";
 import type { HotelCreateField } from "../model/hotel-create-form-schema";
 import { MasterAccountFields } from "./master-account-fields";
