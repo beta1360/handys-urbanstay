@@ -17,7 +17,9 @@
 - 라우트 파일은 `src/app/routes`에 두고, `src/pages`의 페이지를 가져와 연결만 한다.
 - `__root.tsx`에는 자체 UI를 두지 않는다. 탭 제목(`head`)과 `<HeadContent />`, `<Outlet />`, 오류 화면(`errorComponent`: `<HeadContent />`와 `ErrorPage`)만 둔다.
 - 로그인 확인·로그인 화면 진입·사용 중 401 처리는 `src/app/auth`의 함수로 두고, 라우트 파일과 라우터는 이 함수를 연결만 한다. 화면 동작은 `frontend/docs/admin-app.md`의 '로그인'을 따른다.
+- `/`에는 화면을 두지 않고 호텔 목록(`/hotels`)으로 보낸다(방문 기록을 바꾸는 이동). 이동은 `src/app/router/index-redirect.ts`의 함수로 두고 `_authenticated/index.tsx`의 `beforeLoad`가 연결한다. 로그인 뒤 기본 이동(`/`)도 호텔 목록으로 이어진다.
 - QueryClient와 라우터는 `src/app/router/router.ts`에서 함께 만든다. 라우터 context에 QueryClient를 넣고, QueryClient의 오류 처리기에 라우터를 넘기기 위해서다. `QueryProvider`도 여기서 만든 QueryClient를 쓴다.
+- 라우터의 URL search 직렬화는 `src/shared/lib/search-params`의 `parseSearch`·`stringifySearch`를 쓴다(일반 쿼리 문자열). 테스트용 memory 라우터도 같은 함수를 넣는다. 규칙은 `frontend/docs/admin-app.md`의 '구조'를 따른다.
 - 라우트 트리는 `src/app/router/route-tree.gen.ts`에 생성된다. 직접 수정하지 않고 커밋한다.
 - 라우트 생성 설정은 `tsr.config.json`에만 둔다.
 
@@ -37,26 +39,31 @@ apps/app-admin/
    │  │  └─ unauthorized-handler.ts # 사용 중 401이면 /login으로 보낸다
    │  ├─ entrypoint/   # main.tsx, app-providers.tsx (Provider 조합)
    │  ├─ query/        # QueryClient 생성(재시도 규칙, 오류 처리기), QueryProvider (Devtools 포함)
-   │  ├─ router/       # QueryClient·라우터 생성, route-tree.gen.ts
+   │  ├─ router/       # QueryClient·라우터 생성, route-tree.gen.ts, index-redirect.ts(/ → /hotels)
    │  ├─ routes/       # TanStack Router 라우트 파일
    │  │  ├─ __root.tsx           # 탭 제목, 오류 화면
    │  │  ├─ _authenticated.tsx   # 로그인이 필요한 화면의 레이아웃, 로그인 확인
-   │  │  ├─ _authenticated/      # 로그인이 필요한 화면 (index.tsx: /)
+   │  │  ├─ _authenticated/      # 로그인이 필요한 화면
+   │  │  │  ├─ index.tsx         # / (/hotels로 보낸다)
+   │  │  │  └─ hotels/
+   │  │  │     └─ index.tsx      # /hotels (?keyword=&page=)
    │  │  └─ login.tsx            # /login (?redirect=)
    │  └─ styles/
-   ├─ pages/           # error(화면 오류), home, login(로그인 폼)
+   ├─ pages/           # error(화면 오류), hotel-list(호텔 목록: 검색·페이지·URL search 스키마), login(로그인 폼)
    ├─ widgets/         # admin-layout: 사이드바 메뉴(config/menu.ts), 위쪽 화면 제목·계정 이름·로그아웃
    └─ shared/
       ├─ api/          # 검증된 API만 index.ts로 내보낸다
       │  ├─ account.ts          # 내 정보 쿼리 옵션, 로그인, 로그아웃, 로그인 요청 스키마
-      │  ├─ hotel.ts            # 호텔 목록·상세 쿼리 옵션, 목록 전체 쿼리 키, 등록, 수정, 등록·수정 요청 스키마
+      │  ├─ hotel.ts            # 호텔 목록·상세 쿼리 옵션, 목록 전체 쿼리 키, 등록, 수정, 목록 파라미터·등록·수정 요청 스키마
       │  ├─ api-error.ts        # 서버 오류 정보 읽기 (getApiError), 오류 코드 (API_ERROR_CODES)
       │  ├─ validate.ts         # 요청(본문·파라미터)·응답 zod 검증, 개발 콘솔 로그
       │  ├─ validation-error.ts # RequestValidationError, ResponseValidationError
       │  ├─ http.ts             # orval mutator
       │  └─ generated/ # orval 생성 코드. 직접 수정하지 않고 shared/api 밖에서 import하지 않는다
       │     └─ zod/    # orval 생성 zod 스키마
-      └─ config/       # APP_INFO (앱 이름)
+      ├─ config/       # APP_INFO (앱 이름)
+      └─ lib/
+         └─ search-params/ # URL search 직렬화(일반 쿼리 문자열). 라우터와 테스트용 라우터가 쓴다
 ```
 
 ## 라우트 파일 이름
