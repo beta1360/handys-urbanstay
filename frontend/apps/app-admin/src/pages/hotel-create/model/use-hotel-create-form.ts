@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import type { HotelInfoField } from "@/features/hotel-info-form";
 import {
   API_ERROR_CODES,
   createHotel,
@@ -10,24 +11,23 @@ import {
   hotelQueryOptions,
 } from "@/shared/api";
 import type { Hotel } from "@/shared/api";
+import {
+  focusFirstInvalidField,
+  hasFieldError,
+  toFieldErrors,
+  toIssueFieldMessages,
+} from "@/shared/lib/form";
 import { HOTEL_CREATE_MESSAGES } from "../config/messages";
 import {
   EMPTY_HOTEL_CREATE_VALUES,
   HOTEL_CREATE_FIELDS,
   hotelCreateFormSchema,
-  toHotelCreateFieldErrors,
-  toIssueFieldMessages,
 } from "./hotel-create-form-schema";
 import type {
   HotelCreateField,
   HotelCreateFieldErrors,
   MasterField,
 } from "./hotel-create-form-schema";
-import type { HotelInfoField } from "./hotel-info-form";
-
-function hasFieldError(errors: HotelCreateFieldErrors) {
-  return HOTEL_CREATE_FIELDS.some((field) => errors[field]);
-}
 
 export function useHotelCreateForm() {
   const queryClient = useQueryClient();
@@ -64,14 +64,7 @@ export function useHotelCreateForm() {
 
   function showFieldErrors(errors: HotelCreateFieldErrors) {
     setFieldErrors(errors);
-    const firstInvalidField = HOTEL_CREATE_FIELDS.find((field) => errors[field]);
-    if (firstInvalidField === undefined) {
-      return;
-    }
-    const input = formRef.current?.elements.namedItem(firstInvalidField);
-    if (input instanceof HTMLElement) {
-      input.focus();
-    }
+    focusFirstInvalidField(formRef.current, HOTEL_CREATE_FIELDS, errors);
   }
 
   function showSubmitError(error: unknown) {
@@ -83,8 +76,8 @@ export function useHotelCreateForm() {
     const errors: HotelCreateFieldErrors =
       apiError.code === API_ERROR_CODES.loginIdDuplicated
         ? { "master.loginId": apiError.message }
-        : toHotelCreateFieldErrors(apiError.fieldErrors);
-    if (hasFieldError(errors)) {
+        : toFieldErrors(HOTEL_CREATE_FIELDS, apiError.fieldErrors);
+    if (hasFieldError(HOTEL_CREATE_FIELDS, errors)) {
       showFieldErrors(errors);
       return;
     }
@@ -108,7 +101,7 @@ export function useHotelCreateForm() {
     const result = hotelCreateFormSchema.safeParse(values);
     if (!result.success) {
       showFieldErrors(
-        toHotelCreateFieldErrors(toIssueFieldMessages(result.error)),
+        toFieldErrors(HOTEL_CREATE_FIELDS, toIssueFieldMessages(result.error)),
       );
       return;
     }

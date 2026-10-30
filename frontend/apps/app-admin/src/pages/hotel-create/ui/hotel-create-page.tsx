@@ -1,7 +1,7 @@
 import { Button } from "@repo/ui/button";
+import { HotelInfoFields } from "@/features/hotel-info-form";
 import { HOTEL_CREATE_MESSAGES } from "../config/messages";
 import { useHotelCreateForm } from "../model/use-hotel-create-form";
-import { HotelInfoFields } from "./hotel-info-fields";
 import { MasterAccountFields } from "./master-account-fields";
 
 export function HotelCreatePage() {

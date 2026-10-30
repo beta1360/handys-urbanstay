@@ -1,8 +1,8 @@
+import { FormSection } from "@repo/ui/form-section";
 import { TextField } from "@repo/ui/text-field";
 import { TextareaField } from "@repo/ui/textarea-field";
 import { HOTEL_INFO_MESSAGES } from "../config/messages";
 import type { HotelInfoField, HotelInfoValues } from "../model/hotel-info-form";
-import { FormSection } from "./form-section";
 
 const DESCRIPTION_ROWS = 5;
 

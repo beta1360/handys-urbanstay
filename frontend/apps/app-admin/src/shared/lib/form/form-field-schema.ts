@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { FORM_VALIDATION_MESSAGES } from "../config/messages";
+import { FORM_VALIDATION_MESSAGES } from "@/shared/config";
 
 type MessageOf = (value: string) => string | undefined;
 

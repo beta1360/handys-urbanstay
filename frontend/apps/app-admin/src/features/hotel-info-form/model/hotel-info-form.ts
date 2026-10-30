@@ -1,6 +1,6 @@
 import type { z } from "zod";
-import { FORM_VALIDATION_MESSAGES } from "../config/messages";
-import { optionalTextSchema, requiredTextSchema } from "./form-field-schema";
+import { FORM_VALIDATION_MESSAGES } from "@/shared/config";
+import { optionalTextSchema, requiredTextSchema } from "@/shared/lib/form";
 
 export const HOTEL_INFO_FIELDS = [
   "name",

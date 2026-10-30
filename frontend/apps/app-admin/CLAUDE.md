@@ -20,7 +20,8 @@
 - `/`에는 화면을 두지 않고 호텔 목록(`/hotels`)으로 보낸다(방문 기록을 바꾸는 이동). 이동은 `src/app/router/index-redirect.ts`의 함수로 두고 `_authenticated/index.tsx`의 `beforeLoad`가 연결한다. 로그인 뒤 기본 이동(`/`)도 호텔 목록으로 이어진다.
 - QueryClient와 라우터는 `src/app/router/router.ts`에서 함께 만든다. 라우터 context에 QueryClient를 넣고, QueryClient의 오류 처리기에 라우터를 넘기기 위해서다. `QueryProvider`도 여기서 만든 QueryClient를 쓴다.
 - 라우터의 URL search 직렬화는 `src/shared/lib/search-params`의 `parseSearch`·`stringifySearch`를 쓴다(일반 쿼리 문자열). 테스트용 memory 라우터도 같은 함수를 넣는다. 규칙은 `frontend/docs/admin-app.md`의 '구조'를 따른다.
-- 경로 파라미터(`$hotelId`)는 라우트의 `params.parse`·`params.stringify`로 읽고 쓴다. 두 함수는 그 화면의 pages slice(`pages/hotel-detail`)에 둔다. 규칙은 `frontend/docs/admin-app.md`의 '상세 화면'을 따른다.
+- 경로 파라미터(`$hotelId`)는 라우트의 `params.parse`·`params.stringify`로 읽고 쓴다. 두 함수는 `entities/hotel`에 두고, 상세·수정 라우트를 감싸는 `hotels/$hotelId/route.tsx`가 한 번 연결한다. 상세(`index.tsx`)와 수정(`edit.tsx`) 화면은 이 라우트의 `useParams`로 검사한 id를 읽는다. 규칙은 `frontend/docs/admin-app.md`의 '상세 화면'을 따른다.
+- 여러 화면이 함께 쓰는 코드는 `frontend/docs/admin-app.md`의 '구조'에 따라 역할별로 둔다. 도메인과 무관한 폼 도우미는 `shared/lib/form`, 호텔 id 검사, 호텔 하나 조회(`useHotel`), 불러오는 중·불러오기 실패·찾을 수 없음 화면은 `entities/hotel`, 등록·수정이 함께 쓰는 호텔 정보 입력 칸은 `features/hotel-info-form`에 둔다.
 - 라우트 트리는 `src/app/router/route-tree.gen.ts`에 생성된다. 직접 수정하지 않고 커밋한다.
 - 라우트 생성 설정은 `tsr.config.json`에만 둔다.
 
@@ -49,11 +50,16 @@ apps/app-admin/
    │  │  │  └─ hotels/
    │  │  │     ├─ index.tsx      # /hotels (?keyword=&page=)
    │  │  │     ├─ new.tsx        # /hotels/new (호텔 등록). 고정 경로라 $hotelId보다 먼저 잡힌다
-   │  │  │     └─ $hotelId.tsx   # /hotels/$hotelId (호텔 상세)
+   │  │  │     └─ $hotelId/
+   │  │  │        ├─ route.tsx   # /hotels/$hotelId 경로 파라미터 검사. 화면 없이 상세·수정을 감싼다
+   │  │  │        ├─ index.tsx   # /hotels/$hotelId (호텔 상세)
+   │  │  │        └─ edit.tsx    # /hotels/$hotelId/edit (호텔 수정)
    │  │  └─ login.tsx            # /login (?redirect=)
    │  └─ styles/
-   ├─ pages/           # error(화면 오류), hotel-create(호텔 등록: 호텔 정보·마스터 계정 폼, 폼 스키마), hotel-detail(호텔 상세: 경로 파라미터 검사, 찾을 수 없음), hotel-list(호텔 목록: 검색·페이지·URL search 스키마, 호텔 등록 버튼), login(로그인 폼)
+   ├─ pages/           # error(화면 오류), hotel-create(호텔 등록: 마스터 계정 폼, 폼 스키마), hotel-detail(호텔 상세: 수정 버튼), hotel-edit(호텔 수정: 한 번만 채우는 폼, 수정 충돌 시 최신 내용 불러오기), hotel-list(호텔 목록: 검색·페이지·URL search 스키마, 호텔 등록 버튼), login(로그인 폼)
    ├─ widgets/         # admin-layout: 사이드바 메뉴(config/menu.ts), 위쪽 화면 제목·계정 이름·로그아웃
+   ├─ features/        # hotel-info-form: 호텔 정보 입력 칸(이름·주소·대표 전화번호·소개)과 폼 스키마 조각. 등록·수정이 쓴다
+   ├─ entities/        # hotel: 호텔 id 경로 파라미터 검사, 호텔 하나 조회(404는 찾을 수 없음), 불러오는 중·불러오기 실패·찾을 수 없음 화면. 상세·수정이 쓴다
    └─ shared/
       ├─ api/          # 검증된 API만 index.ts로 내보낸다
       │  ├─ account.ts          # 내 정보 쿼리 옵션, 로그인, 로그아웃, 로그인 요청 스키마
@@ -64,8 +70,9 @@ apps/app-admin/
       │  ├─ http.ts             # orval mutator
       │  └─ generated/ # orval 생성 코드. 직접 수정하지 않고 shared/api 밖에서 import하지 않는다
       │     └─ zod/    # orval 생성 zod 스키마
-      ├─ config/       # APP_INFO (앱 이름)
+      ├─ config/       # APP_INFO (앱 이름), FORM_VALIDATION_MESSAGES (서버와 같은 입력 검증 문구)
       └─ lib/
+         ├─ form/          # 필수·선택 문자열·비밀번호 검사, zod 오류·서버 fieldErrors를 칸별 오류로 나누기, 첫 오류 칸 초점
          └─ search-params/ # URL search 직렬화(일반 쿼리 문자열). 라우터와 테스트용 라우터가 쓴다
 ```
 
@@ -75,7 +82,9 @@ TanStack Router 파일 기반 라우팅이 정한 이름은 kebab-case 규칙의
 
 - `__root.tsx`: 루트 라우트. 이름이 고정이다.
 - `_` 접두어: 경로를 만들지 않는 레이아웃 라우트(pathless). 예: `_authenticated.tsx`
-- `$` 접두어: 경로 파라미터. 이름이 JS 식별자여야 하므로 여러 단어면 camelCase로 쓴다. 예: `$hotelId.tsx` (`$hotel-id`는 쓸 수 없다)
+- `$` 접두어: 경로 파라미터. 이름이 JS 식별자여야 하므로 여러 단어면 camelCase로 쓴다. 예: `$hotelId/` (`$hotel-id`는 쓸 수 없다)
+- `route.tsx`: 폴더 경로 자체의 라우트. 폴더 안의 라우트를 감싼다. 예: `$hotelId/route.tsx`
+- `index.tsx`: 폴더 경로에서 보여줄 화면. 예: `$hotelId/index.tsx`
 - 라우트 파일은 `export const Route`(named export)로 내보낸다.
 
 ## 린트

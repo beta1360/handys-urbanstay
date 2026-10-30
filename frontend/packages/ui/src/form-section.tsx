@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { Card } from "@repo/ui/card";
+import { Card } from "./card";
 
 type FormSectionProps = {
-  legend: string;
+  legend: ReactNode;
   children: ReactNode;
 };
 
