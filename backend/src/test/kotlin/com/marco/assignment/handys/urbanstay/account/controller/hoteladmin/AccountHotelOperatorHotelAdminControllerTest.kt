@@ -855,8 +855,9 @@ class AccountHotelOperatorHotelAdminControllerTest {
 		val response = andReturn().response
 		val body = json(response)
 		assertThat(response.status).isEqualTo(status.value())
-		assertThat(body.properties().map { it.key }).containsExactly("success", "data", "error")
+		assertThat(body.properties().map { it.key }).containsExactly("success", "data", "message", "error")
 		assertThat(body["success"].booleanValue()).isTrue()
+		assertThat(body["message"].isNull).isTrue()
 		assertThat(body["error"].isNull).isTrue()
 		return body["data"]
 	}
@@ -868,7 +869,7 @@ class AccountHotelOperatorHotelAdminControllerTest {
 		val body = json(response)
 		val actualFieldErrors = (body["error"] as ObjectNode).remove(FIELD_ERRORS)
 			.values().map { it["field"].stringValue() to it["message"].stringValue() }
-		val expected = mapOf("success" to false, "data" to null, "error" to mapOf("code" to errorCode.code, "message" to message(errorCode.messageKey)))
+		val expected = mapOf("success" to false, "data" to null, "message" to null, "error" to mapOf("code" to errorCode.code, "message" to message(errorCode.messageKey)))
 
 		assertThat(response.status).isEqualTo(errorCode.status.value())
 		assertThat(body).isEqualTo(json(jsonMapper.writeValueAsString(expected)))

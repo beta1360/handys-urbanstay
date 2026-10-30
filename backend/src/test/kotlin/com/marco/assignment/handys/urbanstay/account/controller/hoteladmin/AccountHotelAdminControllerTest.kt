@@ -377,7 +377,7 @@ class AccountHotelAdminControllerTest {
 
 	private fun assertSuccess(response: HttpResponse<String>, data: String) {
 		assertThat(response.statusCode()).isEqualTo(HttpStatus.OK.value())
-		assertThat(json(response.body())).isEqualTo(json("""{"success":true,"data":$data,"error":null}"""))
+		assertThat(json(response.body())).isEqualTo(json("""{"success":true,"data":$data,"message":null,"error":null}"""))
 	}
 
 	private fun assertError(response: HttpResponse<String>, errorCode: ErrorCode, fieldErrors: Map<String, String> = emptyMap()) {
@@ -386,7 +386,7 @@ class AccountHotelAdminControllerTest {
 			.values().associate { it["field"].stringValue() to it["message"].stringValue() }
 
 		assertThat(response.statusCode()).isEqualTo(errorCode.status.value())
-		assertThat(body).isEqualTo(json("""{"success":false,"data":null,"error":{"code":"${errorCode.code}","message":"${message(errorCode.messageKey)}"}}"""))
+		assertThat(body).isEqualTo(json("""{"success":false,"data":null,"message":null,"error":{"code":"${errorCode.code}","message":"${message(errorCode.messageKey)}"}}"""))
 		assertThat(actualFieldErrors).isEqualTo(fieldErrors)
 	}
 

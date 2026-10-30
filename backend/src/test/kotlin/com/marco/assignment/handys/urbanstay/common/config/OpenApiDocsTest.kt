@@ -252,9 +252,9 @@ class OpenApiDocsTest {
 		val schema = docs["components"]["schemas"]["EmptyApiResponse"]
 
 		assertThat(logout.node["responses"]["200"]["content"][JSON]["schema"]).isEqualTo(json("""{"$REF":"#/components/schemas/EmptyApiResponse"}"""))
-		assertThat(required(schema)).containsExactlyInAnyOrder("success", "data", "error")
+		assertThat(required(schema)).containsExactlyInAnyOrder("success", "data", "message", "error")
 		assertThat(schema["properties"]["data"]).isEqualTo(json("""{"type":"null"}"""))
-		assertThat(nullableFields(schema)).containsExactlyInAnyOrder("data", "error")
+		assertThat(nullableFields(schema)).containsExactlyInAnyOrder("data", "message", "error")
 	}
 
 	@Test
@@ -280,8 +280,9 @@ class OpenApiDocsTest {
 		val envelope = schemas[ERROR_SCHEMA_REF.substringAfterLast("/")]
 
 		assertThat(schemas.propertyNames()).doesNotContain("ApiResponse")
-		assertThat(required(envelope)).containsExactlyInAnyOrder("success", "data", "error")
+		assertThat(required(envelope)).containsExactlyInAnyOrder("success", "data", "message", "error")
 		assertThat(envelope["properties"]["data"]).isEqualTo(json("""{"type":"null"}"""))
+		assertThat(envelope["properties"]["message"]).isEqualTo(json("""{"type":"null"}"""))
 		assertThat(envelope["properties"]["error"]).isEqualTo(json("""{"$REF":"#/components/schemas/ErrorResponse"}"""))
 		assertThat(required(schemas["ErrorResponse"])).containsExactlyInAnyOrder("code", "message", "fieldErrors")
 	}
@@ -292,8 +293,8 @@ class OpenApiDocsTest {
 		val schemas = apiDocs(group)["components"]["schemas"]
 		val wrapper = schemas["ApiResponse${group.responseSchema}"]
 
-		assertThat(required(wrapper)).containsExactlyInAnyOrder("success", "data", "error")
-		assertThat(nullableFields(wrapper)).containsExactlyInAnyOrder("data", "error")
+		assertThat(required(wrapper)).containsExactlyInAnyOrder("success", "data", "message", "error")
+		assertThat(nullableFields(wrapper)).containsExactlyInAnyOrder("data", "message", "error")
 		assertThat(nullableFields(schemas[group.responseSchema])).containsExactly("memo")
 	}
 
@@ -360,7 +361,7 @@ class OpenApiDocsTest {
 		docs["tags"].values().associate { it["name"].stringValue() to it["description"].stringValue() }
 
 	private fun expectedExample(errorCode: ErrorCode): JsonNode =
-		json("""{"success":false,"data":null,"error":{"code":"${errorCode.code}","message":"${message(errorCode.messageKey)}","fieldErrors":[]}}""")
+		json("""{"success":false,"data":null,"message":null,"error":{"code":"${errorCode.code}","message":"${message(errorCode.messageKey)}","fieldErrors":[]}}""")
 
 	private fun expectedExamples(vararg errorCodes: ErrorCode): JsonNode =
 		json(errorCodes.joinToString(",", "{", "}") { """"${it.code}":{"value":${expectedExample(it)}}""" })
