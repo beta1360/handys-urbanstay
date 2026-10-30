@@ -1,7 +1,8 @@
-import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@repo/ui/button";
 import { Card } from "@repo/ui/card";
 import { Pagination } from "@repo/ui/pagination";
+import { COMMON_MESSAGES } from "@/shared/config";
+import { ButtonLink } from "@/shared/ui";
 import { HOTEL_LIST_MESSAGES } from "../config/messages";
 import { useHotelList } from "../model/use-hotel-list";
 import { HotelSearchForm } from "./hotel-search-form";
@@ -29,14 +30,14 @@ function HotelListContent({
             {HOTEL_LIST_MESSAGES.loadFailed}
           </p>
           <Button variant="secondary" onClick={retry}>
-            {HOTEL_LIST_MESSAGES.retry}
+            {COMMON_MESSAGES.retry}
           </Button>
         </div>
       </Card>
     ) : (
       <Card>
         <p role="status" className="text-center text-sm text-neutral-500">
-          {HOTEL_LIST_MESSAGES.loading}
+          {COMMON_MESSAGES.loading}
         </p>
       </Card>
     );
@@ -73,7 +74,6 @@ function HotelListContent({
 
 export function HotelListPage() {
   const list = useHotelList();
-  const navigate = useNavigate();
 
   return (
     <div className="flex flex-col gap-4">
@@ -82,12 +82,9 @@ export function HotelListPage() {
           keyword={list.keyword}
           onSearch={list.searchKeyword}
         />
-        <Button
-          variant="primary"
-          onClick={() => void navigate({ to: "/hotels/new" })}
-        >
+        <ButtonLink to="/hotels/new" variant="primary">
           {HOTEL_LIST_MESSAGES.create}
-        </Button>
+        </ButtonLink>
       </div>
       <HotelListContent {...list} />
     </div>

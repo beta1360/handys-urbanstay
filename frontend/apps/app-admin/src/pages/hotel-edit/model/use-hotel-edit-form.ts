@@ -8,6 +8,7 @@ import type { HotelInfoField } from "@/features/hotel-info-form";
 import { useUpdateHotel } from "@/features/hotel-update";
 import { API_ERROR_CODES, getApiError } from "@/shared/api";
 import type { Hotel } from "@/shared/api";
+import { COMMON_MESSAGES } from "@/shared/config";
 import {
   focusFirstInvalidField,
   hasFieldError,
@@ -15,7 +16,6 @@ import {
   toIssueFieldMessages,
 } from "@/shared/lib/form";
 import type { FieldErrors } from "@/shared/lib/form";
-import { HOTEL_EDIT_MESSAGES } from "../config/messages";
 import {
   hotelEditFormSchema,
   toHotelEditFormState,
@@ -66,7 +66,7 @@ export function useHotelEditForm(hotelId: number, initialHotel: Hotel) {
     const apiError = getApiError(error);
     if (apiError === undefined) {
       setFormError({
-        message: HOTEL_EDIT_MESSAGES.requestFailed,
+        message: COMMON_MESSAGES.requestFailed,
         canReload: false,
       });
       return;
@@ -157,7 +157,5 @@ export function useHotelEditForm(hotelId: number, initialHotel: Hotel) {
     changeField,
     handleSubmit,
     reload: () => void reload(),
-    cancel: () =>
-      void navigate({ to: "/hotels/$hotelId", params: { hotelId } }),
   };
 }

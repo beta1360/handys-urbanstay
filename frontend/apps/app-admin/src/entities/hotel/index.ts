@@ -1,6 +1,7 @@
 export { useHotelListQuery } from "./api/hotel-list-query";
 export { cacheSavedHotel, useRefetchHotel } from "./api/hotel-query";
 export {
+  HOTEL_FIELD_LABELS,
   HOTEL_LOAD_MESSAGES,
   HOTEL_NOT_FOUND_MESSAGES,
 } from "./config/messages";

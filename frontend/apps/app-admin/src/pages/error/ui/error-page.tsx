@@ -1,5 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import { Button } from "@repo/ui/button";
+import { COMMON_MESSAGES } from "@/shared/config";
 import { ERROR_PAGE_MESSAGES } from "../config/messages";
 
 export function ErrorPage() {
@@ -11,7 +12,7 @@ export function ErrorPage() {
         {ERROR_PAGE_MESSAGES.description}
       </p>
       <Button variant="secondary" onClick={() => router.invalidate()}>
-        {ERROR_PAGE_MESSAGES.retry}
+        {COMMON_MESSAGES.retry}
       </Button>
     </main>
   );

@@ -11,6 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  HOTEL_FIELD_LABELS,
   HOTEL_LOAD_MESSAGES,
   HOTEL_NOT_FOUND_MESSAGES,
   parseHotelPathParams,
@@ -18,6 +19,7 @@ import {
 } from "@/entities/hotel";
 import { API_ERROR_CODES } from "@/shared/api";
 import type { Hotel } from "@/shared/api";
+import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { HOTEL_DETAIL_MESSAGES } from "../config/messages";
 import { HotelDetailPage } from "./hotel-detail-page";
@@ -130,19 +132,16 @@ function getDescriptionTexts() {
 }
 
 function getBackLink() {
-  return screen.getByRole("link", { name: HOTEL_DETAIL_MESSAGES.backToList });
+  return screen.getByRole("link", { name: COMMON_MESSAGES.backToList });
 }
 
 async function expectNotFound() {
   expect(await screen.findByRole("alert")).toHaveTextContent(
     HOTEL_NOT_FOUND_MESSAGES.description,
   );
-  expect(
-    screen.getAllByRole("button", {
-      name: HOTEL_NOT_FOUND_MESSAGES.backToList,
-    }),
-  ).toHaveLength(1);
-  expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  const links = screen.getAllByRole("link");
+  expect(links).toHaveLength(1);
+  expect(links[0]).toHaveAccessibleName(COMMON_MESSAGES.backToList);
   expect(screen.queryByRole("definition")).not.toBeInTheDocument();
 }
 
@@ -161,10 +160,10 @@ describe("HotelDetailPage 정보", () => {
     expect(await screen.findByText(HOTEL.name)).toBeInTheDocument();
     expect(getBackLink()).toBeInTheDocument();
     expect(getTermTexts()).toEqual([
-      HOTEL_DETAIL_MESSAGES.nameLabel,
-      HOTEL_DETAIL_MESSAGES.addressLabel,
-      HOTEL_DETAIL_MESSAGES.phoneLabel,
-      HOTEL_DETAIL_MESSAGES.descriptionLabel,
+      HOTEL_FIELD_LABELS.name,
+      HOTEL_FIELD_LABELS.address,
+      HOTEL_FIELD_LABELS.phone,
+      HOTEL_FIELD_LABELS.description,
     ]);
     expect(getDescriptionTexts()).toEqual([
       HOTEL.name,
@@ -201,7 +200,7 @@ describe("HotelDetailPage 정보", () => {
     renderHotelDetailPage();
 
     expect(await screen.findByRole("status")).toHaveTextContent(
-      HOTEL_LOAD_MESSAGES.loading,
+      COMMON_MESSAGES.loading,
     );
     expect(getBackLink()).toBeInTheDocument();
     expect(screen.queryByRole("definition")).not.toBeInTheDocument();
@@ -217,7 +216,7 @@ describe("HotelDetailPage 찾을 수 없음", () => {
 
     await expectNotFound();
     expect(
-      screen.queryByRole("button", { name: HOTEL_LOAD_MESSAGES.retry }),
+      screen.queryByRole("button", { name: COMMON_MESSAGES.retry }),
     ).not.toBeInTheDocument();
   });
 
@@ -253,11 +252,13 @@ describe("HotelDetailPage 찾을 수 없음", () => {
       hotelPath("abc"),
     ]);
 
-    await user.click(
-      await screen.findByRole("button", {
-        name: HOTEL_NOT_FOUND_MESSAGES.backToList,
-      }),
-    );
+    const backLink = await screen.findByRole("link", {
+      name: COMMON_MESSAGES.backToList,
+    });
+    expect(backLink).toHaveAttribute("href", "/hotels");
+    expect(backLink).not.toHaveAttribute("aria-current");
+
+    await user.click(backLink);
 
     await vi.waitFor(() => {
       expect(router.state.location.href).toBe("/hotels");
@@ -279,7 +280,7 @@ describe("HotelDetailPage 오류", () => {
     expect(getBackLink()).toBeInTheDocument();
 
     await user.click(
-      screen.getByRole("button", { name: HOTEL_LOAD_MESSAGES.retry }),
+      screen.getByRole("button", { name: COMMON_MESSAGES.retry }),
     );
 
     expect(await screen.findByText(HOTEL.name)).toBeInTheDocument();
@@ -293,13 +294,14 @@ describe("HotelDetailPage 수정 버튼", () => {
     const user = userEvent.setup();
     const router = renderHotelDetailPage();
 
-    const editButton = await screen.findByRole("button", {
+    const editLink = await screen.findByRole("link", {
       name: HOTEL_DETAIL_MESSAGES.edit,
     });
-    expect(editButton.parentElement).toBe(getBackLink().parentElement);
-    expect(editButton.parentElement?.lastElementChild).toBe(editButton);
+    expect(editLink).toHaveAttribute("href", `${hotelPath(HOTEL.id)}/edit`);
+    expect(editLink.parentElement).toBe(getBackLink().parentElement);
+    expect(editLink.parentElement?.lastElementChild).toBe(editLink);
 
-    await user.click(editButton);
+    await user.click(editLink);
 
     expect(await screen.findByText(EDIT_PAGE_TEXT)).toBeInTheDocument();
     expect(router.state.location.href).toBe(`${hotelPath(HOTEL.id)}/edit`);
@@ -323,7 +325,7 @@ describe("HotelDetailPage 수정 버튼", () => {
 
     expect(await screen.findByRole(role)).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: HOTEL_DETAIL_MESSAGES.edit }),
+      screen.queryByRole("link", { name: HOTEL_DETAIL_MESSAGES.edit }),
     ).not.toBeInTheDocument();
   });
 });
@@ -337,7 +339,7 @@ describe("HotelDetailPage 목록으로", () => {
     ]);
 
     const backLink = await screen.findByRole("link", {
-      name: HOTEL_DETAIL_MESSAGES.backToList,
+      name: COMMON_MESSAGES.backToList,
     });
     expect(backLink).toHaveAttribute("href", "/hotels");
     expect(backLink).not.toHaveAttribute("aria-current");

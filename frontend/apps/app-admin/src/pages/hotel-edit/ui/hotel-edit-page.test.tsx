@@ -16,6 +16,7 @@ import type { UserEvent } from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  HOTEL_FIELD_LABELS,
   HOTEL_LOAD_MESSAGES,
   HOTEL_NOT_FOUND_MESSAGES,
   parseHotelPathParams,
@@ -33,7 +34,7 @@ import {
   updateHotel,
 } from "@/shared/api";
 import type { Hotel, HotelPage } from "@/shared/api";
-import { FORM_VALIDATION_MESSAGES } from "@/shared/config";
+import { COMMON_MESSAGES, FORM_VALIDATION_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { HOTEL_EDIT_MESSAGES } from "../config/messages";
 import { HotelEditPage } from "./hotel-edit-page";
@@ -195,11 +196,11 @@ function getHotelInfoGroup() {
 function getFields(): Record<HotelInfoField, HTMLElement> {
   const group = within(getHotelInfoGroup());
   return {
-    name: group.getByLabelText(HOTEL_INFO_MESSAGES.nameLabel),
-    address: group.getByLabelText(HOTEL_INFO_MESSAGES.addressLabel),
-    phone: group.getByLabelText(HOTEL_INFO_MESSAGES.phoneLabel),
+    name: group.getByLabelText(HOTEL_FIELD_LABELS.name),
+    address: group.getByLabelText(HOTEL_FIELD_LABELS.address),
+    phone: group.getByLabelText(HOTEL_FIELD_LABELS.phone),
     description: group.getByLabelText(
-      `${HOTEL_INFO_MESSAGES.descriptionLabel} ${HOTEL_INFO_MESSAGES.optional}`,
+      `${HOTEL_FIELD_LABELS.description} ${HOTEL_INFO_MESSAGES.optional}`,
     ),
   };
 }
@@ -225,6 +226,10 @@ function getInvalidFields() {
 
 function getSubmitButton() {
   return screen.getByRole("button", { name: HOTEL_EDIT_MESSAGES.submit });
+}
+
+function getCancelLink() {
+  return screen.getByRole("link", { name: COMMON_MESSAGES.cancel });
 }
 
 function queryReloadButton() {
@@ -256,10 +261,12 @@ async function expectNotFound() {
   expect(await screen.findByRole("alert")).toHaveTextContent(
     HOTEL_NOT_FOUND_MESSAGES.description,
   );
-  expect(screen.getAllByRole("button")).toHaveLength(1);
-  expect(
-    screen.getByRole("button", { name: HOTEL_NOT_FOUND_MESSAGES.backToList }),
-  ).toBeInTheDocument();
+  expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  const backLink = screen.getByRole("link", {
+    name: COMMON_MESSAGES.backToList,
+  });
+  expect(backLink).toHaveAttribute("href", "/hotels");
+  expect(backLink).not.toHaveAttribute("aria-current");
   expect(screen.queryByRole("group")).not.toBeInTheDocument();
 }
 
@@ -295,7 +302,7 @@ describe("HotelEditPage 불러오기", () => {
     renderHotelEditPage();
 
     expect(await screen.findByRole("status")).toHaveTextContent(
-      HOTEL_LOAD_MESSAGES.loading,
+      COMMON_MESSAGES.loading,
     );
     expect(screen.queryByRole("group")).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
@@ -330,7 +337,7 @@ describe("HotelEditPage 불러오기", () => {
       HOTEL_LOAD_MESSAGES.loadFailed,
     );
     await user.click(
-      screen.getByRole("button", { name: HOTEL_LOAD_MESSAGES.retry }),
+      screen.getByRole("button", { name: COMMON_MESSAGES.retry }),
     );
 
     await screen.findByRole("group", { name: HOTEL_INFO_MESSAGES.legend });
@@ -383,9 +390,9 @@ describe("HotelEditPage 폼", () => {
       expect(field).not.toHaveAttribute("maxlength");
     }
     expect(getSubmitButton()).toHaveAttribute("type", "submit");
-    expect(
-      screen.getByRole("button", { name: HOTEL_EDIT_MESSAGES.cancel }),
-    ).toHaveAttribute("type", "button");
+    const cancelLink = getCancelLink();
+    expect(cancelLink).toHaveAttribute("href", hotelPath(HOTEL.id));
+    expect(cancelLink).not.toHaveAttribute("aria-current");
   });
 
   it("칸을 모두 비우고 저장하면 소개를 뺀 칸에 필수 오류를 보여주고 첫 칸에 초점을 옮기며 요청하지 않는다", async () => {
@@ -531,9 +538,7 @@ describe("HotelEditPage 저장", () => {
     const { user, router } = await renderLoadedHotelEditPage();
 
     await replaceValue(user, "name", "바꾼 이름");
-    await user.click(
-      screen.getByRole("button", { name: HOTEL_EDIT_MESSAGES.cancel }),
-    );
+    await user.click(getCancelLink());
 
     expect(await screen.findByText(DETAIL_PAGE_TEXT)).toBeInTheDocument();
     expect(router.state.location.href).toBe(hotelPath(HOTEL.id));
@@ -602,7 +607,7 @@ describe("HotelEditPage 서버 오류 처리", () => {
     await user.click(getSubmitButton());
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(HOTEL_EDIT_MESSAGES.requestFailed);
+    expect(alert).toHaveTextContent(COMMON_MESSAGES.requestFailed);
     expectAboveButtons(alert);
   });
 

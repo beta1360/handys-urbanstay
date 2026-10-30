@@ -1,34 +1,27 @@
-import { Link } from "@tanstack/react-router";
 import { Table } from "@repo/ui/table";
 import type { TableColumn } from "@repo/ui/table";
+import { HOTEL_FIELD_LABELS } from "@/entities/hotel";
 import type { Hotel } from "@/shared/api";
-import { HOTEL_LIST_MESSAGES } from "../config/messages";
-
-const HOTEL_NAME_LINK_CLASS_NAME =
-  "rounded-sm font-medium text-neutral-900 underline decoration-neutral-300 underline-offset-4 hover:decoration-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900";
+import { TextLink } from "@/shared/ui";
 
 const HOTEL_COLUMNS: readonly TableColumn<Hotel>[] = [
   {
     key: "name",
-    header: HOTEL_LIST_MESSAGES.nameColumn,
+    header: HOTEL_FIELD_LABELS.name,
     cell: (hotel) => (
-      <Link
-        to="/hotels/$hotelId"
-        params={{ hotelId: hotel.id }}
-        className={HOTEL_NAME_LINK_CLASS_NAME}
-      >
+      <TextLink to="/hotels/$hotelId" params={{ hotelId: hotel.id }}>
         {hotel.name}
-      </Link>
+      </TextLink>
     ),
   },
   {
     key: "address",
-    header: HOTEL_LIST_MESSAGES.addressColumn,
+    header: HOTEL_FIELD_LABELS.address,
     cell: (hotel) => hotel.address,
   },
   {
     key: "phone",
-    header: HOTEL_LIST_MESSAGES.phoneColumn,
+    header: HOTEL_FIELD_LABELS.phone,
     cell: (hotel) => hotel.phone,
   },
 ];
