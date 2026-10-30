@@ -60,6 +60,8 @@
 | `@repo/ui/text-field` | `TextField` | label·입력창·오류 문구를 묶는다. `error`가 있으면 입력창에 `aria-invalid`와 오류 문구를 가리키는 `aria-describedby`를 붙인다 |
 | `@repo/ui/card` | `Card` | 테두리가 있는 흰색 상자. 선택 `header` 영역 |
 | `@repo/ui/sidebar` | `Sidebar`, `SidebarItem` | 왼쪽 메뉴. `Sidebar`는 `aria-label`이 필수인 `nav`다 |
+| `@repo/ui/table` | `Table` | 열 정의(`columns`: 머리글, 칸을 그리는 함수)와 `rows`로 표를 그린다. 머리글은 `scope="col"`이다. `aria-busy`면 흐리게 보여준다. `className`은 표를 감싼 상자에 붙는다. 빈 상태는 쓰는 쪽이 표 대신 보여준다 |
+| `@repo/ui/pagination` | `Pagination` | `aria-label`이 필수인 `nav` 안에 이전·다음 버튼과 현재 위치(`status`)를 둔다. `hasPrevious`·`hasNext`가 false면 그 버튼을 비활성화한다. 페이지 계산은 쓰는 쪽이 한다 |
 
 ### packages/ui에 둘 것과 앱에 둘 것
 
