@@ -94,6 +94,9 @@ FSD 레이어(app~shared)가 코드를 '어디에 두는가'를 정한다면, 3�
 - 폼 스키마(생성된 요청 스키마에 화면 문구를 덧붙인 것)와 제출 흐름(변경 훅 호출, 서버 오류 표시, 성공 뒤 동작)은 그 동작의 `features/<동작>/model`에, 폼 화면은 `features/<동작>/ui`에 둔다.
 - 여러 동작이 함께 쓰는 입력 묶음(예: 등록·수정의 호텔 정보 입력 칸)은 그 묶음의 features slice에 둔다.
 - 도메인과 무관한 폼 도우미(예: 서버 오류를 입력창 오류와 폼 알림으로 나누기)는 `shared/lib/form`에 둔다.
+- 폼 알림(입력창과 묶이지 않는 서버 오류)은 react-hook-form의 `errors.root.server`에 둔다. 다시 제출하거나 `reset`하면 함께 지워진다.
+- 제출 중 상태는 `formState.isSubmitting || formState.isSubmitSuccessful`로 정한다. 요청이 끝날 때까지와, 성공한 뒤 화면을 떠날 때까지 로딩이다.
+- 표현 컴포넌트는 react-hook-form을 모른다. model이 칸마다 `register` 결과와 오류를 묶은 props를 만들어 넘기고, 표현 컴포넌트는 입력창에 펼치기만 한다.
 - 검사 시점, 오류 표시, 초점 같은 화면 동작은 각 앱의 화면 규칙(어드민 앱은 `docs/admin-app.md`)을 따른다.
 
 ### 공용 UI와 화면 이동
