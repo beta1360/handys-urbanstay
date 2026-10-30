@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { describe, expect, it } from "vitest";
-import { FORM_VALIDATION_MESSAGES } from "@/shared/config";
+import { FORM_VALIDATION_MESSAGES } from "../config";
 import {
   optionalTextSchema,
   passwordSchema,

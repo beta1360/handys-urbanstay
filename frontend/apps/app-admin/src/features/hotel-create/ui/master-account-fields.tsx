@@ -1,6 +1,6 @@
 import { FormSection } from "@repo/ui/form-section";
 import { TextField } from "@repo/ui/text-field";
-import type { FormFieldProps } from "@/shared/lib/form";
+import type { FormFieldProps } from "@repo/admin-kit/form";
 import { HOTEL_CREATE_FORM_MESSAGES } from "../config/messages";
 import { MASTER_PASSWORD_LENGTH } from "../model/hotel-create-form-schema";
 import type { MasterField } from "../model/hotel-create-form-schema";

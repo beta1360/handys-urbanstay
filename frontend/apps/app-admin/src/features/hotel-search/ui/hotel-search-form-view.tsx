@@ -1,8 +1,8 @@
 import type { FormEvent } from "react";
 import { Button } from "@repo/ui/button";
 import { TextField } from "@repo/ui/text-field";
+import type { FormFieldProps } from "@repo/admin-kit/form";
 import { HOTEL_KEYWORD_MAX_LENGTH } from "@/entities/hotel";
-import type { FormFieldProps } from "@/shared/lib/form";
 import { HOTEL_SEARCH_FORM_MESSAGES } from "../config/messages";
 
 type HotelSearchFormViewProps = {

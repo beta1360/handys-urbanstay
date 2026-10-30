@@ -1,8 +1,8 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   RequestValidationError,
   ResponseValidationError,
 } from "@repo/admin-kit/api";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchMe, loginAccount, logoutAccount, meQueryKey } from "./account";
 import { getGetMeQueryKey, getMe, login, logout } from "./generated";
 

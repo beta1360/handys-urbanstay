@@ -8,8 +8,8 @@ import {
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
+import { showToast } from "@repo/admin-kit/toast";
 import { TOAST_MESSAGES } from "@/shared/config";
-import { showToast } from "@/shared/lib/toast";
 import { ToastProvider } from "./toast-provider";
 
 const NEXT_PAGE_TEXT = "호텔 목록 화면";

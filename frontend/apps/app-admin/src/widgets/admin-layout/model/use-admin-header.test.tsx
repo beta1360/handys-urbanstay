@@ -8,10 +8,10 @@ import {
 } from "@tanstack/react-router";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { showToast } from "@repo/admin-kit/toast";
 import { useMe } from "@/entities/account";
 import { useLogout } from "@/features/auth-logout";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
-import { showToast } from "@/shared/lib/toast";
 import { useAdminHeader } from "./use-admin-header";
 
 vi.mock("@/entities/account", async (importOriginal) => ({
@@ -24,8 +24,8 @@ vi.mock("@/features/auth-logout", async (importOriginal) => ({
   useLogout: vi.fn(),
 }));
 
-vi.mock("@/shared/lib/toast", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/shared/lib/toast")>()),
+vi.mock("@repo/admin-kit/toast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@repo/admin-kit/toast")>()),
   showToast: vi.fn(),
 }));
 

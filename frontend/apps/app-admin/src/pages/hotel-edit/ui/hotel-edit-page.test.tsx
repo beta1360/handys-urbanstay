@@ -16,6 +16,11 @@ import type { UserEvent } from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  FORM_ALERT_MESSAGES,
+  FORM_VALIDATION_MESSAGES,
+} from "@repo/admin-kit/config";
+import { showToast } from "@repo/admin-kit/toast";
+import {
   HOTEL_FIELD_LABELS,
   HOTEL_INFO_FIELDS,
   HOTEL_INFO_MESSAGES,
@@ -33,9 +38,8 @@ import {
   updateHotel,
 } from "@/shared/api";
 import type { Hotel, HotelPage } from "@/shared/api";
-import { COMMON_MESSAGES, FORM_VALIDATION_MESSAGES } from "@/shared/config";
+import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
-import { showToast } from "@/shared/lib/toast";
 import { HotelEditPage } from "./hotel-edit-page";
 
 const { fetchHotel } = vi.hoisted(() => ({ fetchHotel: vi.fn() }));
@@ -49,8 +53,8 @@ vi.mock("@/shared/api", async (importOriginal) => {
   };
 });
 
-vi.mock("@/shared/lib/toast", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/shared/lib/toast")>()),
+vi.mock("@repo/admin-kit/toast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@repo/admin-kit/toast")>()),
   showToast: vi.fn(),
 }));
 
@@ -638,7 +642,7 @@ describe("HotelEditPage 서버 오류 처리", () => {
     await vi.waitFor(() => {
       expect(showToast).toHaveBeenCalledExactlyOnceWith({
         type: "error",
-        message: COMMON_MESSAGES.requestFailed,
+        message: FORM_ALERT_MESSAGES.requestFailed,
       });
     });
   });

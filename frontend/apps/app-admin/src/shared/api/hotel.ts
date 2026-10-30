@@ -1,5 +1,5 @@
-import { parseRequest, parseResponseBody } from "@repo/admin-kit/api";
 import { z } from "zod";
+import { parseRequest, parseResponseBody } from "@repo/admin-kit/api";
 import * as generated from "./generated";
 import {
   CreateHotelResponse,

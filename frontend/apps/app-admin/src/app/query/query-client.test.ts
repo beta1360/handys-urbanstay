@@ -1,10 +1,10 @@
+import { MutationObserver } from "@tanstack/react-query";
+import { AxiosError, AxiosHeaders } from "axios";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   RequestValidationError,
   ResponseValidationError,
 } from "@repo/admin-kit/api";
-import { MutationObserver } from "@tanstack/react-query";
-import { AxiosError, AxiosHeaders } from "axios";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "./query-client";
 
 const onError = vi.fn();

@@ -6,8 +6,9 @@ import {
   showSubmitError,
   SUBMIT_ONLY_VALIDATION,
   toFieldPropsMap,
-} from "@/shared/lib/form";
-import { showToast } from "@/shared/lib/toast";
+} from "@repo/admin-kit/form";
+import { showToast } from "@repo/admin-kit/toast";
+import { getApiError } from "@/shared/api";
 import { useLogin } from "../api/use-login";
 import { LOGIN_FIELDS, loginFormSchema } from "./login-form-schema";
 
@@ -30,7 +31,10 @@ export function useLoginForm(redirectTo: string) {
       showToast({ type: "success", message });
       await navigate({ href: redirectTo });
     } catch (error) {
-      showSubmitError(error, { fields: LOGIN_FIELDS, setError: form.setError });
+      showSubmitError(getApiError(error), {
+        fields: LOGIN_FIELDS,
+        setError: form.setError,
+      });
     }
   });
 

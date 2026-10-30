@@ -3,8 +3,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
+import { SUBMIT_ONLY_VALIDATION, toFieldProps } from "@repo/admin-kit/form";
 import { HOTEL_LIST_FIRST_PAGE, normalizeHotelKeyword } from "@/entities/hotel";
-import { SUBMIT_ONLY_VALIDATION, toFieldProps } from "@/shared/lib/form";
 
 const hotelSearchFormSchema = z.object({
   keyword: z.string().transform(normalizeHotelKeyword),

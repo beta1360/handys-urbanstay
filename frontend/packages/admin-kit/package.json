@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./api": "./src/api/index.ts"
+    "./api": "./src/api/index.ts",
+    "./config": "./src/config/index.ts",
+    "./form": "./src/form/index.ts",
+    "./toast": "./src/toast/index.ts"
   },
   "scripts": {
     "lint": "eslint",
