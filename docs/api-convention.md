@@ -17,6 +17,7 @@
 {
   "success": true,
   "data": { "id": 1, "name": "..." },
+  "message": "호텔을 등록했습니다.",
   "error": null
 }
 ```
@@ -25,6 +26,7 @@
 {
   "success": false,
   "data": null,
+  "message": null,
   "error": {
     "code": "ROOM_NOT_FOUND",
     "message": "객실을 찾을 수 없습니다.",
@@ -37,10 +39,19 @@
 |---|---|
 | `success` | 요청 성공 여부 |
 | `data` | 성공 시 결과. 돌려줄 결과가 없는 성공(예: 로그아웃)과 실패 시 `null` |
+| `message` | 상태를 바꾸는 요청이 성공했을 때 사용자에게 보여줄 결과 문구. 조회와 실패 시 `null` (아래 '성공 메시지') |
 | `error` | 실패 시 에러 정보. 성공 시 `null` |
 | `error.code` | 에러 코드 |
 | `error.message` | 에러 메시지 |
 | `error.fieldErrors` | 입력 검증 실패 목록. 각 항목은 `{ "field": "name", "message": "필수 입력입니다." }` 형태. 해당 없으면 빈 배열 |
+
+### 성공 메시지
+
+- 상태를 바꾸는 요청(POST, PUT, PATCH, DELETE)이 성공하면 `message`에 결과 문구를 담는다. 로그인·로그아웃도 포함한다. 예: 호텔 등록 '호텔을 등록했습니다.', 로그아웃 '로그아웃했습니다.'
+- 조회(GET)가 성공하면 `message`는 `null`이다.
+- 실패 응답의 `message`는 `null`이다. 실패 문구는 `error.message`에 담는다.
+- 문구는 서버가 정한다. 클라이언트는 받은 문구를 그대로 보여주고, 같은 뜻의 문구를 따로 만들지 않는다. 어느 화면에서 어떻게 보여줄지(예: 토스트)는 클라이언트가 정한다.
+- `message`는 응답 스키마에서 항상 있는 필드다(문자열 또는 `null`).
 
 ### HTTP 상태 코드
 
