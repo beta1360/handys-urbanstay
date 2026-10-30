@@ -11,6 +11,7 @@ import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomHotelAdminR
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomStatusHistoryHotelAdminResponse
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomStatusUpdateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomUpdateHotelAdminRequest
+import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
 import com.marco.assignment.handys.urbanstay.room.exception.RoomApiErrors
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import com.marco.assignment.handys.urbanstay.room.service.RoomService
@@ -77,6 +78,9 @@ class RoomHotelAdminController(
 		@Size(max = KEYWORD_MAX_LENGTH, message = "{validation.max-length}")
 		@Parameter(description = "openapi.hotel-admin.operation.getRooms.parameter.keyword")
 		keyword: String?,
+		@RequestParam(required = false)
+		@Parameter(description = "openapi.hotel-admin.operation.getRooms.parameter.status")
+		status: RoomStatus?,
 		@RequestParam(defaultValue = PageParams.DEFAULT_PAGE)
 		@Min(value = PageParams.MIN_PAGE, message = "{validation.min}")
 		@Max(value = PageParams.MAX_PAGE, message = "{validation.max}")
@@ -88,7 +92,7 @@ class RoomHotelAdminController(
 		@Parameter(description = "openapi.hotel-admin.operation.getRooms.parameter.size")
 		size: Int,
 	): ApiResponse<PageResponse<RoomHotelAdminResponse>> =
-		ApiResponse.success(PageResponse.from(roomService.getRooms(hotelAdmin.hotelId, keyword, page, size).map(RoomHotelAdminResponse::from)))
+		ApiResponse.success(PageResponse.from(roomService.getRooms(hotelAdmin.hotelId, keyword, status, page, size).map(RoomHotelAdminResponse::from)))
 
 	@Operation(summary = "openapi.hotel-admin.operation.getRoom.summary", description = "openapi.hotel-admin.operation.getRoom.description")
 	@RoomApiErrors(RoomErrorCode.ROOM_NOT_FOUND)

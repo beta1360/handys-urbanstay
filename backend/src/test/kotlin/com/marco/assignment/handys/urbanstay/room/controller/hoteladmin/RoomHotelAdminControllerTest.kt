@@ -593,6 +593,71 @@ class RoomHotelAdminControllerTest {
 		assertThat(pageInfo(data)).containsExactly(1, 2, 5, 3)
 	}
 
+	@ParameterizedTest
+	@EnumSource(HotelAdminRole::class)
+	fun `마스터와 운영자 모두 상태로 거르면 그 상태의 자기 호텔 객실만 이름 오름차순으로 조회한다`(role: HotelAdminRole) {
+		mapOf("103" to RoomStatus.VACANT, "1001" to RoomStatus.RESERVED, "101" to RoomStatus.RESERVED, "99" to RoomStatus.RESERVED, "102" to RoomStatus.MAINTENANCE)
+			.forEach { (name, status) -> setStatus(saveRoom(hotel, name), status) }
+		setStatus(saveRoom(otherHotel, "100"), RoomStatus.RESERVED)
+
+		val reserved = getRooms("status" to RoomStatus.RESERVED.name, principal = principals.getValue(role)).andExpectSuccess(HttpStatus.OK)
+		val occupied = getRooms("status" to RoomStatus.OCCUPIED.name, principal = principals.getValue(role)).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(itemNames(reserved)).containsExactly("99", "101", "1001")
+		assertThat(reserved["items"].values().map { it["status"].stringValue() }).containsOnly(RoomStatus.RESERVED.name)
+		assertThat(pageInfo(reserved)).containsExactly(0, 10, 3, 1)
+		assertThat(itemNames(occupied)).isEmpty()
+		assertThat(pageInfo(occupied)).containsExactly(0, 10, 0, 0)
+	}
+
+	@Test
+	fun `상태와 검색어를 함께 보내면 둘 다 맞는 객실만 이름 오름차순으로 조회하고 page와 size로 나눠 전체 수는 그 결과 기준이다`() {
+		mapOf(
+			"스위트 3" to RoomStatus.RESERVED,
+			"스위트 1" to RoomStatus.RESERVED,
+			"스위트 2" to RoomStatus.VACANT,
+			"디럭스 1" to RoomStatus.RESERVED,
+			"스위트 10" to RoomStatus.RESERVED,
+		).forEach { (name, status) -> setStatus(saveRoom(hotel, name), status) }
+
+		val first = getRooms("keyword" to " 스위트 ", "status" to RoomStatus.RESERVED.name, "size" to "2").andExpectSuccess(HttpStatus.OK)
+		val second = getRooms("keyword" to "스위트", "status" to RoomStatus.RESERVED.name, "page" to "1", "size" to "2").andExpectSuccess(HttpStatus.OK)
+
+		assertThat(itemNames(first)).containsExactly("스위트 1", "스위트 3")
+		assertThat(pageInfo(first)).containsExactly(0, 2, 3, 2)
+		assertThat(itemNames(second)).containsExactly("스위트 10")
+	}
+
+	@ParameterizedTest
+	@CsvSource("'50%', '50원'", "'a_b', 'axb'", "'c\\d', 'cd'")
+	fun `상태와 함께 보낸 검색어의 퍼센트, 밑줄, 역슬래시도 글자 그대로 찾는다`(literal: String, decoy: String) {
+		listOf("객실 $literal", "객실 $decoy").forEach { setStatus(saveRoom(hotel, it), RoomStatus.MAINTENANCE) }
+
+		assertThat(itemNames(getRooms("keyword" to literal, "status" to RoomStatus.MAINTENANCE.name).andExpectSuccess(HttpStatus.OK)))
+			.containsExactly("객실 $literal")
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["", " "])
+	fun `상태 파라미터가 빈 값이거나 공백만 있으면 상태로 거르지 않고 전체 목록을 조회한다`(value: String) {
+		listOf("102" to RoomStatus.VACANT, "101" to RoomStatus.RESERVED).forEach { (name, status) -> setStatus(saveRoom(hotel, name), status) }
+
+		assertThat(itemNames(getRooms("status" to value).andExpectSuccess(HttpStatus.OK))).containsExactly("101", "102")
+	}
+
+	@Test
+	fun `상태 파라미터는 앞뒤 공백을 지운 상태 이름으로 받는다`() {
+		listOf("102" to RoomStatus.VACANT, "101" to RoomStatus.RESERVED).forEach { (name, status) -> setStatus(saveRoom(hotel, name), status) }
+
+		assertThat(itemNames(getRooms("status" to " RESERVED ").andExpectSuccess(HttpStatus.OK))).containsExactly("101")
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["vacant", "Vacant", "CLEANING", "0", "VACANT,RESERVED"])
+	fun `상태 파라미터가 네 상태 이름이 아니면 status와 형식 메시지로 400 응답한다`(value: String) {
+		getRooms("status" to value).andExpectError(CommonErrorCode.INVALID_INPUT, "status" to message(TYPE))
+	}
+
 	@Test
 	fun `로그인하지 않으면 객실 API는 401 UNAUTHORIZED로 응답하고 바꾸지 않는다`() {
 		val room = saveRoom(hotel, NAME)
@@ -978,17 +1043,19 @@ class RoomHotelAdminControllerTest {
 	}
 
 	@Test
-	fun `객실 목록 문서는 검색어, page·size 파라미터와 모든 필드가 필수인 페이지 응답 스키마를 보여준다`() {
+	fun `객실 목록 문서는 검색어, 상태, page·size 파라미터와 모든 필드가 필수인 페이지 응답 스키마를 보여준다`() {
 		val docs = apiDocs()
 		val getRooms = docs["paths"][ROOMS]["get"]
 		val parameters = getRooms["parameters"].values().associateBy { it["name"].stringValue() }
 		val page = docs["components"]["schemas"]["PageResponseRoomHotelAdminResponse"]
 
-		assertThat(parameters.keys).containsExactly("keyword", "page", "size")
+		assertThat(parameters.keys).containsExactly("keyword", "status", "page", "size")
 		assertThat(parameters.values.map { it["description"].stringValue() })
 			.containsExactlyElementsOf(parameters.keys.map { message("openapi.hotel-admin.operation.getRooms.parameter.$it") })
 		assertThat(parameters.values.map { it["required"].booleanValue() }).containsOnly(false)
 		assertThat(parameters.getValue("keyword")["schema"]).isEqualTo(json("""{"type":"string","maxLength":100,"minLength":0}"""))
+		assertThat(parameters.getValue("status")["schema"])
+			.isEqualTo(json(jsonMapper.writeValueAsString(mapOf("type" to "string", "enum" to STATUS_NAMES))))
 		assertThat(parameters.getValue("page")["schema"])
 			.isEqualTo(json("""{"type":"integer","format":"int32","default":0,"minimum":0,"maximum":99}"""))
 		assertThat(parameters.getValue("size")["schema"])

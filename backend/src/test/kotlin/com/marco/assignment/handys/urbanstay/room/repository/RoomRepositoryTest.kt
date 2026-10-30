@@ -285,6 +285,38 @@ class RoomRepositoryTest {
 		assertThat(search(literal)).containsExactly("객실 $literal")
 	}
 
+	@Test
+	fun `상태별 목록은 그 호텔의 그 상태 객실만 이름 오름차순으로 찾는다`() {
+		listOf("1001" to RoomStatus.RESERVED, "99" to RoomStatus.RESERVED, "101" to RoomStatus.VACANT, "201" to RoomStatus.RESERVED)
+			.forEach { (name, status) -> insertWithoutEntity(mapOf("name" to name, "status" to status.name)) }
+		insertWithoutEntity(mapOf("hotel_id" to checkNotNull(otherHotel.id), "name" to "100", "status" to RoomStatus.RESERVED.name))
+
+		assertThat(roomRepository.findByHotelIdAndStatus(checkNotNull(hotel.id), RoomStatus.RESERVED, FIRST_PAGE_BY_NAME).content.map { it.name })
+			.containsExactly("99", "201", "1001")
+		assertThat(roomRepository.findByHotelIdAndStatus(hotel.id!!, RoomStatus.OCCUPIED, FIRST_PAGE_BY_NAME).content).isEmpty()
+	}
+
+	@Test
+	fun `상태와 검색어를 함께 쓰면 그 호텔에서 둘 다 맞는 객실을 대소문자 구분 없이 이름 오름차순으로 찾고 검색어는 글자 그대로 찾는다`() {
+		listOf(
+			"Suite 10" to RoomStatus.RESERVED,
+			"suite 2" to RoomStatus.RESERVED,
+			"SUITE 1" to RoomStatus.VACANT,
+			"디럭스" to RoomStatus.RESERVED,
+			"객실 50%" to RoomStatus.RESERVED,
+			"객실 50원" to RoomStatus.RESERVED,
+		).forEach { (name, status) -> insertWithoutEntity(mapOf("name" to name, "status" to status.name)) }
+		insertWithoutEntity(mapOf("hotel_id" to checkNotNull(otherHotel.id), "name" to "Suite 3", "status" to RoomStatus.RESERVED.name))
+
+		assertThat(searchWithStatus(RoomStatus.RESERVED, "sUiTe")).containsExactly("suite 2", "Suite 10")
+		assertThat(searchWithStatus(RoomStatus.VACANT, "suite")).containsExactly("SUITE 1")
+		assertThat(searchWithStatus(RoomStatus.RESERVED, "50%")).containsExactly("객실 50%")
+		assertThat(searchWithStatus(RoomStatus.MAINTENANCE, "suite")).isEmpty()
+	}
+
+	private fun searchWithStatus(status: RoomStatus, keyword: String): List<String> =
+		roomRepository.findByHotelIdAndStatusAndNameContainingIgnoreCase(checkNotNull(hotel.id), status, keyword, FIRST_PAGE_BY_NAME).content.map { it.name }
+
 	private fun search(keyword: String): List<String> =
 		roomRepository.findByHotelIdAndNameContainingIgnoreCase(checkNotNull(hotel.id), keyword, FIRST_PAGE_BY_NAME).content.map { it.name }
 

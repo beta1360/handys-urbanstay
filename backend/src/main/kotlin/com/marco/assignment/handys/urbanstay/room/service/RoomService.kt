@@ -51,10 +51,20 @@ class RoomService(
 	}
 
 	@Transactional(readOnly = true)
-	fun getRooms(hotelId: Long, keyword: String?, page: Int, size: Int): Page<Room> {
+	fun getRooms(hotelId: Long, keyword: String?, status: RoomStatus?, page: Int, size: Int): Page<Room> {
 		val pageable = PageRequest.of(page, size, NAME_ORDER)
-		val nameKeyword = keyword?.trim()?.ifEmpty { null } ?: return roomRepository.findByHotelId(hotelId, pageable)
-		return roomRepository.findByHotelIdAndNameContainingIgnoreCase(hotelId, nameKeyword, pageable)
+		val nameKeyword = keyword?.trim()?.ifEmpty { null }
+		return if (status == null) {
+			if (nameKeyword == null) {
+				roomRepository.findByHotelId(hotelId, pageable)
+			} else {
+				roomRepository.findByHotelIdAndNameContainingIgnoreCase(hotelId, nameKeyword, pageable)
+			}
+		} else if (nameKeyword == null) {
+			roomRepository.findByHotelIdAndStatus(hotelId, status, pageable)
+		} else {
+			roomRepository.findByHotelIdAndStatusAndNameContainingIgnoreCase(hotelId, status, nameKeyword, pageable)
+		}
 	}
 
 	@Transactional(readOnly = true)

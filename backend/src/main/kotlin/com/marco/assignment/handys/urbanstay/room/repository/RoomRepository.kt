@@ -21,6 +21,10 @@ interface RoomRepository : JpaRepository<Room, Long> {
 
 	fun findByHotelIdAndNameContainingIgnoreCase(hotelId: Long, keyword: String, pageable: Pageable): Page<Room>
 
+	fun findByHotelIdAndStatus(hotelId: Long, status: RoomStatus, pageable: Pageable): Page<Room>
+
+	fun findByHotelIdAndStatusAndNameContainingIgnoreCase(hotelId: Long, status: RoomStatus, keyword: String, pageable: Pageable): Page<Room>
+
 	@Modifying(flushAutomatically = true, clearAutomatically = true)
 	@Query(
 		"""
