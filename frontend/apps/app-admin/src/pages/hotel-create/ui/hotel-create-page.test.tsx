@@ -15,8 +15,8 @@ import userEvent from "@testing-library/user-event";
 import type { UserEvent } from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HOTEL_FIELD_LABELS } from "@/entities/hotel";
-import { HOTEL_INFO_MESSAGES } from "@/features/hotel-info-form";
+import { HOTEL_FIELD_LABELS, HOTEL_INFO_MESSAGES } from "@/entities/hotel";
+import { HOTEL_CREATE_FORM_MESSAGES } from "@/features/hotel-create";
 import {
   API_ERROR_CODES,
   createHotel,
@@ -28,7 +28,6 @@ import {
 import type { Hotel, HotelPage } from "@/shared/api";
 import { COMMON_MESSAGES, FORM_VALIDATION_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
-import { HOTEL_CREATE_MESSAGES } from "../config/messages";
 import { HotelCreatePage } from "./hotel-create-page";
 
 vi.mock("@/shared/api", async (importOriginal) => ({
@@ -77,13 +76,13 @@ const REQUIRED_FIELDS = INPUT_FIELDS.filter(
   (field) => field !== "description",
 );
 
-const PASSWORD_HINT = HOTEL_CREATE_MESSAGES.masterPasswordHint(8, 64);
+const PASSWORD_HINT = HOTEL_CREATE_FORM_MESSAGES.masterPasswordHint(8, 64);
 
 const PASSWORD_RULE = FORM_VALIDATION_MESSAGES.passwordRule(8, 64);
 
 const FIELD_HINTS: Partial<Record<InputField, string>> = {
   phone: HOTEL_INFO_MESSAGES.phoneHint,
-  loginId: HOTEL_CREATE_MESSAGES.masterLoginIdHint,
+  loginId: HOTEL_CREATE_FORM_MESSAGES.masterLoginIdHint,
   password: PASSWORD_HINT,
 };
 
@@ -159,7 +158,7 @@ function getHotelInfoGroup() {
 }
 
 function getMasterGroup() {
-  return screen.getByRole("group", { name: HOTEL_CREATE_MESSAGES.masterLegend });
+  return screen.getByRole("group", { name: HOTEL_CREATE_FORM_MESSAGES.masterLegend });
 }
 
 function getFields(): Record<InputField, HTMLElement> {
@@ -172,14 +171,14 @@ function getFields(): Record<InputField, HTMLElement> {
     description: hotelInfo.getByLabelText(
       `${HOTEL_FIELD_LABELS.description} ${HOTEL_INFO_MESSAGES.optional}`,
     ),
-    loginId: master.getByLabelText(HOTEL_CREATE_MESSAGES.masterLoginIdLabel),
-    masterName: master.getByLabelText(HOTEL_CREATE_MESSAGES.masterNameLabel),
-    password: master.getByLabelText(HOTEL_CREATE_MESSAGES.masterPasswordLabel),
+    loginId: master.getByLabelText(HOTEL_CREATE_FORM_MESSAGES.masterLoginIdLabel),
+    masterName: master.getByLabelText(HOTEL_CREATE_FORM_MESSAGES.masterNameLabel),
+    password: master.getByLabelText(HOTEL_CREATE_FORM_MESSAGES.masterPasswordLabel),
   };
 }
 
 function getSubmitButton() {
-  return screen.getByRole("button", { name: HOTEL_CREATE_MESSAGES.submit });
+  return screen.getByRole("button", { name: HOTEL_CREATE_FORM_MESSAGES.submit });
 }
 
 function getCancelLink() {

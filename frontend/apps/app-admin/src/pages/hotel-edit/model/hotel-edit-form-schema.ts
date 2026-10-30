@@ -1,5 +1,5 @@
-import { createHotelInfoFormShape } from "@/features/hotel-info-form";
-import type { HotelInfoValues } from "@/features/hotel-info-form";
+import { createHotelInfoFormShape } from "@/entities/hotel";
+import type { HotelInfoValues } from "@/entities/hotel";
 import { updateHotelBodySchema } from "@/shared/api";
 import type { Hotel } from "@/shared/api";
 

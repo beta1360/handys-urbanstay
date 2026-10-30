@@ -1,6 +1,5 @@
 import { Button } from "@repo/ui/button";
-import { HotelNotFound } from "@/entities/hotel";
-import { HotelInfoFields } from "@/features/hotel-info-form";
+import { HotelInfoFields, HotelNotFound } from "@/entities/hotel";
 import type { Hotel } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { ButtonLink } from "@/shared/ui";
@@ -16,11 +15,9 @@ export function HotelEditForm({ hotelId, initialHotel }: HotelEditFormProps) {
   const {
     formRef,
     reloadButtonRef,
-    values,
-    fieldErrors,
+    fields,
     formError,
     status,
-    changeField,
     handleSubmit,
     reload,
   } = useHotelEditForm(hotelId, initialHotel);
@@ -35,11 +32,7 @@ export function HotelEditForm({ hotelId, initialHotel }: HotelEditFormProps) {
       onSubmit={handleSubmit}
       className="flex flex-col gap-4"
     >
-      <HotelInfoFields
-        values={values}
-        errors={fieldErrors}
-        onChange={changeField}
-      />
+      <HotelInfoFields fields={fields} />
       {formError ? (
         <div className="flex flex-wrap items-center gap-3">
           <p role="alert" className="text-sm text-red-600">

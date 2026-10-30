@@ -1,13 +1,9 @@
 import type { z } from "zod";
-import {
-  createHotelInfoFormShape,
-  HOTEL_INFO_FIELDS,
-} from "@/features/hotel-info-form";
-import type { HotelInfoField } from "@/features/hotel-info-form";
+import { createHotelInfoFormShape, HOTEL_INFO_FIELDS } from "@/entities/hotel";
+import type { HotelInfoField } from "@/entities/hotel";
 import { createHotelBodySchema } from "@/shared/api";
 import { FORM_VALIDATION_MESSAGES } from "@/shared/config";
 import { passwordSchema, requiredTextSchema } from "@/shared/lib/form";
-import type { FieldErrors } from "@/shared/lib/form";
 
 const masterRules = createHotelBodySchema.shape.master;
 
@@ -41,8 +37,6 @@ export type HotelCreateFormValues = z.input<typeof hotelCreateFormSchema>;
 export type MasterField = keyof HotelCreateFormValues["master"];
 
 export type HotelCreateField = HotelInfoField | `master.${MasterField}`;
-
-export type HotelCreateFieldErrors = FieldErrors<HotelCreateField>;
 
 export const HOTEL_CREATE_FIELDS = [
   ...HOTEL_INFO_FIELDS,

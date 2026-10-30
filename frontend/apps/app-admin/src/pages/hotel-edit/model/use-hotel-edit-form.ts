@@ -2,9 +2,12 @@ import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { flushSync } from "react-dom";
 import { useNavigate } from "@tanstack/react-router";
-import { HOTEL_LOAD_MESSAGES, useRefetchHotel } from "@/entities/hotel";
-import { HOTEL_INFO_FIELDS } from "@/features/hotel-info-form";
-import type { HotelInfoField } from "@/features/hotel-info-form";
+import {
+  HOTEL_INFO_FIELDS,
+  HOTEL_LOAD_MESSAGES,
+  useRefetchHotel,
+} from "@/entities/hotel";
+import type { HotelInfoField, HotelInfoInputProps } from "@/entities/hotel";
 import { useUpdateHotel } from "@/features/hotel-update";
 import { API_ERROR_CODES, getApiError } from "@/shared/api";
 import type { Hotel } from "@/shared/api";
@@ -49,6 +52,22 @@ export function useHotelEditForm(hotelId: number, initialHotel: Hotel) {
     }));
     setFieldErrors((current) => ({ ...current, [field]: undefined }));
   }
+
+  function toInputProps(field: HotelInfoField): HotelInfoInputProps {
+    return {
+      name: field,
+      value: form.values[field],
+      onChange: (event) => changeField(field, event.target.value),
+      error: fieldErrors[field],
+    };
+  }
+
+  const fields: Record<HotelInfoField, HotelInfoInputProps> = {
+    name: toInputProps("name"),
+    address: toInputProps("address"),
+    phone: toInputProps("phone"),
+    description: toInputProps("description"),
+  };
 
   function showFieldErrors(errors: FieldErrors<HotelInfoField>) {
     setFieldErrors(errors);
@@ -150,11 +169,9 @@ export function useHotelEditForm(hotelId: number, initialHotel: Hotel) {
   return {
     formRef,
     reloadButtonRef,
-    values: form.values,
-    fieldErrors,
+    fields,
     formError,
     status,
-    changeField,
     handleSubmit,
     reload: () => void reload(),
   };
