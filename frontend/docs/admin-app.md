@@ -26,7 +26,7 @@
 
 - `src/` 아래를 FSD로 구성한다. 레이어·세그먼트·서버 상태·폼·화면 이동의 배치는 `frontend/CLAUDE.md`의 '구조 (FSD)'를 따른다. 어드민 앱에서는 아래처럼 둔다.
   - pages: 라우트 하나의 화면 조립. URL search 스키마도 그 화면의 pages slice에 두고 라우트 파일이 연결한다(아래 '목록 화면').
-  - widgets: 여러 도메인·동작을 묶은 화면 블록. 예: `admin-layout`(사이드바·위쪽 영역), `hotel-detail`(호텔 상세: 상태별 내용과 '목록으로'·'수정' 링크 줄)
+  - widgets: 여러 도메인·동작을 묶은 화면 블록. 예: `admin-layout`(사이드바·위쪽 영역), `hotel-detail`(호텔 상세: 상태별 내용과 '목록으로'·'수정' 링크 줄), `hotel-list`(호텔 목록: 상태별 내용, 표, 페이지 이동)
   - features: 사용자 동작 하나. 예: `hotel-create`(호텔 등록), `hotel-update`(호텔 수정), `hotel-search`(호텔 목록 검색), `auth-login`(로그인), `auth-logout`(로그아웃). 여러 동작이 함께 쓰는 입력 묶음은 entities에 둔다(아래 `hotel`의 호텔 정보 입력 칸)
   - entities: 도메인 하나. 예: `hotel`(호텔 조회 훅, 쿼리 키·캐시 규칙, 경로 파라미터 검사, 호텔 하나의 상태 값(불러오는 중·실패·찾을 수 없음·내용), 상태별 화면과 상세 내용 목록, 등록·수정이 함께 쓰는 호텔 정보 입력 칸과 그 폼 스키마 조각, 그 문구), `account`(내 정보 조회와 로그인 상태 캐시 규칙)
   - shared: `api`(검증을 거친 요청 함수), `lib/form`(도메인 무관 폼 도우미), `lib/search-params`(URL search 직렬화), `ui`(`ButtonLink`·`TextLink`), `config`(앱 이름, 서버와 같은 입력 검증 문구, 여러 곳에서 쓰는 문구)
