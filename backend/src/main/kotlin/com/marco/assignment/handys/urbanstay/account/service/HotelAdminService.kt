@@ -10,6 +10,7 @@ import com.marco.assignment.handys.urbanstay.common.exception.violates
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.OptimisticLockingFailureException
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -19,6 +20,10 @@ class HotelAdminService(
 	private val hotelAdminRepository: HotelAdminRepository,
 	private val passwordEncoder: PasswordEncoder,
 ) {
+
+	@Transactional(readOnly = true)
+	fun getHotelAdmin(hotelAdminId: Long): HotelAdmin =
+		checkNotNull(hotelAdminRepository.findByIdOrNull(hotelAdminId)) { "Hotel admin not found: hotelAdminId=$hotelAdminId" }
 
 	@Transactional(readOnly = true)
 	fun checkLoginIdAvailable(loginId: String, hotelAdminId: Long? = null) {

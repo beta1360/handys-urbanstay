@@ -2,6 +2,7 @@ package com.marco.assignment.handys.urbanstay.room.dto.hoteladmin
 
 import com.marco.assignment.handys.urbanstay.common.config.JacksonConfig
 import com.marco.assignment.handys.urbanstay.room.entity.Room
+import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
 import io.swagger.v3.oas.annotations.media.Schema
 import java.time.LocalTime
 
@@ -22,6 +23,8 @@ data class RoomHotelAdminResponse(
 	val checkInTime: LocalTime,
 	@Schema(description = "openapi.schema.RoomHotelAdminResponse.checkOutTime", example = "11:00", pattern = JacksonConfig.LOCAL_TIME_PATTERN)
 	val checkOutTime: LocalTime,
+	@Schema(description = "openapi.schema.RoomHotelAdminResponse.status", example = "VACANT")
+	val status: RoomStatus,
 	@Schema(description = "openapi.schema.RoomHotelAdminResponse.version", example = "0")
 	val version: Long,
 ) {
@@ -38,6 +41,7 @@ data class RoomHotelAdminResponse(
 				description = room.description,
 				checkInTime = room.checkInTime,
 				checkOutTime = room.checkOutTime,
+				status = room.status,
 				version = room.version,
 			)
 	}

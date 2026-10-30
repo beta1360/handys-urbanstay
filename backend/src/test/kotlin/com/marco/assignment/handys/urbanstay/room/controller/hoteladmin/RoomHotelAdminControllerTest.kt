@@ -13,6 +13,7 @@ import com.marco.assignment.handys.urbanstay.common.security.Role
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRepository
 import com.marco.assignment.handys.urbanstay.room.entity.Room
+import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import com.marco.assignment.handys.urbanstay.room.repository.RoomRepository
 import jakarta.servlet.http.Cookie
@@ -50,6 +51,7 @@ import tools.jackson.databind.node.ObjectNode
 import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 import java.time.LocalTime
+import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
@@ -96,6 +98,8 @@ class RoomHotelAdminControllerTest {
 
 	private lateinit var otherHotel: Hotel
 
+	private lateinit var hotelAdmins: Map<HotelAdminRole, HotelAdmin>
+
 	private lateinit var principals: Map<HotelAdminRole, UserDetails>
 
 	private val masterPrincipal: UserDetails get() = principals.getValue(HotelAdminRole.MASTER)
@@ -104,15 +108,17 @@ class RoomHotelAdminControllerTest {
 	fun createHotels() {
 		hotel = saveHotel("어반스테이 $suffix")
 		otherHotel = saveHotel("다른 호텔 $suffix")
-		principals = HotelAdminRole.entries.associateWith { role ->
-			HotelAdminPrincipal.from(saveHotelAdmin(hotel, "${role.name.lowercase()}-$suffix@test.local", role))
+		hotelAdmins = HotelAdminRole.entries.associateWith { role ->
+			saveHotelAdmin(hotel, "${role.name.lowercase()}-$suffix@test.local", role, ACCOUNT_NAMES.getValue(role))
 		}
+		principals = hotelAdmins.mapValues { (_, hotelAdmin) -> HotelAdminPrincipal.from(hotelAdmin) }
 		saveHotelAdmin(otherHotel, "other-master-$suffix@test.local", HotelAdminRole.MASTER)
 	}
 
 	@AfterEach
 	fun deleteHotels() {
 		executor.shutdownNow()
+		createdHotelIds.forEach { jdbcTemplate.update(DELETE_HISTORIES, it) }
 		createdHotelIds.forEach {
 			jdbcTemplate.update(DELETE_ROOMS, it)
 			jdbcTemplate.update(DELETE_HOTEL_ADMINS, it)
@@ -131,8 +137,17 @@ class RoomHotelAdminControllerTest {
 		assertThat(data).isEqualTo(roomJson(id, "101", "스탠다드", 4, -1, null, "14:30", CHECK_OUT, 0))
 		assertThat(jdbcTemplate.queryForObject(SELECT_HOTEL_ID, Long::class.java, id)).isEqualTo(hotel.id)
 		val saved = roomRepository.findById(id).orElseThrow()
-		assertThat(listOf(saved.name, saved.type, saved.description, saved.checkInTime, saved.checkOutTime, saved.version))
-			.containsExactly("101", "스탠다드", null, LocalTime.of(14, 30), LocalTime.of(11, 0), 0L)
+		assertThat(listOf(saved.name, saved.type, saved.description, saved.checkInTime, saved.checkOutTime, saved.status, saved.version))
+			.containsExactly("101", "스탠다드", null, LocalTime.of(14, 30), LocalTime.of(11, 0), RoomStatus.VACANT, 0L)
+	}
+
+	@ParameterizedTest
+	@EnumSource(HotelAdminRole::class)
+	fun `객실을 등록하면 상태는 VACANT이고 등록한 계정의 id와 이름으로 이전 상태 없는 VACANT 이력을 한 줄 남긴다`(role: HotelAdminRole) {
+		val data = create(createBody(), principals.getValue(role)).andExpectSuccess(HttpStatus.CREATED)
+
+		assertThat(data["status"].stringValue()).isEqualTo(RoomStatus.VACANT.name)
+		assertThat(histories(data["id"].longValue())).containsExactly(history(null, RoomStatus.VACANT, role))
 	}
 
 	@ParameterizedTest
@@ -263,6 +278,7 @@ class RoomHotelAdminControllerTest {
 		create(createBody("name" to " $NAME\t", "type" to "디럭스")).andExpectError(RoomErrorCode.ROOM_DUPLICATED)
 
 		assertThat(roomNames(hotel)).containsExactly(NAME)
+		assertThat(historyCount()).isZero()
 	}
 
 	@Test
@@ -284,6 +300,7 @@ class RoomHotelAdminControllerTest {
 		assertError(responses.single { it.status == HttpStatus.CONFLICT.value() }, RoomErrorCode.ROOM_DUPLICATED)
 		val winner = json(responses.single { it.status == HttpStatus.CREATED.value() })["data"]
 		assertThat(roomIds(hotel)).containsExactly(winner["id"].longValue())
+		assertThat(historyCount()).isEqualTo(1)
 	}
 
 	@Test
@@ -463,8 +480,8 @@ class RoomHotelAdminControllerTest {
 	}
 
 	@ParameterizedTest
-	@ValueSource(strings = ["id", "hotelId"])
-	fun `수정 요청에 문서에 없는 id나 호텔 항목을 보내면 알 수 없는 항목 메시지로 400 응답하고 바꾸지 않는다`(field: String) {
+	@ValueSource(strings = ["id", "hotelId", "status"])
+	fun `수정 요청에 문서에 없는 id나 호텔, 상태 항목을 보내면 알 수 없는 항목 메시지로 400 응답하고 바꾸지 않는다`(field: String) {
 		val room = saveRoom(hotel, NAME)
 
 		update(room.id!!, updateBody(0, field to checkNotNull(otherHotel.id))).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(UNKNOWN_FIELD))
@@ -576,16 +593,85 @@ class RoomHotelAdminControllerTest {
 		assertThat(pageInfo(data)).containsExactly(1, 2, 5, 3)
 	}
 
+	@ParameterizedTest
+	@EnumSource(HotelAdminRole::class)
+	fun `마스터와 운영자 모두 상태로 거르면 그 상태의 자기 호텔 객실만 이름 오름차순으로 조회한다`(role: HotelAdminRole) {
+		mapOf("103" to RoomStatus.VACANT, "1001" to RoomStatus.RESERVED, "101" to RoomStatus.RESERVED, "99" to RoomStatus.RESERVED, "102" to RoomStatus.MAINTENANCE)
+			.forEach { (name, status) -> setStatus(saveRoom(hotel, name), status) }
+		setStatus(saveRoom(otherHotel, "100"), RoomStatus.RESERVED)
+
+		val reserved = getRooms("status" to RoomStatus.RESERVED.name, principal = principals.getValue(role)).andExpectSuccess(HttpStatus.OK)
+		val occupied = getRooms("status" to RoomStatus.OCCUPIED.name, principal = principals.getValue(role)).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(itemNames(reserved)).containsExactly("99", "101", "1001")
+		assertThat(reserved["items"].values().map { it["status"].stringValue() }).containsOnly(RoomStatus.RESERVED.name)
+		assertThat(pageInfo(reserved)).containsExactly(0, 10, 3, 1)
+		assertThat(itemNames(occupied)).isEmpty()
+		assertThat(pageInfo(occupied)).containsExactly(0, 10, 0, 0)
+	}
+
+	@Test
+	fun `상태와 검색어를 함께 보내면 둘 다 맞는 객실만 이름 오름차순으로 조회하고 page와 size로 나눠 전체 수는 그 결과 기준이다`() {
+		mapOf(
+			"스위트 3" to RoomStatus.RESERVED,
+			"스위트 1" to RoomStatus.RESERVED,
+			"스위트 2" to RoomStatus.VACANT,
+			"디럭스 1" to RoomStatus.RESERVED,
+			"스위트 10" to RoomStatus.RESERVED,
+		).forEach { (name, status) -> setStatus(saveRoom(hotel, name), status) }
+
+		val first = getRooms("keyword" to " 스위트 ", "status" to RoomStatus.RESERVED.name, "size" to "2").andExpectSuccess(HttpStatus.OK)
+		val second = getRooms("keyword" to "스위트", "status" to RoomStatus.RESERVED.name, "page" to "1", "size" to "2").andExpectSuccess(HttpStatus.OK)
+
+		assertThat(itemNames(first)).containsExactly("스위트 1", "스위트 3")
+		assertThat(pageInfo(first)).containsExactly(0, 2, 3, 2)
+		assertThat(itemNames(second)).containsExactly("스위트 10")
+	}
+
+	@ParameterizedTest
+	@CsvSource("'50%', '50원'", "'a_b', 'axb'", "'c\\d', 'cd'")
+	fun `상태와 함께 보낸 검색어의 퍼센트, 밑줄, 역슬래시도 글자 그대로 찾는다`(literal: String, decoy: String) {
+		listOf("객실 $literal", "객실 $decoy").forEach { setStatus(saveRoom(hotel, it), RoomStatus.MAINTENANCE) }
+
+		assertThat(itemNames(getRooms("keyword" to literal, "status" to RoomStatus.MAINTENANCE.name).andExpectSuccess(HttpStatus.OK)))
+			.containsExactly("객실 $literal")
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["", " "])
+	fun `상태 파라미터가 빈 값이거나 공백만 있으면 상태로 거르지 않고 전체 목록을 조회한다`(value: String) {
+		listOf("102" to RoomStatus.VACANT, "101" to RoomStatus.RESERVED).forEach { (name, status) -> setStatus(saveRoom(hotel, name), status) }
+
+		assertThat(itemNames(getRooms("status" to value).andExpectSuccess(HttpStatus.OK))).containsExactly("101", "102")
+	}
+
+	@Test
+	fun `상태 파라미터는 앞뒤 공백을 지운 상태 이름으로 받는다`() {
+		listOf("102" to RoomStatus.VACANT, "101" to RoomStatus.RESERVED).forEach { (name, status) -> setStatus(saveRoom(hotel, name), status) }
+
+		assertThat(itemNames(getRooms("status" to " RESERVED ").andExpectSuccess(HttpStatus.OK))).containsExactly("101")
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["vacant", "Vacant", "CLEANING", "0", "VACANT,RESERVED"])
+	fun `상태 파라미터가 네 상태 이름이 아니면 status와 형식 메시지로 400 응답한다`(value: String) {
+		getRooms("status" to value).andExpectError(CommonErrorCode.INVALID_INPUT, "status" to message(TYPE))
+	}
+
 	@Test
 	fun `로그인하지 않으면 객실 API는 401 UNAUTHORIZED로 응답하고 바꾸지 않는다`() {
 		val room = saveRoom(hotel, NAME)
 
 		mockMvc.get(ROOMS).andExpectError(CommonErrorCode.UNAUTHORIZED)
 		mockMvc.get("$ROOMS/${room.id}").andExpectError(CommonErrorCode.UNAUTHORIZED)
+		mockMvc.get("$ROOMS/${room.id}/status-histories").andExpectError(CommonErrorCode.UNAUTHORIZED)
 		mockMvc.post(ROOMS) { withCsrf(); jsonBody(createBody("name" to "102")) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
 		mockMvc.put("$ROOMS/${room.id}") { withCsrf(); jsonBody(updateBody(0, "type" to "디럭스")) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
+		mockMvc.put("$ROOMS/${room.id}/status") { withCsrf(); jsonBody(statusBody(RoomStatus.VACANT, RoomStatus.RESERVED)) }
+			.andExpectError(CommonErrorCode.UNAUTHORIZED)
 		assertThat(roomNames(hotel)).containsExactly(NAME)
 		assertUnchanged(room)
+		assertThat(historyCount()).isZero()
 	}
 
 	@Test
@@ -595,20 +681,274 @@ class RoomHotelAdminControllerTest {
 
 		getRooms(principal = appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
 		getRoom(checkNotNull(room.id), appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
+		getHistories(room.id!!, principal = appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
 		create(createBody("name" to "102"), appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
 		update(room.id!!, updateBody(0, "type" to "디럭스"), appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
+		changeStatus(room.id!!, statusBody(RoomStatus.VACANT, RoomStatus.RESERVED), appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
 		assertThat(roomNames(hotel)).containsExactly(NAME)
 		assertUnchanged(room)
+		assertThat(historyCount()).isZero()
 	}
 
 	@Test
-	fun `CSRF 토큰 없이 등록하거나 수정하면 403 INVALID_CSRF_TOKEN으로 응답하고 바꾸지 않는다`() {
+	fun `CSRF 토큰 없이 등록하거나 수정하거나 상태를 바꾸면 403 INVALID_CSRF_TOKEN으로 응답하고 바꾸지 않는다`() {
 		val room = saveRoom(hotel, NAME)
 
 		mockMvc.post(ROOMS) { with(user(masterPrincipal)); jsonBody(createBody("name" to "102")) }.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
 		mockMvc.put("$ROOMS/${room.id}") { with(user(masterPrincipal)); jsonBody(updateBody(0, "type" to "디럭스")) }
 			.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
+		mockMvc.put("$ROOMS/${room.id}/status") { with(user(masterPrincipal)); jsonBody(statusBody(RoomStatus.VACANT, RoomStatus.RESERVED)) }
+			.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
 		assertThat(roomNames(hotel)).containsExactly(NAME)
+		assertUnchanged(room)
+		assertThat(historyCount()).isZero()
+	}
+
+	@ParameterizedTest
+	@EnumSource(HotelAdminRole::class)
+	fun `마스터와 운영자 모두 허용된 변경으로 상태를 바꾸면 바뀐 상태와 그대로인 version으로 200 응답하고 바꾼 계정의 id와 이름으로 이력을 한 줄 남긴다`(
+		role: HotelAdminRole,
+	) {
+		val room = saveRoom(hotel, NAME)
+
+		val data = changeStatus(room.id!!, statusBody(RoomStatus.VACANT, RoomStatus.RESERVED), principals.getValue(role)).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data).isEqualTo(roomJson(room.id!!, NAME, ROOM_TYPE, CAPACITY, FLOOR, null, CHECK_IN, CHECK_OUT, 0, RoomStatus.RESERVED))
+		assertThat(roomJson(reload(room))).isEqualTo(data)
+		assertThat(histories(room.id!!)).containsExactly(history(RoomStatus.VACANT, RoomStatus.RESERVED, role))
+	}
+
+	@Test
+	fun `허용된 여섯 가지 변경은 모두 200으로 바꾸고 바꿀 때마다 이력을 한 줄씩 남긴다`() {
+		val room = saveRoom(hotel, NAME)
+		val changes = listOf(
+			RoomStatus.VACANT to RoomStatus.RESERVED,
+			RoomStatus.RESERVED to RoomStatus.OCCUPIED,
+			RoomStatus.OCCUPIED to RoomStatus.MAINTENANCE,
+			RoomStatus.MAINTENANCE to RoomStatus.VACANT,
+			RoomStatus.VACANT to RoomStatus.MAINTENANCE,
+			RoomStatus.MAINTENANCE to RoomStatus.VACANT,
+			RoomStatus.VACANT to RoomStatus.RESERVED,
+			RoomStatus.RESERVED to RoomStatus.VACANT,
+		)
+
+		val statuses = changes.map { (from, to) -> changeStatus(room.id!!, statusBody(from, to)).andExpectSuccess(HttpStatus.OK)["status"].stringValue() }
+
+		assertThat(statuses).containsExactlyElementsOf(changes.map { it.second.name })
+		assertThat(histories(room.id!!)).containsExactlyElementsOf(changes.map { (from, to) -> history(from, to, HotelAdminRole.MASTER) })
+		assertThat(reload(room).version).isZero()
+	}
+
+	@Test
+	fun `없는 id와 다른 호텔의 객실 id로 상태를 바꾸면 허용되지 않는 변경이어도 모두 404 ROOM_NOT_FOUND로 응답하고 바꾸지 않는다`() {
+		val otherRoom = saveRoom(otherHotel, NAME)
+
+		listOf(MISSING_ID, checkNotNull(otherRoom.id)).forEach { id ->
+			HotelAdminRole.entries.forEach { role ->
+				changeStatus(id, statusBody(RoomStatus.VACANT, RoomStatus.RESERVED), principals.getValue(role)).andExpectError(RoomErrorCode.ROOM_NOT_FOUND)
+				changeStatus(id, statusBody(RoomStatus.VACANT, RoomStatus.OCCUPIED), principals.getValue(role)).andExpectError(RoomErrorCode.ROOM_NOT_FOUND)
+			}
+		}
+		assertUnchanged(otherRoom)
+		assertThat(histories(otherRoom.id!!)).isEmpty()
+	}
+
+	@ParameterizedTest(name = "{0} -> {1}")
+	@MethodSource("disallowedChanges")
+	fun `허용되지 않는 변경과 같은 상태로의 변경은 409 ROOM_STATUS_TRANSITION_NOT_ALLOWED로 응답하고 바꾸지 않는다`(from: RoomStatus, to: RoomStatus) {
+		val room = saveRoom(hotel, NAME).also { setStatus(it, from) }
+
+		changeStatus(room.id!!, statusBody(from, to)).andExpectError(RoomErrorCode.ROOM_STATUS_TRANSITION_NOT_ALLOWED)
+
+		assertThat(reload(room).status).isEqualTo(from)
+		assertThat(histories(room.id!!)).isEmpty()
+	}
+
+	@Test
+	fun `허용되지 않는 변경이면서 from도 지금 상태와 다르면 ROOM_STATUS_TRANSITION_NOT_ALLOWED가 먼저다`() {
+		val room = saveRoom(hotel, NAME).also { setStatus(it, RoomStatus.RESERVED) }
+
+		changeStatus(room.id!!, statusBody(RoomStatus.VACANT, RoomStatus.OCCUPIED)).andExpectError(RoomErrorCode.ROOM_STATUS_TRANSITION_NOT_ALLOWED)
+		changeStatus(room.id!!, statusBody(RoomStatus.VACANT, RoomStatus.VACANT)).andExpectError(RoomErrorCode.ROOM_STATUS_TRANSITION_NOT_ALLOWED)
+
+		assertThat(reload(room).status).isEqualTo(RoomStatus.RESERVED)
+		assertThat(histories(room.id!!)).isEmpty()
+	}
+
+	@Test
+	fun `허용된 변경이라도 그사이 다른 사용자가 먼저 바꿔 지금 상태가 from과 다르면 409 ROOM_STATUS_CHANGED로 응답하고 바꾸지 않는다`() {
+		val room = saveRoom(hotel, NAME)
+		changeStatus(room.id!!, statusBody(RoomStatus.VACANT, RoomStatus.RESERVED), principals.getValue(HotelAdminRole.OPERATOR))
+			.andExpectSuccess(HttpStatus.OK)
+
+		changeStatus(room.id!!, statusBody(RoomStatus.VACANT, RoomStatus.MAINTENANCE)).andExpectError(RoomErrorCode.ROOM_STATUS_CHANGED)
+
+		assertThat(reload(room).status).isEqualTo(RoomStatus.RESERVED)
+		assertThat(histories(room.id!!)).containsExactly(history(RoomStatus.VACANT, RoomStatus.RESERVED, HotelAdminRole.OPERATOR))
+	}
+
+	@Test
+	fun `같은 객실을 같은 from으로 동시에 다른 상태로 바꾸면 하나만 200으로 반영되고 나머지는 409 ROOM_STATUS_CHANGED로 응답하며 이력은 한 줄이다`() {
+		val room = saveRoom(hotel, NAME)
+		val targets = listOf(RoomStatus.RESERVED, RoomStatus.MAINTENANCE)
+
+		val responses = concurrently { index -> changeStatus(room.id!!, statusBody(RoomStatus.VACANT, targets[index])).andReturn().response }
+
+		assertThat(responses.map { it.status }).containsExactlyInAnyOrder(HttpStatus.OK.value(), HttpStatus.CONFLICT.value())
+		assertError(responses.single { it.status == HttpStatus.CONFLICT.value() }, RoomErrorCode.ROOM_STATUS_CHANGED)
+		val winner = RoomStatus.valueOf(json(responses.single { it.status == HttpStatus.OK.value() })["data"]["status"].stringValue())
+		assertThat(reload(room).status).isEqualTo(winner)
+		assertThat(histories(room.id!!)).containsExactly(history(RoomStatus.VACANT, winner, HotelAdminRole.MASTER))
+	}
+
+	@Test
+	fun `상태를 바꾼 뒤에도 그 전에 조회한 version으로 객실을 수정할 수 있고 수정은 상태를 바꾸지 않는다`() {
+		val room = saveRoom(hotel, NAME)
+		changeStatus(room.id!!, statusBody(RoomStatus.VACANT, RoomStatus.RESERVED)).andExpectSuccess(HttpStatus.OK)
+
+		val data = update(room.id!!, updateBody(0, "type" to "디럭스")).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data).isEqualTo(roomJson(room.id!!, NAME, "디럭스", CAPACITY, FLOOR, null, CHECK_IN, CHECK_OUT, 1, RoomStatus.RESERVED))
+		assertThat(roomJson(reload(room))).isEqualTo(data)
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["from", "to"])
+	fun `상태 변경 요청의 from과 to가 없거나 null이면 필수 입력 메시지로 400 응답하고 바꾸지 않는다`(field: String) {
+		val room = saveRoom(hotel, NAME)
+
+		changeStatus(room.id!!, statusBody(RoomStatus.VACANT, RoomStatus.RESERVED) - field).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(REQUIRED))
+		changeStatus(room.id!!, statusBody(RoomStatus.VACANT, RoomStatus.RESERVED) + (field to null))
+			.andExpectError(CommonErrorCode.INVALID_INPUT, field to message(REQUIRED))
+		assertUnchanged(room)
+		assertThat(histories(room.id!!)).isEmpty()
+	}
+
+	@ParameterizedTest
+	@MethodSource("invalidStatuses")
+	fun `상태 변경 요청의 from과 to가 네 상태 이름이 아니면 형식 메시지로 400 응답하고 바꾸지 않는다`(field: String, value: Any) {
+		val room = saveRoom(hotel, NAME)
+
+		changeStatus(room.id!!, statusBody(RoomStatus.VACANT, RoomStatus.RESERVED) + (field to value))
+			.andExpectError(CommonErrorCode.INVALID_INPUT, field to message(TYPE))
+		assertUnchanged(room)
+		assertThat(histories(room.id!!)).isEmpty()
+	}
+
+	@Test
+	fun `상태 변경 요청의 from과 to는 앞뒤에 공백이 붙은 상태 이름도 공백을 지운 이름으로 받는다`() {
+		val room = saveRoom(hotel, NAME)
+
+		val data = changeStatus(room.id!!, mapOf("from" to " VACANT", "to" to "RESERVED ")).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data["status"].stringValue()).isEqualTo(RoomStatus.RESERVED.name)
+		assertThat(histories(room.id!!)).containsExactly(history(RoomStatus.VACANT, RoomStatus.RESERVED, HotelAdminRole.MASTER))
+	}
+
+	@ParameterizedTest
+	@EnumSource(HotelAdminRole::class)
+	fun `마스터와 운영자 모두 객실의 상태 이력을 최신순으로 바꾼 계정의 id와 그때의 이름, 바꾼 시각과 함께 조회한다`(role: HotelAdminRole) {
+		val roomId = create(createBody()).andExpectSuccess(HttpStatus.CREATED)["id"].longValue()
+		changeStatus(roomId, statusBody(RoomStatus.VACANT, RoomStatus.RESERVED), principals.getValue(role)).andExpectSuccess(HttpStatus.OK)
+		changeStatus(roomId, statusBody(RoomStatus.RESERVED, RoomStatus.OCCUPIED)).andExpectSuccess(HttpStatus.OK)
+		val (registered, reserved, occupied) = savedHistories(roomId)
+
+		val data = getHistories(roomId, principal = principals.getValue(role)).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data["items"].values().toList()).containsExactly(
+			historyJson(occupied, RoomStatus.RESERVED, RoomStatus.OCCUPIED, HotelAdminRole.MASTER),
+			historyJson(reserved, RoomStatus.VACANT, RoomStatus.RESERVED, role),
+			historyJson(registered, null, RoomStatus.VACANT, HotelAdminRole.MASTER),
+		)
+		assertThat(pageInfo(data)).containsExactly(0, 10, 3, 1)
+	}
+
+	@Test
+	fun `상태 이력의 바꾼 시각은 저장된 마이크로초 정밀도 그대로의 UTC ISO 8601 문자열이고 초 아래 자릿수는 없거나 3자리씩이다`() {
+		val room = saveRoom(hotel, NAME)
+		insertHistory(room, null, RoomStatus.VACANT, HotelAdminRole.MASTER, "2026-10-30T15:59:32+09:00")
+		insertHistory(room, RoomStatus.VACANT, RoomStatus.RESERVED, HotelAdminRole.MASTER, "2026-10-30T15:59:32.12+09:00")
+		insertHistory(room, RoomStatus.RESERVED, RoomStatus.OCCUPIED, HotelAdminRole.MASTER, "2026-10-30T15:59:32.123456+09:00")
+
+		val data = getHistories(room.id!!).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data["items"].values().map { it["changedAt"].stringValue() })
+			.containsExactly("2026-10-30T06:59:32.123456Z", "2026-10-30T06:59:32.120Z", "2026-10-30T06:59:32Z")
+	}
+
+	@Test
+	fun `상태 이력은 바꾼 시각이 같으면 id 내림차순이고 page와 size로 나눠 조회하며 다른 객실의 이력은 나오지 않는다`() {
+		val room = saveRoom(hotel, NAME)
+		val ids = listOf("00:00:01", "00:00:02", "00:00:02", "00:00:03", "00:00:04").map { time ->
+			insertHistory(room, RoomStatus.VACANT, RoomStatus.RESERVED, HotelAdminRole.MASTER, "2026-10-30T${time}Z")
+		}
+		insertHistory(saveRoom(hotel, OTHER_NAME), null, RoomStatus.VACANT, HotelAdminRole.MASTER, "2026-10-31T00:00:00Z")
+
+		val first = getHistories(room.id!!, "size" to "2").andExpectSuccess(HttpStatus.OK)
+		val second = getHistories(room.id!!, "page" to "1", "size" to "2").andExpectSuccess(HttpStatus.OK)
+		val last = getHistories(room.id!!, "page" to "2", "size" to "2").andExpectSuccess(HttpStatus.OK)
+
+		assertThat(listOf(first, second, last).map { page -> page["items"].values().map { it["id"].longValue() } })
+			.containsExactly(listOf(ids[4], ids[3]), listOf(ids[2], ids[1]), listOf(ids[0]))
+		assertThat(pageInfo(second)).containsExactly(1, 2, 5, 3)
+	}
+
+	@Test
+	fun `이름을 바꾼 계정의 이전 이력은 바꿀 때의 이름 그대로이고 계정이 비활성화돼도 그대로 보인다`() {
+		val room = saveRoom(hotel, NAME)
+		val operator = principals.getValue(HotelAdminRole.OPERATOR)
+		changeStatus(room.id!!, statusBody(RoomStatus.VACANT, RoomStatus.RESERVED), operator).andExpectSuccess(HttpStatus.OK)
+		updateOperator { it.update(it.loginId, RENAMED_OPERATOR) }
+		changeStatus(room.id!!, statusBody(RoomStatus.RESERVED, RoomStatus.OCCUPIED), operator).andExpectSuccess(HttpStatus.OK)
+		updateOperator { it.changeActive(false) }
+
+		val data = getHistories(room.id!!).andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data["items"].values().map { it["changedBy"] }).containsExactly(
+			changedByJson(HotelAdminRole.OPERATOR, RENAMED_OPERATOR),
+			changedByJson(HotelAdminRole.OPERATOR, ACCOUNT_NAMES.getValue(HotelAdminRole.OPERATOR)),
+		)
+	}
+
+	@Test
+	fun `없는 id와 다른 호텔의 객실 id로 상태 이력을 조회하면 모두 404 ROOM_NOT_FOUND로 응답한다`() {
+		val otherRoom = saveRoom(otherHotel, NAME)
+		insertHistory(otherRoom, null, RoomStatus.VACANT, HotelAdminRole.MASTER, "2026-10-30T00:00:00Z")
+
+		listOf(MISSING_ID, checkNotNull(otherRoom.id)).forEach { id ->
+			HotelAdminRole.entries.forEach { role -> getHistories(id, principal = principals.getValue(role)).andExpectError(RoomErrorCode.ROOM_NOT_FOUND) }
+		}
+	}
+
+	@ParameterizedTest
+	@CsvSource(
+		"page, -1, validation.min, 0",
+		"page, 100, validation.max, 99",
+		"size, 0, validation.min, 1",
+		"size, 101, validation.max, 100",
+	)
+	fun `상태 이력의 범위를 벗어난 page와 size는 파라미터 이름과 범위 메시지로 400 응답한다`(parameter: String, value: String, messageKey: String, bound: String) {
+		val room = saveRoom(hotel, NAME)
+
+		getHistories(room.id!!, parameter to value)
+			.andExpectError(CommonErrorCode.INVALID_INPUT, parameter to message(messageKey).replace("{value}", bound))
+	}
+
+	@ParameterizedTest
+	@CsvSource("page, 99", "size, 1", "size, 100")
+	fun `상태 이력의 page와 size는 범위의 끝 값까지 받는다`(parameter: String, value: String) {
+		val room = saveRoom(hotel, NAME)
+
+		assertThat(getHistories(room.id!!, parameter to value).andExpectSuccess(HttpStatus.OK)[parameter].asString()).isEqualTo(value)
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["status", "version"])
+	fun `상태 변경 요청에 문서에 없는 항목을 보내면 알 수 없는 항목 메시지로 400 응답하고 바꾸지 않는다`(field: String) {
+		val room = saveRoom(hotel, NAME)
+
+		changeStatus(room.id!!, statusBody(RoomStatus.VACANT, RoomStatus.RESERVED) + (field to 0))
+			.andExpectError(CommonErrorCode.INVALID_INPUT, field to message(UNKNOWN_FIELD))
 		assertUnchanged(room)
 	}
 
@@ -617,9 +957,12 @@ class RoomHotelAdminControllerTest {
 		val docs = apiDocs()
 		val rooms = docs["paths"][ROOMS]
 		val room = docs["paths"]["$ROOMS/{roomId}"]
-		val operations = listOf(rooms["post"], rooms["get"], room["get"], room["put"])
+		val status = docs["paths"]["$ROOMS/{roomId}/status"]
+		val histories = docs["paths"]["$ROOMS/{roomId}/status-histories"]
+		val operations = listOf(rooms["post"], rooms["get"], room["get"], room["put"], status["put"], histories["get"])
 
-		assertThat(operations.map { it["operationId"].stringValue() }).containsExactly("createRoom", "getRooms", "getRoom", "updateRoom")
+		assertThat(operations.map { it["operationId"].stringValue() })
+			.containsExactly("createRoom", "getRooms", "getRoom", "updateRoom", "updateRoomStatus", "getRoomStatusHistories")
 		assertThat(operations.map { op -> op["tags"].values().map { it.stringValue() } }).containsOnly(listOf("room"))
 		assertThat(docs["tags"].values().single { it["name"].stringValue() == "room" }["description"].stringValue())
 			.isEqualTo(message("openapi.hotel-admin.tag.room"))
@@ -639,20 +982,80 @@ class RoomHotelAdminControllerTest {
 		assertThat(room["put"]["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "403", "404", "409", "500")
 		assertThat(errorCodes(room["put"], HttpStatus.CONFLICT)).containsExactlyInAnyOrder(RoomErrorCode.ROOM_DUPLICATED.code, RoomErrorCode.ROOM_MODIFIED.code)
 		assertThat(room["put"]["responses"]["200"]["content"][JSON]["schema"]).isEqualTo(schemaRef("ApiResponseRoomHotelAdminResponse"))
+		assertThat(status["put"]["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "403", "404", "409", "500")
+		assertThat(errorCodes(status["put"], HttpStatus.NOT_FOUND)).containsExactly(RoomErrorCode.ROOM_NOT_FOUND.code)
+		assertThat(errorCodes(status["put"], HttpStatus.CONFLICT))
+			.containsExactlyInAnyOrder(RoomErrorCode.ROOM_STATUS_TRANSITION_NOT_ALLOWED.code, RoomErrorCode.ROOM_STATUS_CHANGED.code)
+		assertThat(errorCodes(status["put"], HttpStatus.FORBIDDEN)).contains(CommonErrorCode.INVALID_CSRF_TOKEN.code)
+		assertThat(status["put"]["parameters"].values().map { it["name"].stringValue() }).containsExactly("roomId")
+		assertThat(status["put"]["requestBody"]["content"][JSON]["schema"]).isEqualTo(schemaRef("RoomStatusUpdateHotelAdminRequest"))
+		assertThat(status["put"]["responses"]["200"]["content"][JSON]["schema"]).isEqualTo(schemaRef("ApiResponseRoomHotelAdminResponse"))
+		assertThat(histories["get"]["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "403", "404", "500")
+		assertThat(errorCodes(histories["get"], HttpStatus.NOT_FOUND)).containsExactly(RoomErrorCode.ROOM_NOT_FOUND.code)
 	}
 
 	@Test
-	fun `객실 목록 문서는 검색어, page·size 파라미터와 모든 필드가 필수인 페이지 응답 스키마를 보여준다`() {
+	fun `상태 이력 문서는 page·size 파라미터와 최신순 페이지 응답, nullable 이전 상태와 date-time 형식의 바꾼 시각을 보여준다`() {
+		val docs = apiDocs()
+		val operation = docs["paths"]["$ROOMS/{roomId}/status-histories"]["get"]
+		val parameters = operation["parameters"].values().associateBy { it["name"].stringValue() }
+		val schemas = docs["components"]["schemas"]
+		val history = schemas["RoomStatusHistoryHotelAdminResponse"]
+		val properties = history["properties"]
+
+		assertThat(parameters.keys).containsExactly("roomId", "page", "size")
+		assertThat(listOf("page", "size").map { parameters.getValue(it)["description"].stringValue() })
+			.containsExactlyElementsOf(listOf("page", "size").map { message("openapi.hotel-admin.operation.getRoomStatusHistories.parameter.$it") })
+		assertThat(parameters.getValue("page")["schema"])
+			.isEqualTo(json("""{"type":"integer","format":"int32","default":0,"minimum":0,"maximum":99}"""))
+		assertThat(parameters.getValue("size")["schema"])
+			.isEqualTo(json("""{"type":"integer","format":"int32","default":10,"minimum":1,"maximum":100}"""))
+		assertThat(operation["responses"]["200"]["content"][JSON]["schema"])
+			.isEqualTo(schemaRef("ApiResponsePageResponseRoomStatusHistoryHotelAdminResponse"))
+		assertThat(schemas["PageResponseRoomStatusHistoryHotelAdminResponse"]["properties"]["items"]["items"])
+			.isEqualTo(schemaRef("RoomStatusHistoryHotelAdminResponse"))
+		assertThat(required(history)).containsExactlyInAnyOrder("id", "fromStatus", "toStatus", "changedBy", "changedAt")
+		assertThat(properties.properties().filter { (_, property) -> "null" in types(property) }.map { it.key }).containsExactly("fromStatus")
+		assertThat(types(properties["fromStatus"])).containsExactly("string", "null")
+		assertThat(enumValues(properties["fromStatus"])).containsExactlyElementsOf(STATUS_NAMES)
+		assertThat(types(properties["toStatus"])).containsExactly("string")
+		assertThat(enumValues(properties["toStatus"])).containsExactlyElementsOf(STATUS_NAMES)
+		assertThat(types(properties["changedAt"])).containsExactly("string")
+		assertThat(properties["changedAt"]["format"].stringValue()).isEqualTo("date-time")
+		assertThat(properties["changedAt"]["example"].stringValue()).isEqualTo("2026-10-30T06:59:32.123456Z")
+		assertThat(properties["changedBy"]["\$ref"].stringValue()).isEqualTo("#/components/schemas/RoomStatusHistoryChangedByHotelAdminResponse")
+		assertThat(required(schemas["RoomStatusHistoryChangedByHotelAdminResponse"])).containsExactlyInAnyOrder("id", "name")
+	}
+
+	@Test
+	fun `상태 변경 요청 문서는 from과 to가 네 상태 이름의 필수 enum이고 예시를 보여준다`() {
+		val request = apiDocs()["components"]["schemas"]["RoomStatusUpdateHotelAdminRequest"]
+		val properties = request["properties"]
+
+		assertThat(properties.propertyNames()).containsExactlyInAnyOrder("from", "to")
+		assertThat(required(request)).containsExactlyInAnyOrder("from", "to")
+		listOf("from", "to").forEach { field ->
+			assertThat(types(properties[field])).containsExactly("string")
+			assertThat(enumValues(properties[field])).containsExactlyElementsOf(STATUS_NAMES)
+			assertThat(properties[field]["description"].stringValue()).isEqualTo(message("openapi.schema.RoomStatusUpdateHotelAdminRequest.$field"))
+		}
+		assertThat(listOf(properties["from"]["example"].stringValue(), properties["to"]["example"].stringValue())).containsExactly("VACANT", "RESERVED")
+	}
+
+	@Test
+	fun `객실 목록 문서는 검색어, 상태, page·size 파라미터와 모든 필드가 필수인 페이지 응답 스키마를 보여준다`() {
 		val docs = apiDocs()
 		val getRooms = docs["paths"][ROOMS]["get"]
 		val parameters = getRooms["parameters"].values().associateBy { it["name"].stringValue() }
 		val page = docs["components"]["schemas"]["PageResponseRoomHotelAdminResponse"]
 
-		assertThat(parameters.keys).containsExactly("keyword", "page", "size")
+		assertThat(parameters.keys).containsExactly("keyword", "status", "page", "size")
 		assertThat(parameters.values.map { it["description"].stringValue() })
 			.containsExactlyElementsOf(parameters.keys.map { message("openapi.hotel-admin.operation.getRooms.parameter.$it") })
 		assertThat(parameters.values.map { it["required"].booleanValue() }).containsOnly(false)
 		assertThat(parameters.getValue("keyword")["schema"]).isEqualTo(json("""{"type":"string","maxLength":100,"minLength":0}"""))
+		assertThat(parameters.getValue("status")["schema"])
+			.isEqualTo(json(jsonMapper.writeValueAsString(mapOf("type" to "string", "enum" to STATUS_NAMES))))
 		assertThat(parameters.getValue("page")["schema"])
 			.isEqualTo(json("""{"type":"integer","format":"int32","default":0,"minimum":0,"maximum":99}"""))
 		assertThat(parameters.getValue("size")["schema"])
@@ -674,18 +1077,21 @@ class RoomHotelAdminControllerTest {
 	}
 
 	@Test
-	fun `객실 응답 문서는 모든 필드가 필수이고 층과 소개는 null을 허용하며 시각 형식을 보여준다`() {
+	fun `객실 응답 문서는 모든 필드가 필수이고 층과 소개는 null을 허용하며 시각 형식과 상태 값 목록을 보여준다`() {
 		val response = apiDocs()["components"]["schemas"]["RoomHotelAdminResponse"]
 		val properties = response["properties"]
 
 		assertThat(required(response))
-			.containsExactlyInAnyOrder("id", "name", "type", "capacity", "floor", "description", "checkInTime", "checkOutTime", "version")
+			.containsExactlyInAnyOrder("id", "name", "type", "capacity", "floor", "description", "checkInTime", "checkOutTime", "status", "version")
 		assertThat(properties.properties().filter { (_, property) -> "null" in types(property) }.map { it.key })
 			.containsExactlyInAnyOrder("floor", "description")
 		listOf("checkInTime", "checkOutTime").forEach { field ->
 			assertThat(types(properties[field])).containsExactly("string")
 			assertThat(properties[field]["pattern"].stringValue()).isEqualTo(JacksonConfig.LOCAL_TIME_PATTERN)
 		}
+		assertThat(types(properties["status"])).containsExactly("string")
+		assertThat(enumValues(properties["status"])).containsExactlyElementsOf(STATUS_NAMES)
+		assertThat(properties["status"]["example"].stringValue()).isEqualTo("VACANT")
 	}
 
 	private fun assertRequestRules(request: JsonNode) {
@@ -732,6 +1138,19 @@ class RoomHotelAdminControllerTest {
 			jsonBody(body)
 		}
 
+	private fun getHistories(roomId: Long, vararg params: Pair<String, String>, principal: UserDetails = masterPrincipal): ResultActionsDsl =
+		mockMvc.get("$ROOMS/$roomId/status-histories") {
+			with(user(principal))
+			params.forEach { (name, value) -> param(name, value) }
+		}
+
+	private fun changeStatus(id: Long, body: Map<String, Any?>, principal: UserDetails = masterPrincipal): ResultActionsDsl =
+		mockMvc.put("$ROOMS/$id/status") {
+			with(user(principal))
+			withCsrf()
+			jsonBody(body)
+		}
+
 	private fun MockHttpServletRequestDsl.withCsrf() {
 		cookie(xsrf)
 		header(XSRF_HEADER, xsrf.value)
@@ -756,11 +1175,69 @@ class RoomHotelAdminControllerTest {
 	private fun updateBody(version: Long, vararg overrides: Pair<String, Any?>): Map<String, Any?> =
 		createBody("description" to null) + ("version" to version) + overrides
 
+	private fun statusBody(from: RoomStatus, to: RoomStatus): Map<String, Any?> = linkedMapOf("from" to from.name, "to" to to.name)
+
+	private fun setStatus(room: Room, status: RoomStatus) {
+		jdbcTemplate.update(UPDATE_STATUS, status.name, room.id)
+	}
+
+	private fun histories(roomId: Long): List<HistoryRow> =
+		jdbcTemplate.query(SELECT_HISTORIES, { rs, _ ->
+			HistoryRow(rs.getString("from_status"), rs.getString("to_status"), rs.getLong("changed_by_id"), rs.getString("changed_by_name"))
+		}, roomId)
+
+	private fun history(from: RoomStatus?, to: RoomStatus, role: HotelAdminRole): HistoryRow =
+		HistoryRow(from?.name, to.name, checkNotNull(hotelAdmins.getValue(role).id), ACCOUNT_NAMES.getValue(role))
+
+	private fun historyCount(): Int = checkNotNull(jdbcTemplate.queryForObject(COUNT_HISTORIES, Int::class.java, hotel.id))
+
+	private fun insertHistory(room: Room, from: RoomStatus?, to: RoomStatus, role: HotelAdminRole, changedAt: String): Long =
+		checkNotNull(
+			jdbcTemplate.queryForObject(
+				INSERT_HISTORY,
+				Long::class.java,
+				room.id,
+				from?.name,
+				to.name,
+				hotelAdmins.getValue(role).id,
+				ACCOUNT_NAMES.getValue(role),
+				changedAt,
+				changedAt,
+			),
+		)
+
+	private fun savedHistories(roomId: Long): List<SavedHistory> =
+		jdbcTemplate.query(SELECT_HISTORY_TIMES, { rs, _ ->
+			SavedHistory(rs.getLong("id"), rs.getObject("created_at", OffsetDateTime::class.java).toInstant().toString())
+		}, roomId)
+
+	private fun historyJson(saved: SavedHistory, from: RoomStatus?, to: RoomStatus, role: HotelAdminRole): JsonNode =
+		json(
+			jsonMapper.writeValueAsString(
+				linkedMapOf(
+					"id" to saved.id,
+					"fromStatus" to from?.name,
+					"toStatus" to to.name,
+					"changedBy" to linkedMapOf("id" to hotelAdmins.getValue(role).id, "name" to ACCOUNT_NAMES.getValue(role)),
+					"changedAt" to saved.changedAt,
+				),
+			),
+		)
+
+	private fun changedByJson(role: HotelAdminRole, name: String): JsonNode =
+		json(jsonMapper.writeValueAsString(linkedMapOf("id" to hotelAdmins.getValue(role).id, "name" to name)))
+
+	private fun updateOperator(change: (HotelAdmin) -> Unit) {
+		val operator = hotelAdminRepository.findById(checkNotNull(hotelAdmins.getValue(HotelAdminRole.OPERATOR).id)).orElseThrow()
+		change(operator)
+		hotelAdminRepository.save(operator)
+	}
+
 	private fun saveHotel(name: String): Hotel =
 		hotelRepository.save(Hotel(name, "서울 $suffix", PHONE, null)).also { createdHotelIds += checkNotNull(it.id) }
 
-	private fun saveHotelAdmin(hotel: Hotel, loginId: String, role: HotelAdminRole): HotelAdmin =
-		hotelAdminRepository.save(HotelAdmin(hotel, loginId, PASSWORD_HASH, "계정", role))
+	private fun saveHotelAdmin(hotel: Hotel, loginId: String, role: HotelAdminRole, name: String = "계정"): HotelAdmin =
+		hotelAdminRepository.save(HotelAdmin(hotel, loginId, PASSWORD_HASH, name, role))
 
 	private fun saveRoom(
 		hotel: Hotel,
@@ -823,6 +1300,7 @@ class RoomHotelAdminControllerTest {
 		checkInTime: String,
 		checkOutTime: String,
 		version: Long,
+		status: RoomStatus = RoomStatus.VACANT,
 	): JsonNode =
 		json(
 			jsonMapper.writeValueAsString(
@@ -835,6 +1313,7 @@ class RoomHotelAdminControllerTest {
 					"description" to description,
 					"checkInTime" to checkInTime,
 					"checkOutTime" to checkOutTime,
+					"status" to status.name,
 					"version" to version,
 				),
 			),
@@ -851,6 +1330,7 @@ class RoomHotelAdminControllerTest {
 			room.checkInTime.format(TIME_FORMAT),
 			room.checkOutTime.format(TIME_FORMAT),
 			room.version,
+			room.status,
 		)
 
 	private fun itemNames(data: JsonNode): List<String> = data["items"].values().map { it["name"].stringValue() }
@@ -871,6 +1351,8 @@ class RoomHotelAdminControllerTest {
 	private fun types(property: JsonNode): List<String> =
 		property.path("type").let { type -> if (type.isArray) type.values().map { it.stringValue() } else listOfNotNull(type.stringValue(null)) }
 
+	private fun enumValues(property: JsonNode): List<String?> = property.path("enum").values().map { it.stringValue(null) }
+
 	private fun schemaRef(name: String): JsonNode = json("""{"${'$'}ref":"#/components/schemas/$name"}""")
 
 	private fun json(response: MockHttpServletResponse): JsonNode = json(response.getContentAsString(StandardCharsets.UTF_8))
@@ -880,6 +1362,10 @@ class RoomHotelAdminControllerTest {
 	private fun message(key: String): String = messageSource.getMessage(key, null, Locale.KOREAN)
 
 	private fun maxLength(max: Int): String = message(MAX_LENGTH).replace("{max}", max.toString())
+
+	private data class HistoryRow(val from: String?, val to: String, val changedById: Long, val changedByName: String)
+
+	private data class SavedHistory(val id: Long, val changedAt: String)
 
 	companion object {
 		private const val ROOMS = ApiPaths.HOTEL_ADMIN + "/rooms"
@@ -908,8 +1394,21 @@ class RoomHotelAdminControllerTest {
 		private const val MISSING_ID = Long.MAX_VALUE
 		private const val CONCURRENT_REQUESTS = 2
 		private const val TIMEOUT_SECONDS = 10L
+		private val ACCOUNT_NAMES = mapOf(HotelAdminRole.MASTER to "마스터 홍길동", HotelAdminRole.OPERATOR to "운영자 김철수")
+		private val STATUS_NAMES = RoomStatus.entries.map { it.name }
+		private const val DELETE_HISTORIES = "delete from room_status_history where room_id in (select id from room where hotel_id = ?)"
 		private const val DELETE_ROOMS = "delete from room where hotel_id = ?"
 		private const val DELETE_HOTEL_ADMINS = "delete from hotel_admin where hotel_id = ?"
+		private const val UPDATE_STATUS = "update room set status = ? where id = ?"
+		private const val SELECT_HISTORIES = "select from_status, to_status, changed_by_id, changed_by_name from room_status_history where room_id = ? order by id"
+		private const val COUNT_HISTORIES = "select count(*) from room_status_history h join room r on r.id = h.room_id where r.hotel_id = ?"
+		private const val SELECT_HISTORY_TIMES = "select id, created_at from room_status_history where room_id = ? order by id"
+		private const val INSERT_HISTORY = """
+			insert into room_status_history (room_id, from_status, to_status, changed_by_id, changed_by_name, created_at, updated_at)
+			values (?, ?, ?, ?, ?, cast(? as timestamptz), cast(? as timestamptz))
+			returning id
+		"""
+		private const val RENAMED_OPERATOR = "운영자 이영희"
 		private const val SELECT_HOTEL_ID = "select hotel_id from room where id = ?"
 		private const val SELECT_ROOM_NAMES = "select name from room where hotel_id = ? order by id"
 		private const val SELECT_ROOM_IDS = "select id from room where hotel_id = ? order by id"
@@ -930,6 +1429,17 @@ class RoomHotelAdminControllerTest {
 			Arguments.of("floor", true),
 			Arguments.of("description", 1),
 		)
+
+		@JvmStatic
+		fun disallowedChanges(): List<Arguments> =
+			RoomStatus.entries.flatMap { from -> RoomStatus.entries.filterNot(from::canChangeTo).map { to -> Arguments.of(from, to) } }
+
+		@JvmStatic
+		fun invalidStatuses(): List<Arguments> =
+			listOf("from", "to").flatMap { field ->
+				listOf<Any>("vacant", "Vacant", "CLEANING", "VA CANT", "", " ", "0", 0, 1, true, listOf("VACANT"), mapOf("name" to "VACANT"))
+					.map { Arguments.of(field, it) }
+			}
 
 		@JvmStatic
 		fun updateTypeMismatches(): List<Arguments> = listOf(

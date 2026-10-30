@@ -1,11 +1,15 @@
 package com.marco.assignment.handys.urbanstay.room.service
 
 import com.marco.assignment.handys.urbanstay.TestcontainersConfiguration
+import com.marco.assignment.handys.urbanstay.account.entity.HotelAdmin
+import com.marco.assignment.handys.urbanstay.account.entity.HotelAdminRole
+import com.marco.assignment.handys.urbanstay.account.repository.HotelAdminRepository
 import com.marco.assignment.handys.urbanstay.common.exception.BusinessException
 import com.marco.assignment.handys.urbanstay.common.exception.ErrorCode
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRepository
 import com.marco.assignment.handys.urbanstay.room.entity.Room
+import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
@@ -35,6 +39,9 @@ class RoomServiceTest {
 	private lateinit var hotelRepository: HotelRepository
 
 	@Autowired
+	private lateinit var hotelAdminRepository: HotelAdminRepository
+
+	@Autowired
 	private lateinit var transactionManager: PlatformTransactionManager
 
 	@Autowired
@@ -48,15 +55,22 @@ class RoomServiceTest {
 
 	private lateinit var hotel: Hotel
 
+	private lateinit var hotelAdmin: HotelAdmin
+
 	@BeforeEach
 	fun createHotel() {
 		hotel = hotelRepository.save(Hotel("어반스테이 $suffix", "서울 $suffix", PHONE, null)).also { createdHotelIds += checkNotNull(it.id) }
+		hotelAdmin = hotelAdminRepository.save(HotelAdmin(hotel, "master-$suffix@test.local", "password-hash", "마스터", HotelAdminRole.MASTER))
 	}
 
 	@AfterEach
 	fun deleteHotel() {
 		executor.shutdownNow()
-		createdHotelIds.forEach { jdbcTemplate.update(DELETE_ROOMS, it) }
+		createdHotelIds.forEach {
+			jdbcTemplate.update(DELETE_HISTORIES, it)
+			jdbcTemplate.update(DELETE_ROOMS, it)
+			jdbcTemplate.update(DELETE_HOTEL_ADMINS, it)
+		}
 		hotelRepository.deleteAllByIdInBatch(createdHotelIds)
 	}
 
@@ -70,6 +84,7 @@ class RoomServiceTest {
 
 		assertErrorCode(second, RoomErrorCode.ROOM_DUPLICATED)
 		assertThat(rooms()).containsExactly(NAME to FIRST_TYPE)
+		assertThat(histories()).containsExactly(null to RoomStatus.VACANT.name)
 	}
 
 	@Test
@@ -102,6 +117,41 @@ class RoomServiceTest {
 		assertThat(jdbcTemplate.queryForObject(SELECT_VERSION, Long::class.java, otherId)).isZero()
 	}
 
+	@Test
+	fun `먼저 온 상태 변경이 커밋되기 전이라 전이 확인을 통과한 같은 from의 변경도 조건부 UPDATE가 0행이라 ROOM_STATUS_CHANGED로 거절된다`() {
+		val roomId = checkNotNull(create(NAME, FIRST_TYPE).id)
+
+		val second = runSecondWhileFirstUncommitted(
+			first = { changeStatus(roomId, RoomStatus.VACANT, RoomStatus.RESERVED) },
+			second = { changeStatus(roomId, RoomStatus.VACANT, RoomStatus.MAINTENANCE) },
+			lockedTable = "room",
+		)
+
+		assertErrorCode(second, RoomErrorCode.ROOM_STATUS_CHANGED)
+		assertThat(jdbcTemplate.queryForMap(SELECT_STATUS_VERSION, roomId))
+			.containsExactlyInAnyOrderEntriesOf(mapOf("status" to RoomStatus.RESERVED.name, "version" to 0L))
+		assertThat(histories()).containsExactly(null to RoomStatus.VACANT.name, RoomStatus.VACANT.name to RoomStatus.RESERVED.name)
+	}
+
+	@Test
+	fun `객실 수정이 객실을 읽은 뒤 상태 변경이 커밋돼도 수정의 저장은 version 확인을 통과하고 상태를 옛 값으로 덮어쓰지 않는다`() {
+		val roomId = checkNotNull(create(NAME, FIRST_TYPE).id)
+
+		val updated = TransactionTemplate(transactionManager).execute {
+			val read = roomService.getRoom(checkNotNull(hotel.id), roomId)
+			executor.submit(Callable { changeStatus(roomId, RoomStatus.VACANT, RoomStatus.RESERVED) }).get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+			update(roomId, NAME, FIRST_UPDATE_TYPE).also { assertThat(it).isSameAs(read) }
+		}
+
+		assertThat(checkNotNull(updated).version).isEqualTo(1)
+		assertThat(jdbcTemplate.queryForMap(SELECT_STATUS_VERSION, roomId))
+			.containsExactlyInAnyOrderEntriesOf(mapOf("status" to RoomStatus.RESERVED.name, "version" to 1L))
+		assertThat(rooms()).containsExactly(NAME to FIRST_UPDATE_TYPE)
+	}
+
+	private fun changeStatus(roomId: Long, from: RoomStatus, to: RoomStatus): Room =
+		roomService.changeStatus(checkNotNull(hotel.id), roomId, checkNotNull(hotelAdmin.id), from, to)
+
 	private fun update(roomId: Long, name: String, type: String): Room =
 		roomService.update(
 			hotelId = checkNotNull(hotel.id),
@@ -119,6 +169,7 @@ class RoomServiceTest {
 	private fun create(name: String, type: String): Room =
 		roomService.create(
 			hotelId = checkNotNull(hotel.id),
+			hotelAdminId = checkNotNull(hotelAdmin.id),
 			name = name,
 			type = type,
 			capacity = 2,
@@ -162,6 +213,9 @@ class RoomServiceTest {
 	private fun rooms(): List<Pair<String, String>> =
 		jdbcTemplate.query(SELECT_ROOMS, { rs, _ -> rs.getString("name") to rs.getString("type") }, hotel.id)
 
+	private fun histories(): List<Pair<String?, String>> =
+		jdbcTemplate.query(SELECT_HISTORIES, { rs, _ -> rs.getString("from_status") to rs.getString("to_status") }, hotel.id)
+
 	companion object {
 		private const val PHONE = "02-1234-5678"
 		private const val NAME = "101"
@@ -174,9 +228,16 @@ class RoomServiceTest {
 		private val CHECK_OUT: LocalTime = LocalTime.of(11, 0)
 		private const val TIMEOUT_SECONDS = 10L
 		private const val POLL_INTERVAL_MILLIS = 20L
+		private const val DELETE_HISTORIES = "delete from room_status_history where room_id in (select id from room where hotel_id = ?)"
 		private const val DELETE_ROOMS = "delete from room where hotel_id = ?"
+		private const val DELETE_HOTEL_ADMINS = "delete from hotel_admin where hotel_id = ?"
 		private const val SELECT_ROOMS = "select name, type from room where hotel_id = ? order by id"
 		private const val SELECT_VERSION = "select version from room where id = ?"
+		private const val SELECT_STATUS_VERSION = "select status, version from room where id = ?"
+		private const val SELECT_HISTORIES = """
+			select h.from_status, h.to_status from room_status_history h join room r on r.id = h.room_id
+			where r.hotel_id = ? order by h.id
+		"""
 		private const val LOCK_WAITS = """
 			select count(*) from pg_stat_activity
 			where datname = current_database() and wait_event_type = 'Lock' and query ilike ?
