@@ -21,7 +21,7 @@
 - QueryClient와 라우터는 `src/app/router/router.ts`에서 함께 만든다. 라우터 context에 QueryClient를 넣고, QueryClient의 오류 처리기에 라우터를 넘기기 위해서다. `QueryProvider`도 여기서 만든 QueryClient를 쓴다.
 - 라우터의 URL search 직렬화는 `src/shared/lib/search-params`의 `parseSearch`·`stringifySearch`를 쓴다(일반 쿼리 문자열). 테스트용 memory 라우터도 같은 함수를 넣는다. 규칙은 `frontend/docs/admin-app.md`의 '구조'를 따른다.
 - 경로 파라미터(`$hotelId`)는 라우트의 `params.parse`·`params.stringify`로 읽고 쓴다. 두 함수는 `entities/hotel`에 두고, 상세·수정 라우트를 감싸는 `hotels/$hotelId/route.tsx`가 한 번 연결한다. 상세(`index.tsx`)와 수정(`edit.tsx`) 화면은 이 라우트의 `useParams`로 검사한 id를 읽는다. 규칙은 `frontend/docs/admin-app.md`의 '상세 화면'을 따른다.
-- 여러 화면이 함께 쓰는 코드는 `frontend/docs/admin-app.md`의 '구조'에 따라 역할별로 둔다. 도메인과 무관한 폼 도우미는 `shared/lib/form`, 호텔 id 검사, 호텔 하나 조회(`useHotel`: 상태 값 `loading`·`failed`·`notFound`·`ready` 하나를 돌려준다), 상태별 화면(`HotelLoading`·`HotelLoadFailed`·`HotelNotFound`)과 상세 내용 목록(`HotelInformation`), 호텔 항목 이름(`HOTEL_FIELD_LABELS`: 입력 칸·상세·목록 표가 함께 쓴다)은 `entities/hotel`, 등록·수정이 함께 쓰는 호텔 정보 입력 칸은 `features/hotel-info-form`에 둔다. 여러 화면이 함께 쓰는 문구(`COMMON_MESSAGES`)는 `shared/config`, 화면 이동 링크(`ButtonLink`·`TextLink`)는 `shared/ui`에 둔다.
+- 여러 화면이 함께 쓰는 코드는 `frontend/docs/admin-app.md`의 '구조'에 따라 역할별로 둔다. 도메인과 무관한 폼 도우미는 `shared/lib/form`, 호텔 id 검사, 호텔 하나 조회(`useHotel`: 상태 값 `loading`·`failed`·`notFound`·`ready` 하나를 돌려준다), 상태별 화면(`HotelLoading`·`HotelLoadFailed`·`HotelNotFound`)과 상세 내용 목록(`HotelInformation`), 호텔 항목 이름(`HOTEL_FIELD_LABELS`: 입력 칸·상세·목록 표가 함께 쓴다), 등록·수정이 함께 쓰는 호텔 정보 입력 칸(`HotelInfoFields`: 칸마다 입력창 props를 받는 표현 컴포넌트)과 그 폼 스키마 조각(`createHotelInfoFormShape`)은 `entities/hotel`에 둔다. 여러 화면이 함께 쓰는 문구(`COMMON_MESSAGES`)는 `shared/config`, 화면 이동 링크(`ButtonLink`·`TextLink`)는 `shared/ui`에 둔다.
 - 서버 상태는 `frontend/CLAUDE.md`의 '서버 상태'를 따른다.
   - `shared/api`: 검증을 거친 요청 함수(`fetchMe`, `fetchHotels`, `fetchHotel`, 로그인·로그아웃, 등록·수정)와 쿼리 키 함수(`meQueryKey`, `hotelListQueryKey`, `hotelQueryKey`)
   - `entities/account/api`: 내 정보 조회(`useMe`, `ensureMe`)와 로그인 상태 캐시 규칙(`startSession`, `endSession`, `forgetMe`, `isPendingMeQuery`)
@@ -61,19 +61,18 @@ apps/app-admin/
    │  │  │        └─ edit.tsx    # /hotels/$hotelId/edit (호텔 수정)
    │  │  └─ login.tsx            # /login (?redirect=)
    │  └─ styles/
-   ├─ pages/           # error(화면 오류), hotel-create(호텔 등록: 마스터 계정 폼, 폼 스키마), hotel-detail(호텔 상세: 경로 파라미터를 읽고 widgets/hotel-detail을 배치), hotel-edit(호텔 수정: 한 번만 채우는 폼, 수정 충돌 시 최신 내용 불러오기), hotel-list(호텔 목록: 검색·페이지·URL search 스키마, 호텔 등록 버튼), login(로그인 화면 틀. redirect를 읽어 features/auth-login의 LoginForm 배치)
+   ├─ pages/           # error(화면 오류), hotel-create(호텔 등록: features/hotel-create의 HotelCreateForm 배치), hotel-detail(호텔 상세: 경로 파라미터를 읽고 widgets/hotel-detail을 배치), hotel-edit(호텔 수정: 한 번만 채우는 폼, 수정 충돌 시 최신 내용 불러오기), hotel-list(호텔 목록: 검색·페이지·URL search 스키마, 호텔 등록 버튼), login(로그인 화면 틀. redirect를 읽어 features/auth-login의 LoginForm 배치)
    ├─ widgets/
    │  ├─ admin-layout/ # 사이드바 메뉴(config/menu.ts), 위쪽 영역. model: useAdminHeader(화면 제목·계정 이름·로그아웃 상태). ui: AdminHeader(연결)·AdminHeaderBar(표현)
    │  └─ hotel-detail/ # 호텔 상세. HotelDetail(연결)이 useHotel의 상태 값으로 찾을 수 없음 또는 링크 줄 + 불러오는 중·실패·내용을 고른다
    ├─ features/
-   │  ├─ hotel-info-form/ # 호텔 정보 입력 칸(이름·주소·대표 전화번호·소개)과 폼 스키마 조각. 등록·수정이 쓴다
-   │  ├─ hotel-create/    # api: 호텔 등록 변경 훅. 성공하면 entities/hotel의 캐시 규칙을 부른다
+   │  ├─ hotel-create/    # 호텔 등록 폼. api: 등록 변경 훅(성공하면 entities/hotel의 캐시 규칙). model: 폼 스키마(마스터 계정 포함), useHotelCreateForm(react-hook-form, 성공하면 상세로 이동). ui: HotelCreateForm(연결)·HotelCreateFormView·MasterAccountFields(표현)
    │  ├─ hotel-update/    # api: 호텔 수정 변경 훅. 성공하면 entities/hotel의 캐시 규칙을 부른다
    │  ├─ auth-login/      # 로그인 폼. api: 로그인(성공하면 로그인 상태 시작). model: 폼 스키마, useLoginForm(react-hook-form, 성공하면 redirect로 이동). ui: LoginForm(연결)·LoginFormView(표현)
    │  └─ auth-logout/     # api: 로그아웃. 성공하거나 401이면 로그인 상태를 끝낸다
    ├─ entities/
    │  ├─ account/      # api: 내 정보 조회, 로그인 상태 캐시 규칙(시작·끝·내 정보 지우기)
-   │  └─ hotel/        # api: 호텔 상세·목록 조회 훅, 캐시 규칙. lib: 목록 페이지 계산. config: 호텔 항목 이름(HOTEL_FIELD_LABELS). 호텔 id 경로 파라미터 검사, 호텔 하나 조회(상태 값 하나, 404는 notFound), 상태별 화면·상세 내용 목록(HotelInformation)
+   │  └─ hotel/        # api: 호텔 상세·목록 조회 훅, 캐시 규칙. lib: 목록 페이지 계산. config: 호텔 항목 이름(HOTEL_FIELD_LABELS). 호텔 id 경로 파라미터 검사, 호텔 하나 조회(상태 값 하나, 404는 notFound), 상태별 화면·상세 내용 목록(HotelInformation), 등록·수정이 함께 쓰는 호텔 정보 입력 칸(HotelInfoFields)과 폼 스키마 조각
    └─ shared/
       ├─ api/          # 검증된 API만 index.ts로 내보낸다. TanStack Query를 쓰지 않는다
       │  ├─ account.ts          # 내 정보 조회와 쿼리 키, 로그인, 로그아웃, 로그인 요청 스키마

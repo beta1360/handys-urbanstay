@@ -1,0 +1,51 @@
+import type { FormEvent } from "react";
+import { Button } from "@repo/ui/button";
+import { HotelInfoFields } from "@/entities/hotel";
+import { COMMON_MESSAGES } from "@/shared/config";
+import type { FormFieldProps } from "@/shared/lib/form";
+import { ButtonLink } from "@/shared/ui";
+import { HOTEL_CREATE_FORM_MESSAGES } from "../config/messages";
+import type { HotelCreateField } from "../model/hotel-create-form-schema";
+import { MasterAccountFields } from "./master-account-fields";
+
+type HotelCreateFormViewProps = {
+  fields: Record<HotelCreateField, FormFieldProps>;
+  alert: string | undefined;
+  isSubmitting: boolean;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+};
+
+export function HotelCreateFormView({
+  fields,
+  alert,
+  isSubmitting,
+  onSubmit,
+}: HotelCreateFormViewProps) {
+  return (
+    <form
+      noValidate
+      onSubmit={onSubmit}
+      className="flex max-w-2xl flex-col gap-4"
+    >
+      <HotelInfoFields fields={fields} />
+      <MasterAccountFields fields={fields} />
+      {alert ? (
+        <p role="alert" className="text-sm text-red-600">
+          {alert}
+        </p>
+      ) : null}
+      <div className="flex gap-2">
+        <Button type="submit" variant="primary" loading={isSubmitting}>
+          {HOTEL_CREATE_FORM_MESSAGES.submit}
+        </Button>
+        <ButtonLink
+          to="/hotels"
+          activeOptions={{ exact: true }}
+          variant="secondary"
+        >
+          {COMMON_MESSAGES.cancel}
+        </ButtonLink>
+      </div>
+    </form>
+  );
+}

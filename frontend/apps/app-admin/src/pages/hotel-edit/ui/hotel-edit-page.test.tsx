@@ -17,16 +17,14 @@ import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   HOTEL_FIELD_LABELS,
+  HOTEL_INFO_FIELDS,
+  HOTEL_INFO_MESSAGES,
   HOTEL_LOAD_MESSAGES,
   HOTEL_NOT_FOUND_MESSAGES,
   parseHotelPathParams,
   stringifyHotelPathParams,
 } from "@/entities/hotel";
-import {
-  HOTEL_INFO_FIELDS,
-  HOTEL_INFO_MESSAGES,
-} from "@/features/hotel-info-form";
-import type { HotelInfoField } from "@/features/hotel-info-form";
+import type { HotelInfoField } from "@/entities/hotel";
 import {
   API_ERROR_CODES,
   hotelListQueryKey,
