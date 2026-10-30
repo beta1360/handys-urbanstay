@@ -92,7 +92,7 @@ FSD 레이어(app~shared)가 코드를 '어디에 두는가'를 정한다면, 3�
 
 - 폼은 react-hook-form과 zod resolver로 만든다.
 - 폼 스키마(생성된 요청 스키마에 화면 문구를 덧붙인 것)와 제출 흐름(변경 훅 호출, 서버 오류 표시, 성공 뒤 동작)은 그 동작의 `features/<동작>/model`에, 폼 화면은 `features/<동작>/ui`에 둔다.
-- 여러 동작이 함께 쓰는 입력 묶음(예: 등록·수정의 호텔 정보 입력 칸)은 그 묶음의 features slice에 둔다.
+- 여러 동작이 함께 쓰는 입력 묶음(예: 등록·수정의 호텔 정보 입력 칸)은 그 도메인의 entities slice에 둔다. 같은 레이어의 slice끼리는 import하지 않으므로 features에 두면 다른 동작이 가져다 쓸 수 없다. 입력 칸은 칸마다 입력창 props를 받아 펼치는 표현 컴포넌트로, 스키마 조각은 그 도메인의 입력 규칙으로 둔다.
 - 도메인과 무관한 폼 도우미(예: 서버 오류를 입력창 오류와 폼 알림으로 나누기)는 `shared/lib/form`에 둔다.
 - 폼 알림(입력창과 묶이지 않는 서버 오류)은 react-hook-form의 `errors.root.server`에 둔다. 다시 제출하거나 `reset`하면 함께 지워진다.
 - 제출 중 상태는 `formState.isSubmitting || formState.isSubmitSuccessful`로 정한다. 요청이 끝날 때까지와, 성공한 뒤 화면을 떠날 때까지 로딩이다.
