@@ -51,6 +51,9 @@ urbanstay/
   - 타입이 틀린 값(예: 문자열 자리에 배열·객체), 쿼리·경로 파라미터 타입 불일치: `validation.type`
   - 정수(`Int`·`Long`, nullable·목록 원소·중첩 객체 포함)의 타입 범위를 넘는 값도 `validation.type`이고 필드는 그 경로(예: `capacity`, `ids[1]`)다. Jackson은 이 오류를 `MismatchedInputException`이 아닌 `InputCoercionException`(경로는 담겨 있다)으로 던지므로 `GlobalExceptionHandler`가 함께 처리한다. 쿼리·경로 파라미터의 범위 초과도 `validation.type`이다.
   - enum은 상수 이름 문자열만 받는다(대소문자 구분). 숫자(예: `0`)와 없는 이름은 `validation.type`이다(`spring.jackson.datatype.enum.fail-on-numbers-for-enums=true`).
+    - 빈 문자열과 공백만 있는 값도 `validation.type`이다. 앞뒤에 공백이 붙은 이름(예: `" VACANT"`)은 Jackson이 공백을 지운 이름으로 받는다(`RoomHotelAdminControllerTest`).
+    - 요청 파라미터의 enum(예: 객실 목록의 `status`)은 Spring 변환기가 앞뒤 공백을 지워 받고, 비었거나 공백만 있으면 null(선택 파라미터면 거르지 않음)이며, 없는 이름은 `validation.type`이고 필드는 파라미터 이름이다.
+    - 문서 스키마에는 값 목록(`enum`)이 나온다. nullable enum 응답 필드는 `type: [string, null]`이고 `enum`에는 null이 없다(예: 객실 상태 이력의 `fromStatus`).
   - `LocalDate`, `LocalDateTime`, `OffsetDateTime`은 ISO 8601 문자열(예: `2026-10-29`, `2026-10-29T10:00:00`, `2026-10-29T10:00:00+09:00`)만 받는다. 숫자(타임스탬프), 배열, 숫자 문자열, 다른 형식은 `validation.type`이다(`JacksonConfig`의 `isoDateTimeModule`, `@JsonFormat` 패턴으로 바꿀 수 없다). `OffsetDateTime`은 UTC로 바꿔 읽는다. 다른 날짜·시간 타입(예: `Instant`)을 요청에 쓰려면 먼저 `isoDateTimeModule`에 등록한다.
   - `LocalTime`은 시와 분이 두 자리씩인 `HH:mm` 문자열(`00:00`~`23:59`, 예: `15:00`, `09:30`)만 받는다. 초가 붙은 값(`15:00:00`), 한 자리 시(`9:30`), `24:00`, 앞뒤 공백이 붙은 값, 숫자, 배열은 `validation.type`이다(`isoDateTimeModule`에 등록한 `ResolverStyle.STRICT`의 `HH:mm` 포매터). 응답도 같은 포매터의 `LocalTimeSerializer`(`isoDateTimeModule`에 등록)로 `HH:mm` 문자열이다. Jackson 기본 직렬화는 `15:00:00`이다.
     - 요청·응답의 `LocalTime` 필드에는 `@Schema(pattern = JacksonConfig.LOCAL_TIME_PATTERN, example = "15:00")`를 붙인다. springdoc 기본 스키마(`type: string`, `format: time-local`)에 pattern이 더해져 orval zod가 서버와 같은 규칙으로 검사한다.
@@ -61,6 +64,7 @@ urbanstay/
   - 중첩 요청 객체 필드에는 `@Valid`를 붙여 안쪽 필드까지 검증한다(예: 호텔 등록의 `master`, 오류 필드는 `master.loginId`).
   - 필드를 알 수 없는 오류(JSON 문법 오류, 빈 본문, 본문 전체의 타입 불일치, 지원하지 않는 미디어 타입)는 빈 `fieldErrors`다.
   - Jackson은 첫 오류에서 멈추므로 본문을 읽는 오류는 `fieldErrors`가 하나다. Bean Validation 오류는 틀린 필드를 모두 담는다.
+- 응답의 시각(`Instant`)은 Jackson 기본 직렬화인 UTC ISO 8601 문자열이다(예: `2026-10-30T06:59:32.123456Z`). 초 아래 자릿수는 값에 따라 없거나 3자리씩 늘고(`...32Z`, `...32.120Z`, `...32.123456Z`), DB(`timestamptz`)에서 읽은 값은 마이크로초까지다. 문서 스키마는 `type: string`, `format: date-time`이고 필드에 예시를 적는다. 실제 응답 형식은 API 테스트로 고정한다(객실 상태 이력의 `changedAt`).
 - 앞뒤 공백을 지운 값으로 검사할 문자열 필드에는 `@JsonDeserialize(using = TrimmedStringDeserializer::class)`(`common/request`)를 붙인다. 본문을 읽을 때 Kotlin `trim()`으로 지우므로 `@NotBlank`·길이·형식 제약이 지운 값에 걸린다. 타입·null 처리는 기본 문자열과 같다. 저장할 값의 정규화는 엔티티가 따로 한다(예: `Hotel.normalize`).
 - 문자열 요청 파라미터(예: 검색어)는 컨트롤러의 `@InitBinder`에서 `TrimmedStringEditor`(`common/request`)를 등록해 앞뒤 공백을 지우고, 비면 null로 받는다. `@Size` 같은 제약은 지운 값에 걸린다.
 - 필수 문자열(`@NotBlank`)은 문서에 `minLength: 1`로 나온다. `@Size`는 문서의 minLength를 `min`(기본 0)으로 덮으므로 필수 문자열의 최대 길이는 `@Size` 대신 Hibernate Validator의 `@Length(max = ..., message = "{validation.max-length}")`로 검사하고 문서 길이는 `@Schema(maxLength = ...)`로 적는다. 선택 문자열은 `@Size(max)`를 그대로 쓴다.
@@ -77,6 +81,7 @@ urbanstay/
   - 정렬 순서는 operation 설명에 적고, 숫자·영문 대소문자·한글이 섞인 이름으로 저장소 테스트와 API 테스트에서 확인한다.
   - 이름이 유일한 범위의 목록에도 id를 둘째 기준으로 둔다(예: 객실 목록은 이름 오름차순, 같으면 id 오름차순).
 - 부분 일치 검색은 Spring Data 파생 쿼리(예: `findByNameContainingIgnoreCase`)로 한다. 파생 쿼리는 `\`, `%`, `_`를 이스케이프하고 `escape '\'`를 붙여 입력을 글자 그대로 찾는다. `@Query`로 LIKE를 직접 쓰면 이스케이프되지 않는다.
+- 한 필드 검색과 선택 필터를 AND로만 묶는 목록은 조합마다 파생 쿼리를 두고 서비스가 고른다. 예: 객실 목록의 `findByHotelId`, `findByHotelIdAndStatus`, `findByHotelIdAndNameContainingIgnoreCase`, `findByHotelIdAndStatusAndNameContainingIgnoreCase`. 이스케이프와 서비스가 정한 정렬이 그대로 적용된다. 필터가 더 늘어 조합이 감당하기 어려워지면 `Specification`으로 옮긴다.
 - 여러 필드 중 하나에 들어 있으면 찾는 검색(OR)과 선택 필터가 함께 있어 파생 쿼리로 쓰기 어려우면 `Specification`(`JpaSpecificationExecutor`)으로 한다. 예: `account/repository/HotelAdminSpecifications.search`(이름 또는 아이디 검색 + 활성 여부 필터)
   - 이스케이프는 파생 쿼리와 같게 직접 한다. 검색어를 `EscapeCharacter.DEFAULT.escape`로 바꿔 `%검색어%`를 만들고, `like(..., EscapeCharacter.DEFAULT.escapeCharacter)`로 `escape '\'`를 붙인다.
   - 대소문자 구분 없는 비교는 파생 쿼리처럼 컬럼과 검색어 양쪽에 DB의 `upper`를 건다. 검색어만 Kotlin에서 대소문자를 바꾸면 DB의 `upper`와 결과가 달라지는 글자(예: `ß`)가 있을 수 있다.
@@ -180,8 +185,8 @@ urbanstay/
 
 ## 객실
 
-- 객실은 `room` 도메인의 `room` 테이블(`Room`, `V6__create_room.sql`)에 저장한다. 한 호텔에 속하고(`hotel_id`, `Hotel`과 JPA 연관관계) 이름, 객실 유형, 최대 인원, 층(선택), 소개(선택), 체크인·체크아웃 시각, 낙관적 잠금 버전(`version`)을 가진다.
-  - 객실 상태와 삭제는 아직 없다. 테이블에 상태 컬럼도 두지 않는다.
+- 객실은 `room` 도메인의 `room` 테이블(`Room`, `V6__create_room.sql`)에 저장한다. 한 호텔에 속하고(`hotel_id`, `Hotel`과 JPA 연관관계) 이름, 객실 유형, 최대 인원, 층(선택), 소개(선택), 체크인·체크아웃 시각, 상태(`status`, 객실 상태 절), 낙관적 잠금 버전(`version`)을 가진다.
+  - 객실 삭제는 아직 없다.
 - 값의 규칙
   - 이름(호수)과 객실 유형은 앞뒤 공백을 지운 뒤 1~50자, 소개는 1000자 이하이고 비거나 공백만 있으면 null이다. 엔티티(`Room.normalize`)가 지워 저장한다.
   - 최대 인원은 1~20, 층은 -10~200(지하는 음수, null 가능) 정수다. 요청은 `@Min`·`@Max`(`validation.min`·`validation.max`)로 검사하고 상수는 `Room.MIN_CAPACITY` 등이다.
@@ -191,14 +196,38 @@ urbanstay/
 - 이름은 같은 호텔 안에서만 유일하다(`room_hotel_id_name_key unique (hotel_id, name)`, 앞뒤 공백을 지운 값을 대소문자 구분해 비교). 다른 호텔과는 같아도 된다.
   - 사전 확인(수정은 자기 자신을 빼고 `existsByHotelIdAndNameAndIdNot`)과 함께 이 제약 위반도 `RoomErrorCode.ROOM_DUPLICATED`(409)로 바꾼다.
   - 이 제약의 인덱스가 호텔별 목록의 `hotel_id` 조건에도 쓰여 따로 인덱스를 두지 않는다.
-- 객실 관리(`ApiPaths.HOTEL_ADMIN + "/rooms"`의 등록·목록·조회·수정, `RoomHotelAdminController`)는 `RoomService`가 한다. 호텔 계정 모두(`Role.HOTEL_ADMIN`, 마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 보안 규칙은 따로 두지 않는다(`HOTEL_ADMIN_PATTERN`).
+- 객실 관리(`ApiPaths.HOTEL_ADMIN + "/rooms"`의 등록·목록·조회·수정과 `/{roomId}/status` 상태 변경, `/{roomId}/status-histories` 상태 이력 조회, `RoomHotelAdminController`)는 `RoomService`가 한다. 호텔 계정 모두(`Role.HOTEL_ADMIN`, 마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 보안 규칙은 따로 두지 않는다(`HOTEL_ADMIN_PATTERN`).
   - 대상 호텔은 로그인한 계정의 `HotelAdminPrincipal.hotelId`다. 등록은 `HotelService.getHotel(hotelId)`로 호텔을 읽어 연관관계에 쓴다.
   - 조회·수정할 객실은 같은 호텔에서만 찾는다(`findByIdAndHotelId`). 없는 id와 다른 호텔의 객실 id는 모두 404 `RoomErrorCode.ROOM_NOT_FOUND`다. 다른 호텔 객실의 존재를 알리지 않기 위해서다.
   - 수정은 PUT으로 모든 항목을 바꾼다. 층과 소개를 보내지 않거나 null이면 null로 바뀐다. 순서는 객실 조회 → version 확인(`ROOM_MODIFIED`) → 이름 중복 확인 → 엔티티 변경 → `saveAndFlush`이고, 유일 제약 위반과 `OptimisticLockingFailureException`을 함께 변환한다. version 충돌과 이름 중복이 겹치면 version 충돌이 먼저다.
-  - 목록은 같은 호텔의 객실을 이름 오름차순, 같으면 id 오름차순으로 준다(목록 조회 절). `keyword`(선택, 100자)는 이름에서 대소문자 구분 없이 찾는다(`findByHotelIdAndNameContainingIgnoreCase`).
+  - 목록은 같은 호텔의 객실을 이름 오름차순, 같으면 id 오름차순으로 준다(목록 조회 절). `keyword`(선택, 100자)는 이름에서 대소문자 구분 없이 찾고, `status`(선택, 하나)는 그 상태의 객실만 거른다. 둘을 함께 보내면 AND다(조합별 파생 쿼리, 목록 조회 절). 상태 필터용 인덱스는 따로 두지 않는다(`hotel_id` 조건에 유일 제약의 인덱스를 쓴다).
 - 테스트
   - 마스터와 운영자가 모두 쓰는 API는 두 역할의 principal로 정상 흐름을 확인한다(`@EnumSource(HotelAdminRole::class)`, `RoomHotelAdminControllerTest`).
-  - 객실이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔의 `room`을 먼저 지운다.
+  - 객실이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔 객실의 `room_status_history`, 그다음 `room`을 먼저 지운다. 이력은 바꾼 호텔 계정(`hotel_admin`)도 가리키므로, 여러 호텔을 지울 때는 모든 호텔의 이력을 먼저 지운 뒤 객실과 호텔 계정을 지운다.
+
+## 객실 상태
+
+- 상태는 `RoomStatus`(`VACANT` 공실, `RESERVED` 예약됨, `OCCUPIED` 이용중, `MAINTENANCE` 정비중)이고 `room.status`에 상수 이름으로 저장한다(`V7__add_room_status.sql`, CHECK로 네 값만, not null). 새 객실은 `VACANT`로 시작하고 등록 요청은 상태를 받지 않는다. 마이그레이션 전 객실은 `VACANT`로 채우고 이력은 남기지 않았다.
+- 허용하는 변경은 `RoomStatus.canChangeTo`의 여섯 가지뿐이다. `VACANT → RESERVED`, `RESERVED → OCCUPIED`, `OCCUPIED → MAINTENANCE`, `MAINTENANCE → VACANT`, `RESERVED → VACANT`(예약을 되돌림), `VACANT → MAINTENANCE`(이용 없이 정비). 같은 상태로의 변경을 포함한 나머지는 409 `RoomErrorCode.ROOM_STATUS_TRANSITION_NOT_ALLOWED`다. 16가지 조합 전부를 `RoomStatusTest`로 확인한다.
+- 상태 변경(`PUT ApiPaths.HOTEL_ADMIN + "/rooms/{roomId}/status"`, 본문 `{ from, to }`, `RoomService.changeStatus`)은 호텔 계정 모두가 자기 호텔의 객실에만 한다. 요청에는 화면에서 본 상태 `from`과 바꿀 상태 `to`를 보낸다.
+  - 판단 순서는 객실 조회(`findByIdAndHotelId`, 404 `ROOM_NOT_FOUND`) → 전이 확인(요청의 `from → to`, 409 `ROOM_STATUS_TRANSITION_NOT_ALLOWED`) → 조건부 UPDATE(바뀐 행이 없으면 409 `ROOM_STATUS_CHANGED`)다. 허용되지 않는 변경이면서 `from`도 지금 상태와 다르면 `ROOM_STATUS_TRANSITION_NOT_ALLOWED`다.
+  - 상태는 조건부 UPDATE(compare-and-set)로만 바꾼다. `RoomRepository.updateStatus`가 `where id = :id and hotel.id = :hotelId and status = :from`으로 한 번에 바꾸고 바뀐 행 수를 돌려준다. 동시에 같은 `from`으로 바꾸면 늦은 쪽은 먼저 커밋된 변경을 기다렸다가 조건이 맞지 않아 0행이 된다.
+  - 상태 변경은 `version`을 올리지 않는다(벌크 UPDATE라 JPA 버전 검사를 타지 않는다). 상태가 바뀌어도 열어 둔 객실 수정(PUT)은 거절되지 않는다.
+  - 반대로 객실 수정이 상태를 덮어쓰지 않도록 `Room.status`는 `@Column(updatable = false)`로 JPA UPDATE에서 뺀다. JPA는 엔티티를 저장할 때 모든 컬럼을 UPDATE하므로, 수정이 객실을 읽은 뒤 상태 변경이 커밋되면 version은 그대로라 통과한 수정의 flush가 읽어 둔 옛 상태로 되돌린다.
+  - 벌크 UPDATE는 영속성 컨텍스트를 거치지 않으므로 `@Modifying(flushAutomatically = true, clearAutomatically = true)`로 앞의 변경을 먼저 flush하고 뒤에 비운다. 응답과 이력에 쓸 객실은 비운 뒤 다시 읽는다. 비우지 않으면 응답에 옛 상태가 나간다.
+  - 벌크 UPDATE는 JPA Auditing을 거치지 않으므로 `updated_at`을 같은 문장에서 함께 바꾼다(서비스의 `Instant.now()`).
+  - 성공하면 바뀐 상태의 객실 응답(`RoomHotelAdminResponse`, version 그대로)을 준다.
+- 이력은 `room_status_history`(`RoomStatusHistory`)에 상태가 바뀔 때마다 한 줄, 상태 변경과 같은 트랜잭션에서 저장한다. 변경이 거절되거나 실패하면 이력도 남지 않는다.
+  - 항목은 이전 상태(`from_status`, 등록이면 null), 바뀐 상태(`to_status`), 바꾼 호텔 계정(`changed_by_id`, `HotelAdmin`과 JPA 연관관계)과 그때의 이름(`changed_by_name`), 바꾼 시각이다. 바꾼 시각은 따로 두지 않고 공통 컬럼 `created_at`을 쓴다(이력은 바꾸지 않으므로 `updated_at`도 같다).
+  - 객실 등록(`RoomService.create`)도 등록한 계정으로 `(null → VACANT)` 이력을 같은 트랜잭션에 남긴다. 컨트롤러가 `HotelAdminPrincipal.id`를 넘긴다.
+  - 이름은 세션 principal에 없으므로(이름 변경은 세션을 끊지 않는다) 변경 시점에 `HotelAdminService.getHotelAdmin`으로 계정을 읽어 지금 이름을 저장한다. 나중에 이름이 바뀌거나 계정이 비활성화돼도 이력은 저장한 이름 그대로다. 서비스 방향은 `RoomService → HotelService → HotelAdminService`, `RoomService → HotelAdminService`이고 계정 도메인은 객실 도메인을 쓰지 않는다. 세션은 요청마다 계정을 확인하므로 계정이 없으면 서버 오류(500)로 둔다.
+  - DB도 CHECK로 네 상태 값, 정리된 이름(호텔 계정 이름처럼 1~50자, 앞뒤 공백 없음)만 받고, 객실과 호텔 계정은 외래 키로 가리킨다. 호텔 계정은 지우지 않는다.
+- 이력 조회(`GET ApiPaths.HOTEL_ADMIN + "/rooms/{roomId}/status-histories"`, `RoomService.getStatusHistories`)는 `(roomId, hotelId)`로 객실을 먼저 확인해(404 `ROOM_NOT_FOUND`) 다른 호텔 객실의 이력이 새지 않게 하고, 그 객실의 이력을 최신순(바꾼 시각 내림차순, 같으면 id 내림차순)으로 페이지로 준다. 인덱스는 `room_status_history_room_id_created_at_id_idx (room_id, created_at desc, id desc)`다.
+  - 응답(`RoomStatusHistoryHotelAdminResponse`)은 `{ id, fromStatus, toStatus, changedBy: { id, name }, changedAt }`이고 `changedAt`은 UTC ISO 8601 문자열이다(응답과 예외 절).
+- 테스트
+  - 순서 고정 테스트(`RoomServiceTest`): 두 상태 변경이 모두 전이 확인을 통과한 뒤 먼저 커밋된 변경 때문에 늦은 쪽의 조건부 UPDATE가 0행이 돼 `ROOM_STATUS_CHANGED`가 되는 경로, 객실 수정이 객실을 읽은 뒤 상태 변경이 커밋돼도 수정의 저장이 상태를 덮어쓰지 않는 경로. 뒤의 것은 `updatable = false`를 빼면 실패한다(`RoomRepositoryTest`도 같은 보호를 확인한다).
+  - 이력의 이름 고정, 바꾼 시각의 응답 형식, 최신순·페이지는 API 테스트에서 확인한다. 정렬과 시각 형식은 바꾼 시각을 정해 JDBC로 넣은 이력으로 확인한다.
+  - 마이그레이션의 기존 객실 채우기는 별도 스키마에 V6까지 적용해 객실을 넣은 뒤 V7을 적용해 확인한다(`RoomStatusMigrationTest`, 테스트 트랜잭션 없이, 끝나면 그 스키마를 `clean`).
 
 ## 상수
 
@@ -222,6 +251,7 @@ urbanstay/
   - `created_at timestamptz not null`
   - `updated_at timestamptz not null`
 - 스키마는 Flyway로만 바꾼다. 앱 시작 시 `ddl-auto=validate`로 엔티티와 스키마가 일치하는지 검사한다.
+- 엔티티 저장(JPA UPDATE)과 조건부 UPDATE가 함께 바꾸면 안 되는 컬럼은 `@Column(updatable = false)`로 JPA UPDATE에서 빼고 조건부 UPDATE로만 바꾼다(예: `Room.status`, 객실 상태 절).
 - open-in-view는 끈다. 지연 로딩은 Service의 트랜잭션 안에서만 쓴다.
 
 ## 동시성과 충돌
@@ -233,10 +263,11 @@ urbanstay/
   - 서비스는 읽은 엔티티의 version이 요청과 다르면 도메인 409를 던진다.
   - 같은 version으로 동시에 들어온 수정은 flush 때 JPA가 막는다. flush를 서비스 안(`saveAndFlush`)에서 해 `OptimisticLockingFailureException`도 같은 도메인 409로 바꾼다. 커밋 때 터지면 서비스 밖이라 500이 된다.
   - 지금 낙관적 잠금을 쓰는 엔티티는 `Hotel`(`HOTEL_MODIFIED`), `HotelAdmin`(`HOTEL_ADMIN_MODIFIED`), `Room`(`ROOM_MODIFIED`)이다. version을 받지 않는 변경(예: 비밀번호 재설정, 활성 상태 변경)도 같은 엔티티를 바꾸면 같은 변환을 거친다.
+- version과 따로 움직여야 하는 값(예: 객실 상태)은 요청에 화면에서 본 값을 함께 받아 "지금 값이 그것일 때만" 바꾸는 조건부 UPDATE로 막는다. 바뀐 행이 없으면 도메인 409다(`ROOM_STATUS_CHANGED`, 객실 상태 절).
 - 중복 확인 같은 조회는 엔티티를 바꾸기 전에 한다. 바뀐 엔티티가 있으면 조회 전 자동 flush로 제약 위반이 변환 범위 밖에서 난다.
 - 테스트는 두 경로를 모두 확인한다.
   - 동시 요청: 두 스레드를 `CountDownLatch`로 함께 출발시킨다.
-  - 사전 확인을 통과한 뒤 DB에서 막히는 경로: 먼저 온 트랜잭션을 열어 둔 채 다음 요청이 잠금을 기다리는지(`pg_stat_activity`) 확인하고 커밋한다(`HotelServiceTest`, `HotelMasterServiceTest`, `HotelOperatorServiceTest`, `RoomServiceTest`).
+  - 사전 확인을 통과한 뒤 DB에서 막히는 경로: 먼저 온 트랜잭션을 열어 둔 채 다음 요청이 잠금을 기다리는지(`pg_stat_activity`) 확인하고 커밋한다(`HotelServiceTest`, `HotelMasterServiceTest`, `HotelOperatorServiceTest`, `RoomServiceTest`). 조건부 UPDATE도 같은 방식으로 늦은 쪽이 0행이 되는 경로를 확인한다(객실 상태 절).
   - 동시 요청 테스트는 실행마다 어느 경로를 탈지 정해지지 않는다. 변환 코드를 지켜 주는 것은 순서를 고정한 경로 테스트다.
 
 ## 테스트
@@ -257,6 +288,7 @@ urbanstay/
 - 파일 하나에 논리적인 스키마 변경 하나를 담는다. 보통 그 도메인 PR의 변경 하나다.
 - 버전은 순차 정수를 쓴다. 예: `V1__create_hotel.sql`, `V2__create_room.sql`
 - 이미 적용된 파일은 수정하지 않는다. 변경은 새 버전 파일로 추가한다.
+- 기존 테이블에 not null 컬럼을 더할 때는 default로 기존 행을 채운 뒤 default를 지운다. 새 행의 값은 엔티티가 정한다(`V4__add_hotel_admin_version.sql`, `V7__add_room_status.sql`).
 - 한 파일에 여러 도메인의 테이블을 섞지 않는다.
 - 시드 데이터는 스키마(DDL)와 다른 파일로 둔다.
 - 도메인 규칙을 지키는 DB 제약(예: 이용 기간 겹침 방지)은 해당 도메인의 마이그레이션에 함께 넣는다.
