@@ -29,12 +29,12 @@ export function reportResponseIssues(
   reportIssues("API 응답 검증 실패", operation, issues);
 }
 
-export function parseRequestBody<Schema extends z.ZodType>(
+export function parseRequest<Schema extends z.ZodType>(
   operation: string,
   schema: Schema,
-  body: z.input<Schema>,
+  request: z.input<Schema>,
 ): z.output<Schema> {
-  const result = schema.safeParse(body);
+  const result = schema.safeParse(request);
   if (!result.success) {
     reportIssues("API 요청 검증 실패", operation, result.error.issues);
     throw new RequestValidationError(operation, result.error.issues);

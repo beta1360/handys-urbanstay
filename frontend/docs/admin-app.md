@@ -93,8 +93,14 @@
   - orval의 axios 클라이언트는 응답을 검증하지 않는다. 그래서 검증은 `shared/api`에서 직접 연결한다.
 - `shared/api/http.ts`는 axios 인스턴스로 요청하고 응답 본문을 돌려준다. 2xx가 아닌 응답은 오류로 던지므로 React Query가 error로 받는다.
 - `shared/api`는 검증을 거친 것만 내보낸다. 생성 코드와 `http`는 내보내지 않는다.
-  - 요청 본문을 스키마로 검증한 뒤 생성 함수를 부르고, 받은 응답을 스키마로 검증한 뒤 돌려준다.
+  - 요청 본문과 쿼리·경로 파라미터를 스키마로 검증한 뒤 생성 함수를 부르고, 받은 응답을 스키마로 검증한 뒤 돌려준다.
+  - 보내는 값은 검증을 통과한 값이다. 스키마에 없는 필드는 빠지고, 빠진 파라미터에는 스키마의 기본값이 채워진다.
+  - 결과(`data`)를 돌려주는 API는 `data`만 돌려준다. 성공 응답의 `success`가 false이거나 `data`가 null이면 응답 검증 실패로 본다.
   - 조회는 TanStack Query 옵션(`queryKey`, `queryFn`)으로, 변경은 함수로 내보낸다.
+    - 쿼리 키는 생성된 `get...QueryKey`로 만든다.
+    - 조회 파라미터는 `queryFn` 안에서 검증한다. 검증 실패는 그 쿼리의 오류가 된다.
+    - `queryFn`이 받은 `signal`을 생성 함수에 넘긴다. 쿼리가 취소되면 요청도 취소된다.
+  - 캐시를 갱신할 때 쿼리 하나는 쿼리 옵션의 `queryKey`로 가리킨다. 여러 쿼리를 한 번에 가리키는 키(예: 검색어·페이지가 다른 목록 전체)가 필요하면 파라미터 없이 만든 생성 키를 따로 내보낸다.
 - `shared/api` 밖에서는 `shared/api/generated`를 import하지 않는다. ESLint `no-restricted-imports`로 막는다. Steiger는 다른 레이어의 import만 막고 재수출과 같은 shared 레이어의 import는 막지 않기 때문이다.
 - 검증에 실패하면 전용 오류를 던진다. AxiosError와 구분된다.
   - 요청 검증 실패는 `RequestValidationError`다. 요청을 보내지 않는다.

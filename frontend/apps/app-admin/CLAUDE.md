@@ -49,8 +49,9 @@ apps/app-admin/
    └─ shared/
       ├─ api/          # 검증된 API만 index.ts로 내보낸다
       │  ├─ account.ts          # 내 정보 쿼리 옵션, 로그인, 로그아웃, 로그인 요청 스키마
+      │  ├─ hotel.ts            # 호텔 목록·상세 쿼리 옵션, 목록 전체 쿼리 키, 등록, 수정, 등록·수정 요청 스키마
       │  ├─ api-error.ts        # 서버 오류 정보 읽기 (getApiError), 오류 코드 (API_ERROR_CODES)
-      │  ├─ validate.ts         # 요청 본문·응답 zod 검증, 개발 콘솔 로그
+      │  ├─ validate.ts         # 요청(본문·파라미터)·응답 zod 검증, 개발 콘솔 로그
       │  ├─ validation-error.ts # RequestValidationError, ResponseValidationError
       │  ├─ http.ts             # orval mutator
       │  └─ generated/ # orval 생성 코드. 직접 수정하지 않고 shared/api 밖에서 import하지 않는다

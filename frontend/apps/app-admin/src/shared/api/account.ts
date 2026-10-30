@@ -8,7 +8,7 @@ import {
   LogoutResponse,
 } from "./generated/zod";
 import { AccountAppAdminResponse } from "./generated/zod/schemas";
-import { parseRequestBody, parseResponseBody } from "./validate";
+import { parseRequest, parseResponseBody } from "./validate";
 
 export const loginAccountBodySchema = LoginBody;
 
@@ -34,7 +34,7 @@ export function meQueryOptions() {
 }
 
 export async function loginAccount(body: LoginAccountBody) {
-  const validBody = parseRequestBody("login", LoginBody, body);
+  const validBody = parseRequest("login", LoginBody, body);
   const response = await login(validBody);
   return parseResponseBody("login", LoginSuccessResponse, response).data;
 }

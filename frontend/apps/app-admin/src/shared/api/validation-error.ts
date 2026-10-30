@@ -8,7 +8,7 @@ export class RequestValidationError extends Error {
   readonly issues: ValidationIssues;
 
   constructor(operation: string, issues: ValidationIssues) {
-    super(`${operation} 요청 본문이 스키마와 맞지 않습니다.`);
+    super(`${operation} 요청이 스키마와 맞지 않습니다.`);
     this.operation = operation;
     this.issues = issues;
   }
