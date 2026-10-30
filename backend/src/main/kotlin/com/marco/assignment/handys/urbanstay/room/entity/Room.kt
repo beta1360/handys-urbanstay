@@ -2,7 +2,10 @@ package com.marco.assignment.handys.urbanstay.room.entity
 
 import com.marco.assignment.handys.urbanstay.common.entity.BaseEntity
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
+import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.FetchType
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Version
@@ -44,6 +47,13 @@ class Room(
 		protected set
 
 	var checkOutTime: LocalTime = normalizeTime(checkOutTime)
+		protected set
+
+	@Enumerated(EnumType.STRING)
+	// 상태는 RoomRepository.updateStatus(조건부 UPDATE)로만 바꾼다.
+	// 객실 수정의 JPA UPDATE가 그사이 바뀐 상태를 읽어 둔 옛 값으로 덮어쓰지 않도록 UPDATE 컬럼에서 뺀다.
+	@Column(updatable = false)
+	var status: RoomStatus = RoomStatus.VACANT
 		protected set
 
 	@Version
