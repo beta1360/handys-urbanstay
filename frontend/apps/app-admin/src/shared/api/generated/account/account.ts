@@ -25,8 +25,11 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AccountHotelMasterPasswordResetAppAdminRequest,
+  AccountHotelMasterUpdateAppAdminRequest,
   AccountLoginAppAdminRequest,
   ApiResponseAccountAppAdminResponse,
+  ApiResponseAccountHotelMasterAppAdminResponse,
   EmptyApiResponse,
   ErrorApiResponse
 } from '../schemas';
@@ -55,6 +58,237 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
+ * 호텔의 마스터 계정을 조회합니다. 비밀번호는 주지 않습니다. 정보 수정 요청에 보낼 version이 함께 옵니다. 호텔이 없으면 404 HOTEL_NOT_FOUND로, 호텔은 있는데 마스터가 없으면 404 HOTEL_MASTER_NOT_FOUND로 응답합니다.
+ * @summary 호텔 마스터 조회
+ */
+export const getHotelMaster = (
+    hotelId: number,
+ options?: SecondParameter<typeof http>,signal?: AbortSignal
+) => {
+
+
+      return http<ApiResponseAccountHotelMasterAppAdminResponse>(
+      {url: `/api/v1/app-admin/hotels/${hotelId}/master`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetHotelMasterQueryKey = (hotelId: number,) => {
+    return [
+    `/api/v1/app-admin/hotels/${hotelId}/master`
+    ] as const;
+    }
+
+
+export const getGetHotelMasterQueryOptions = <TData = Awaited<ReturnType<typeof getHotelMaster>>, TError = ErrorType<ErrorApiResponse>>(hotelId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHotelMaster>>, TError, TData>>, request?: SecondParameter<typeof http>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetHotelMasterQueryKey(hotelId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHotelMaster>>> = ({ signal }) => getHotelMaster(hotelId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: hotelId !== null && hotelId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHotelMaster>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetHotelMasterQueryResult = NonNullable<Awaited<ReturnType<typeof getHotelMaster>>>
+export type GetHotelMasterQueryError = ErrorType<ErrorApiResponse>
+
+
+export function useGetHotelMaster<TData = Awaited<ReturnType<typeof getHotelMaster>>, TError = ErrorType<ErrorApiResponse>>(
+ hotelId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHotelMaster>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getHotelMaster>>,
+          TError,
+          Awaited<ReturnType<typeof getHotelMaster>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetHotelMaster<TData = Awaited<ReturnType<typeof getHotelMaster>>, TError = ErrorType<ErrorApiResponse>>(
+ hotelId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHotelMaster>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getHotelMaster>>,
+          TError,
+          Awaited<ReturnType<typeof getHotelMaster>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetHotelMaster<TData = Awaited<ReturnType<typeof getHotelMaster>>, TError = ErrorType<ErrorApiResponse>>(
+ hotelId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHotelMaster>>, TError, TData>>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 호텔 마스터 조회
+ */
+
+export function useGetHotelMaster<TData = Awaited<ReturnType<typeof getHotelMaster>>, TError = ErrorType<ErrorApiResponse>>(
+ hotelId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHotelMaster>>, TError, TData>>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetHotelMasterQueryOptions(hotelId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 호텔 마스터의 아이디와 이름을 요청 값으로 바꿉니다. 입력값 규칙은 호텔 등록의 마스터와 같습니다. 조회할 때 받은 version을 함께 보냅니다. 그사이 다른 사용자가 먼저 정보를 수정하거나 비밀번호를 재설정해 version이 다르면 409 HOTEL_ADMIN_MODIFIED로 응답하므로, 다시 조회한 뒤 수정합니다. 동시에 같은 version으로 수정하면 하나만 반영되고 나머지는 409 HOTEL_ADMIN_MODIFIED입니다. 아이디를 다른 호텔 계정(마스터·운영자)이 이미 쓰고 있으면(대소문자와 앞뒤 공백은 구분하지 않음) 409 LOGIN_ID_DUPLICATED로 응답합니다. 자기 아이디를 대소문자나 앞뒤 공백만 바꿔 보내면 같은 아이디라 중복이 아닙니다. version이 다르면서 아이디도 겹치면 HOTEL_ADMIN_MODIFIED입니다. 서로 다른 마스터를 같은 새 아이디로 동시에 바꿔도 하나만 반영되고 나머지는 409 LOGIN_ID_DUPLICATED입니다. 아이디가 실제로 바뀌면(소문자로 바꾼 값이 지금과 다르면) 그 마스터가 호텔 운영자 앱에 로그인해 둔 세션은 다음 요청에서 401 UNAUTHORIZED로 끊기고, 마스터는 새 아이디로 다시 로그인합니다. 이름만 바꾸거나 대소문자·앞뒤 공백만 다른 같은 아이디를 보내면 세션은 유지됩니다. 성공하면 수정한 마스터를 최신 version과 함께 돌려주며, 바뀐 값이 없으면 version도 그대로입니다. 호텔이 없으면 404 HOTEL_NOT_FOUND, 호텔은 있는데 마스터가 없으면 404 HOTEL_MASTER_NOT_FOUND로 응답합니다.
+ * @summary 호텔 마스터 정보 수정
+ */
+export const updateHotelMaster = (
+    hotelId: number,
+    accountHotelMasterUpdateAppAdminRequest: BodyType<AccountHotelMasterUpdateAppAdminRequest>,
+ options?: SecondParameter<typeof http>,signal?: AbortSignal
+) => {
+
+
+      return http<ApiResponseAccountHotelMasterAppAdminResponse>(
+      {url: `/api/v1/app-admin/hotels/${hotelId}/master`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: accountHotelMasterUpdateAppAdminRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getUpdateHotelMasterMutationKey = () => ['updateHotelMaster'] as const;
+
+export const getUpdateHotelMasterMutationOptions = <TError = ErrorType<ErrorApiResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHotelMaster>>, TError,UpdateHotelMasterMutationVariables, TContext>, request?: SecondParameter<typeof http>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateHotelMaster>>, TError,UpdateHotelMasterMutationVariables, TContext> => {
+
+const mutationKey = getUpdateHotelMasterMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateHotelMaster>>, UpdateHotelMasterMutationVariables> = (props) => {
+          const {hotelId,data} = props ?? {};
+
+          return  updateHotelMaster(hotelId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateHotelMasterMutationResult = NonNullable<Awaited<ReturnType<typeof updateHotelMaster>>>
+    export type UpdateHotelMasterMutationBody = BodyType<AccountHotelMasterUpdateAppAdminRequest>
+    export type UpdateHotelMasterMutationError = ErrorType<ErrorApiResponse>
+    export type UpdateHotelMasterMutationVariables = {hotelId: number;data: BodyType<AccountHotelMasterUpdateAppAdminRequest>}
+
+    /**
+ * @summary 호텔 마스터 정보 수정
+ */
+export const useUpdateHotelMaster = <TError = ErrorType<ErrorApiResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHotelMaster>>, TError,UpdateHotelMasterMutationVariables, TContext>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateHotelMaster>>,
+        TError,
+        UpdateHotelMasterMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateHotelMasterMutationOptions(options), queryClient);
+    }
+    /**
+ * 호텔 마스터의 비밀번호를 새 비밀번호로 바꿉니다. 비밀번호 규칙은 호텔 등록의 마스터 처음 비밀번호와 같고, 앞뒤 공백을 지우지 않고 입력한 그대로 씁니다. 지금과 같은 비밀번호로도 재설정할 수 있습니다. version은 보내지 않습니다. 성공하면 data는 null입니다. 재설정하면 같은 비밀번호로 바꿨더라도 그 마스터가 호텔 운영자 앱에 로그인해 둔 세션은 다음 요청에서 401 UNAUTHORIZED로 끊기고, 마스터는 새 비밀번호로 다시 로그인합니다. 재설정도 마스터 계정을 바꾸므로 version이 1 커집니다. 그래서 재설정 전에 조회한 version으로 정보를 수정하면 409 HOTEL_ADMIN_MODIFIED이므로 다시 조회한 뒤 수정합니다. 같은 마스터의 정보 수정이나 다른 재설정과 동시에 처리되면 늦은 쪽이 409 HOTEL_ADMIN_MODIFIED일 수 있고, 이때 비밀번호는 바뀌지 않았으므로 다시 시도합니다. 호텔이 없으면 404 HOTEL_NOT_FOUND, 호텔은 있는데 마스터가 없으면 404 HOTEL_MASTER_NOT_FOUND로 응답합니다.
+ * @summary 호텔 마스터 비밀번호 재설정
+ */
+export const resetHotelMasterPassword = (
+    hotelId: number,
+    accountHotelMasterPasswordResetAppAdminRequest: BodyType<AccountHotelMasterPasswordResetAppAdminRequest>,
+ options?: SecondParameter<typeof http>,signal?: AbortSignal
+) => {
+
+
+      return http<EmptyApiResponse>(
+      {url: `/api/v1/app-admin/hotels/${hotelId}/master/password`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: accountHotelMasterPasswordResetAppAdminRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getResetHotelMasterPasswordMutationKey = () => ['resetHotelMasterPassword'] as const;
+
+export const getResetHotelMasterPasswordMutationOptions = <TError = ErrorType<ErrorApiResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetHotelMasterPassword>>, TError,ResetHotelMasterPasswordMutationVariables, TContext>, request?: SecondParameter<typeof http>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetHotelMasterPassword>>, TError,ResetHotelMasterPasswordMutationVariables, TContext> => {
+
+const mutationKey = getResetHotelMasterPasswordMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetHotelMasterPassword>>, ResetHotelMasterPasswordMutationVariables> = (props) => {
+          const {hotelId,data} = props ?? {};
+
+          return  resetHotelMasterPassword(hotelId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetHotelMasterPasswordMutationResult = NonNullable<Awaited<ReturnType<typeof resetHotelMasterPassword>>>
+    export type ResetHotelMasterPasswordMutationBody = BodyType<AccountHotelMasterPasswordResetAppAdminRequest>
+    export type ResetHotelMasterPasswordMutationError = ErrorType<ErrorApiResponse>
+    export type ResetHotelMasterPasswordMutationVariables = {hotelId: number;data: BodyType<AccountHotelMasterPasswordResetAppAdminRequest>}
+
+    /**
+ * @summary 호텔 마스터 비밀번호 재설정
+ */
+export const useResetHotelMasterPassword = <TError = ErrorType<ErrorApiResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetHotelMasterPassword>>, TError,ResetHotelMasterPasswordMutationVariables, TContext>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof resetHotelMasterPassword>>,
+        TError,
+        ResetHotelMasterPasswordMutationVariables,
+        TContext
+      > => {
+      return useMutation(getResetHotelMasterPasswordMutationOptions(options), queryClient);
+    }
+    /**
  * 세션을 끝내고 세션 쿠키와 XSRF-TOKEN 쿠키를 지웁니다. data는 항상 null입니다. 다음 로그인 전에는 어드민 API 응답(예: 내 정보 조회의 401)에서 새 XSRF-TOKEN 쿠키를 받습니다.
  * @summary 로그아웃
  */

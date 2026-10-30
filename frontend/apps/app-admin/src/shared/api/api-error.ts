@@ -7,6 +7,10 @@ export type ApiError = ErrorResponseOutput;
 
 export const API_ERROR_CODES = {
   unauthorized: "UNAUTHORIZED",
+  hotelNotFound: "HOTEL_NOT_FOUND",
+  hotelDuplicated: "HOTEL_DUPLICATED",
+  hotelModified: "HOTEL_MODIFIED",
+  loginIdDuplicated: "LOGIN_ID_DUPLICATED",
 } as const;
 
 export function getApiError(error: unknown): ApiError | undefined {
