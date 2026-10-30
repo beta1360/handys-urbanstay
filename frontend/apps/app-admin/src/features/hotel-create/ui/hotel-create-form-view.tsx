@@ -10,14 +10,12 @@ import { MasterAccountFields } from "./master-account-fields";
 
 type HotelCreateFormViewProps = {
   fields: Record<HotelCreateField, FormFieldProps>;
-  alert: string | undefined;
   isSubmitting: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
 export function HotelCreateFormView({
   fields,
-  alert,
   isSubmitting,
   onSubmit,
 }: HotelCreateFormViewProps) {
@@ -29,11 +27,6 @@ export function HotelCreateFormView({
     >
       <HotelInfoFields fields={fields} />
       <MasterAccountFields fields={fields} />
-      {alert ? (
-        <p role="alert" className="text-sm text-red-600">
-          {alert}
-        </p>
-      ) : null}
       <div className="flex gap-2">
         <Button type="submit" variant="primary" loading={isSubmitting}>
           {HOTEL_CREATE_FORM_MESSAGES.submit}

@@ -11,5 +11,7 @@ import type { ErrorResponse } from './errorResponse.ts';
 export interface ApiResponseAccountHotelMasterAppAdminResponse {
   success: boolean;
   data: AccountHotelMasterAppAdminResponse | null;
+  /** @nullable */
+  message: string | null;
   error: ErrorResponse | null;
 }

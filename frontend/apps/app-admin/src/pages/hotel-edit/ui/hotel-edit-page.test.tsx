@@ -35,6 +35,7 @@ import {
 import type { Hotel, HotelPage } from "@/shared/api";
 import { COMMON_MESSAGES, FORM_VALIDATION_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
+import { showToast } from "@/shared/lib/toast";
 import { HotelEditPage } from "./hotel-edit-page";
 
 const { fetchHotel } = vi.hoisted(() => ({ fetchHotel: vi.fn() }));
@@ -48,7 +49,14 @@ vi.mock("@/shared/api", async (importOriginal) => {
   };
 });
 
+vi.mock("@/shared/lib/toast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/shared/lib/toast")>()),
+  showToast: vi.fn(),
+}));
+
 const onMutationError = vi.fn();
+
+const UPDATE_MESSAGE = "호텔 정보를 수정했습니다.";
 
 const DETAIL_PAGE_TEXT = "호텔 상세 화면";
 
@@ -102,7 +110,12 @@ function createErrorBody(
   message: string,
   fieldErrors: FieldError[] = [],
 ) {
-  return { success: false, data: null, error: { code, message, fieldErrors } };
+  return {
+    success: false,
+    data: null,
+    message: null,
+    error: { code, message, fieldErrors },
+  };
 }
 
 function createAxiosError(status: number, data: unknown) {
@@ -520,9 +533,12 @@ describe("HotelEditPage 저장", () => {
     expect(updateHotel).toHaveBeenCalledOnce();
   });
 
-  it("저장에 성공하면 응답을 상세 캐시에 넣고 목록 캐시를 무효화한 뒤 방문 기록을 바꿔 상세로 이동한다", async () => {
+  it("저장에 성공하면 서버의 성공 문구를 토스트로 띄우고 응답을 상세 캐시에 넣고 목록 캐시를 무효화한 뒤 방문 기록을 바꿔 상세로 이동한다", async () => {
     const updatedHotel = { ...LATEST_HOTEL, version: HOTEL.version + 1 };
-    vi.mocked(updateHotel).mockResolvedValue(updatedHotel);
+    vi.mocked(updateHotel).mockResolvedValue({
+      data: updatedHotel,
+      message: UPDATE_MESSAGE,
+    });
     const { user, router, queryClient } = await renderLoadedHotelEditPage();
     const listQueryKey = hotelListQueryKey({ page: 0 });
     queryClient.setQueryData(listQueryKey, EMPTY_HOTEL_PAGE);
@@ -530,6 +546,10 @@ describe("HotelEditPage 저장", () => {
     await user.click(getSubmitButton());
 
     expect(await screen.findByText(DETAIL_PAGE_TEXT)).toBeInTheDocument();
+    expect(showToast).toHaveBeenCalledExactlyOnceWith({
+      type: "success",
+      message: UPDATE_MESSAGE,
+    });
     expect(router.state.location.href).toBe(hotelPath(HOTEL.id));
     expect(queryClient.getQueryData(hotelQueryKey(HOTEL.id))).toEqual(
       updatedHotel,
@@ -575,6 +595,7 @@ describe("HotelEditPage 서버 오류 처리", () => {
       describedText("phone", "전화번호 서버 오류"),
     );
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(showToast).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -582,7 +603,7 @@ describe("HotelEditPage 서버 오류 처리", () => {
     ["저장할 때 호텔이 없다는 응답", 404, API_ERROR_CODES.hotelNotFound],
     ["서버 오류 응답", 500, "INTERNAL_SERVER_ERROR"],
   ])(
-    "%s이면 서버 문구를 제출 버튼 위 알림으로 보여주고 최신 내용 불러오기 버튼은 두지 않는다",
+    "%s이면 서버 문구를 폼 안이 아닌 오류 토스트로 보여주고 입력한 내용은 그대로 둔다",
     async (_, status, code) => {
       const message = `${code} 서버 문구`;
       vi.mocked(updateHotel).mockRejectedValue(
@@ -592,17 +613,21 @@ describe("HotelEditPage 서버 오류 처리", () => {
 
       await user.click(getSubmitButton());
 
-      const alert = await screen.findByRole("alert");
-      expect(alert).toHaveTextContent(message);
-      expectAboveButtons(alert);
+      await vi.waitFor(() => {
+        expect(getSubmitButton()).not.toBeDisabled();
+      });
+      expect(showToast).toHaveBeenCalledExactlyOnceWith({
+        type: "error",
+        message,
+      });
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
       expect(queryReloadButton()).not.toBeInTheDocument();
       expect(getInvalidFields()).toEqual([]);
       expectFormValues(valuesOf(HOTEL));
-      expect(getSubmitButton()).not.toBeDisabled();
     },
   );
 
-  it("본문을 쓸 수 없는 오류면 일반 오류 문구를 제출 버튼 위 알림으로 보여준다", async () => {
+  it("본문을 쓸 수 없는 오류면 일반 오류 문구를 오류 토스트로 보여준다", async () => {
     vi.mocked(updateHotel).mockRejectedValue(
       new AxiosError("Network Error", AxiosError.ERR_NETWORK),
     );
@@ -610,12 +635,15 @@ describe("HotelEditPage 서버 오류 처리", () => {
 
     await user.click(getSubmitButton());
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(COMMON_MESSAGES.requestFailed);
-    expectAboveButtons(alert);
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalledExactlyOnceWith({
+        type: "error",
+        message: COMMON_MESSAGES.requestFailed,
+      });
+    });
   });
 
-  it("로그인이 필요하다는 응답은 전역 오류 처리기로 넘긴다", async () => {
+  it("로그인이 필요하다는 응답은 전역 오류 처리기로 넘기고 토스트를 띄우지 않는다", async () => {
     const error = createApiError(401, API_ERROR_CODES.unauthorized);
     vi.mocked(updateHotel).mockRejectedValue(error);
     const { user } = await renderLoadedHotelEditPage();
@@ -626,6 +654,10 @@ describe("HotelEditPage 서버 오류 처리", () => {
       expect(onMutationError).toHaveBeenCalledOnce();
     });
     expect(onMutationError.mock.lastCall?.[0]).toBe(error);
+    await vi.waitFor(() => {
+      expect(getSubmitButton()).not.toBeDisabled();
+    });
+    expect(showToast).not.toHaveBeenCalled();
   });
 });
 
@@ -650,6 +682,7 @@ describe("HotelEditPage 수정 충돌", () => {
 
     expect(alert).toHaveTextContent(HOTEL_MODIFIED_MESSAGE);
     expectAboveButtons(alert);
+    expect(showToast).not.toHaveBeenCalled();
     const reloadButton = getReloadButton();
     expect(reloadButton.parentElement).toBe(alert.parentElement);
     expect(reloadButton).toHaveAttribute("type", "button");

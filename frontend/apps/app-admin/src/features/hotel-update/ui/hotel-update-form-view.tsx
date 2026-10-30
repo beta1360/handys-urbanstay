@@ -12,7 +12,6 @@ type HotelUpdateFormViewProps = {
   hotelId: number;
   fields: Record<HotelInfoField, FormFieldProps>;
   alert: string | undefined;
-  canReload: boolean;
   status: Exclude<HotelUpdateStatus, "notFound">;
   reloadButtonRef: Ref<HTMLButtonElement>;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -23,7 +22,6 @@ export function HotelUpdateFormView({
   hotelId,
   fields,
   alert,
-  canReload,
   status,
   reloadButtonRef,
   onSubmit,
@@ -37,17 +35,15 @@ export function HotelUpdateFormView({
           <p role="alert" className="text-sm text-red-600">
             {alert}
           </p>
-          {canReload ? (
-            <Button
-              ref={reloadButtonRef}
-              type="button"
-              variant="secondary"
-              loading={status === "reloading"}
-              onClick={onReload}
-            >
-              {HOTEL_UPDATE_FORM_MESSAGES.reload}
-            </Button>
-          ) : null}
+          <Button
+            ref={reloadButtonRef}
+            type="button"
+            variant="secondary"
+            loading={status === "reloading"}
+            onClick={onReload}
+          >
+            {HOTEL_UPDATE_FORM_MESSAGES.reload}
+          </Button>
         </div>
       ) : null}
       <div className="flex gap-2">

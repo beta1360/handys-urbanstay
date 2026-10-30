@@ -21,6 +21,7 @@ function createApiError(status: number, code: string) {
   const data = {
     success: false,
     data: null,
+    message: null,
     error: { code, message: "요청을 처리하지 못했습니다.", fieldErrors: [] },
   };
   return new AxiosError(

@@ -14,7 +14,8 @@
     "./sidebar": "./src/sidebar.tsx",
     "./table": "./src/table.tsx",
     "./text-field": "./src/text-field.tsx",
-    "./textarea-field": "./src/textarea-field.tsx"
+    "./textarea-field": "./src/textarea-field.tsx",
+    "./toast": "./src/toast.tsx"
   },
   "scripts": {
     "lint": "eslint",

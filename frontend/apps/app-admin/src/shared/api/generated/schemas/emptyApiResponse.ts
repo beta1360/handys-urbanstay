@@ -11,5 +11,7 @@ export interface EmptyApiResponse {
   success: boolean;
   /** @nullable */
   data: null;
+  /** @nullable */
+  message: string | null;
   error: ErrorResponse | null;
 }

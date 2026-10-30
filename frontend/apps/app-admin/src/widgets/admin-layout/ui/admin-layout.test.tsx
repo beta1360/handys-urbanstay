@@ -44,6 +44,7 @@ function createApiError(status: number, code: string) {
   const data = {
     success: false,
     data: null,
+    message: null,
     error: { code, message: "요청을 처리하지 못했습니다.", fieldErrors: [] },
   };
   return new AxiosError(
@@ -260,7 +261,10 @@ describe("AdminLayout 로그아웃", () => {
   });
 
   it.each([
-    ["로그아웃에 성공하면", () => Promise.resolve()],
+    [
+      "로그아웃에 성공하면",
+      () => Promise.resolve({ message: "로그아웃했습니다." }),
+    ],
     [
       "로그아웃 요청이 401이면",
       () => Promise.reject(createApiError(401, API_ERROR_CODES.unauthorized)),

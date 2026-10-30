@@ -11,6 +11,7 @@ import { ErrorResponse } from './errorResponse.zod.ts';
 export const ErrorApiResponse = zod.object({
   "success": zod.boolean(),
   "data": zod.null(),
+  "message": zod.null(),
   "error": ErrorResponse
 });
 

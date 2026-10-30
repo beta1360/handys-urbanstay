@@ -26,6 +26,8 @@ const HOTEL: Hotel = {
   version: 4,
 };
 
+const MESSAGE = "호텔 정보를 수정했습니다.";
+
 const BODY: UpdateHotelBody = {
   name: HOTEL.name,
   address: HOTEL.address,
@@ -51,7 +53,7 @@ afterEach(() => {
 
 describe("useUpdateHotel", () => {
   it("호텔 ID와 본문으로 수정하고 성공하면 캐시 규칙으로 응답을 캐시에 넣은 뒤 화면의 onSuccess를 부른다", async () => {
-    vi.mocked(updateHotel).mockResolvedValue(HOTEL);
+    vi.mocked(updateHotel).mockResolvedValue({ data: HOTEL, message: MESSAGE });
     const onSuccess = vi.fn();
     const { result, queryClient } = renderUseUpdateHotel();
 
@@ -64,7 +66,10 @@ describe("useUpdateHotel", () => {
     });
     expect(updateHotel).toHaveBeenCalledExactlyOnceWith(HOTEL.id, BODY);
     expect(cacheSavedHotel).toHaveBeenCalledExactlyOnceWith(queryClient, HOTEL);
-    expect(onSuccess.mock.lastCall?.[0]).toEqual(HOTEL);
+    expect(onSuccess.mock.lastCall?.[0]).toEqual({
+      data: HOTEL,
+      message: MESSAGE,
+    });
   });
 
   it("수정에 실패하면 캐시를 바꾸지 않고 화면의 onError를 부른다", async () => {

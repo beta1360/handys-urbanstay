@@ -95,6 +95,7 @@ FSD 레이어(app~shared)가 코드를 '어디에 두는가'를 정한다면, 3�
 - 여러 동작이 함께 쓰는 입력 묶음(예: 등록·수정의 호텔 정보 입력 칸)은 그 도메인의 entities slice에 둔다. 같은 레이어의 slice끼리는 import하지 않으므로 features에 두면 다른 동작이 가져다 쓸 수 없다. 입력 칸은 칸마다 입력창 props를 받아 펼치는 표현 컴포넌트로, 스키마 조각은 그 도메인의 입력 규칙으로 둔다.
 - 도메인과 무관한 폼 도우미(예: 서버 오류를 입력창 오류와 폼 알림으로 나누기)는 `shared/lib/form`에 둔다.
 - 폼 알림(입력창과 묶이지 않는 서버 오류)은 react-hook-form의 `errors.root.server`에 둔다. 다시 제출하거나 `reset`하면 함께 지워진다.
+  - 폼 안에 보여줄지 토스트로 보여줄지는 각 앱의 화면 규칙을 따른다. 토스트로 보여줘도 `errors.root.server`에 둔다. 제출이 실패한 상태로 남아야 아래 제출 중 상태가 풀리기 때문이다.
 - 제출 중 상태는 `formState.isSubmitting || formState.isSubmitSuccessful`로 정한다. 요청이 끝날 때까지와, 성공한 뒤 화면을 떠날 때까지 로딩이다.
 - 표현 컴포넌트는 react-hook-form을 모른다. model이 칸마다 `register` 결과와 오류를 묶은 props를 만들어 넘기고, 표현 컴포넌트는 입력창에 펼치기만 한다.
 - 검사 시점, 오류 표시, 초점 같은 화면 동작은 각 앱의 화면 규칙(어드민 앱은 `docs/admin-app.md`)을 따른다.
@@ -115,6 +116,12 @@ FSD 레이어(app~shared)가 코드를 '어디에 두는가'를 정한다면, 3�
 - 화면 문구 등 상수는 `as const` 객체로 둔다.
 - slice 전용 상수는 그 slice의 `config/`에, 여러 곳에서 쓰는 상수는 `shared/config/`에 둔다. 여러 slice에 같은 문구(예: '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.', '불러오는 중입니다.', '다시 시도')를 따로 두지 않는다.
 
+## 토스트
+
+- 토스트는 UI 라이브러리 없이 직접 만든다. 표현 컴포넌트(어드민 앱은 `@repo/ui/toast`), 도메인과 무관한 상태와 `showToast`(각 앱의 `shared/lib/toast`), 영역을 그리는 Provider(app 레이어)로 나눈다.
+- `showToast`는 동작의 결과를 아는 `model`(features·widgets)에서 부른다. `ui`는 props만 받는다.
+- 무엇을 토스트로 보여줄지, 위치와 동작은 각 앱의 화면 규칙(어드민 앱은 `docs/admin-app.md`의 '토스트')을 따른다.
+
 ## Provider
 
 - Provider는 역할별로 잘게 나눠 컴포넌트로 만들고 app 레이어에 둔다.
@@ -125,6 +132,7 @@ FSD 레이어(app~shared)가 코드를 '어디에 두는가'를 정한다면, 3�
 
 - orval이 생성한 `src/shared/api/generated`를 쓴다. 생성 코드는 직접 수정하지 않고 codegen으로 다시 만든다.
 - 요청 본문은 보내기 전에, 응답은 쓰기 전에 orval이 생성한 zod 스키마로 검증한다. 규칙은 `docs/api-convention.md`의 '검증'을 따른다.
+- 상태를 바꾸는 요청의 성공 문구는 응답의 `message`를 그대로 보여준다. 같은 뜻의 문구를 클라이언트에 따로 두지 않는다(`docs/api-convention.md`의 '성공 메시지').
 
 ## 스타일
 

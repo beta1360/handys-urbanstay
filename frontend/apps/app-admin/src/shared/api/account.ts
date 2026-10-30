@@ -22,7 +22,12 @@ const ACCOUNT_SUCCESS_SHAPE = {
 
 const GetMeSuccessResponse = GetMeResponse.extend(ACCOUNT_SUCCESS_SHAPE);
 
-const LoginSuccessResponse = LoginResponse.extend(ACCOUNT_SUCCESS_SHAPE);
+const LoginSuccessResponse = LoginResponse.extend({
+  ...ACCOUNT_SUCCESS_SHAPE,
+  message: z.string(),
+});
+
+const LogoutSuccessResponse = LogoutResponse.extend({ message: z.string() });
 
 type RequestOptions = {
   signal?: AbortSignal;
@@ -40,9 +45,20 @@ export async function fetchMe({ signal }: RequestOptions = {}) {
 export async function loginAccount(body: LoginAccountBody) {
   const validBody = parseRequest("login", LoginBody, body);
   const response = await login(validBody);
-  return parseResponseBody("login", LoginSuccessResponse, response).data;
+  const { data, message } = parseResponseBody(
+    "login",
+    LoginSuccessResponse,
+    response,
+  );
+  return { data, message };
 }
 
-export async function logoutAccount(): Promise<void> {
-  parseResponseBody("logout", LogoutResponse, await logout());
+export async function logoutAccount() {
+  const response = await logout();
+  const { message } = parseResponseBody(
+    "logout",
+    LogoutSuccessResponse,
+    response,
+  );
+  return { message };
 }

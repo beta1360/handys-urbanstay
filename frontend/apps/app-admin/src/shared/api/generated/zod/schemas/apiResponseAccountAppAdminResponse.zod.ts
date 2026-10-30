@@ -12,6 +12,7 @@ import { ErrorResponse } from './errorResponse.zod.ts';
 export const ApiResponseAccountAppAdminResponse = zod.object({
   "success": zod.boolean(),
   "data": zod.union([AccountAppAdminResponse,zod.null()]),
+  "message": zod.string().nullable(),
   "error": zod.union([ErrorResponse,zod.null()])
 });
 

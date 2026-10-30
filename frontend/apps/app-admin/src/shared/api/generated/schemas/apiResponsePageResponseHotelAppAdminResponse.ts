@@ -11,5 +11,7 @@ import type { PageResponseHotelAppAdminResponse } from './pageResponseHotelAppAd
 export interface ApiResponsePageResponseHotelAppAdminResponse {
   success: boolean;
   data: PageResponseHotelAppAdminResponse | null;
+  /** @nullable */
+  message: string | null;
   error: ErrorResponse | null;
 }

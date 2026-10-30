@@ -28,6 +28,7 @@ import {
 import type { Hotel, HotelPage } from "@/shared/api";
 import { COMMON_MESSAGES, FORM_VALIDATION_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
+import { dismissToast, showToast } from "@/shared/lib/toast";
 import { HotelCreatePage } from "./hotel-create-page";
 
 vi.mock("@/shared/api", async (importOriginal) => ({
@@ -35,7 +36,15 @@ vi.mock("@/shared/api", async (importOriginal) => ({
   createHotel: vi.fn(),
 }));
 
+vi.mock("@/shared/lib/toast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/shared/lib/toast")>()),
+  showToast: vi.fn(),
+  dismissToast: vi.fn(),
+}));
+
 const onMutationError = vi.fn();
+
+const CREATE_MESSAGE = "호텔을 등록했습니다.";
 
 const DETAIL_PAGE_TEXT = "호텔 상세 화면";
 
@@ -97,7 +106,12 @@ function createErrorBody(
   message: string,
   fieldErrors: FieldError[] = [],
 ) {
-  return { success: false, data: null, error: { code, message, fieldErrors } };
+  return {
+    success: false,
+    data: null,
+    message: null,
+    error: { code, message, fieldErrors },
+  };
 }
 
 function createAxiosError(status: number, data: unknown) {
@@ -183,11 +197,6 @@ function getSubmitButton() {
 
 function getCancelLink() {
   return screen.getByRole("link", { name: COMMON_MESSAGES.cancel });
-}
-
-function expectBetweenFieldsAndButtons(element: HTMLElement) {
-  expect(element.previousElementSibling).toContainElement(getMasterGroup());
-  expect(element.nextElementSibling).toContainElement(getSubmitButton());
 }
 
 function getInvalidFields() {
@@ -463,8 +472,11 @@ describe("HotelCreatePage 요청", () => {
     expect(createHotel).toHaveBeenCalledOnce();
   });
 
-  it("등록에 성공하면 목록 캐시를 무효화하고 상세 캐시에 넣은 뒤 방문 기록을 바꿔 상세로 이동한다", async () => {
-    vi.mocked(createHotel).mockResolvedValue(HOTEL);
+  it("등록에 성공하면 서버의 성공 문구를 토스트로 띄우고 목록 캐시를 무효화하고 상세 캐시에 넣은 뒤 방문 기록을 바꿔 상세로 이동한다", async () => {
+    vi.mocked(createHotel).mockResolvedValue({
+      data: HOTEL,
+      message: CREATE_MESSAGE,
+    });
     const { user, router, queryClient } = await renderHotelCreatePage();
     const listQueryKey = hotelListQueryKey({ page: 0 });
     queryClient.setQueryData(listQueryKey, EMPTY_HOTEL_PAGE);
@@ -472,6 +484,10 @@ describe("HotelCreatePage 요청", () => {
     await submitValidForm(user);
 
     expect(await screen.findByText(DETAIL_PAGE_TEXT)).toBeInTheDocument();
+    expect(showToast).toHaveBeenCalledExactlyOnceWith({
+      type: "success",
+      message: CREATE_MESSAGE,
+    });
     expect(router.state.location.href).toBe(`/hotels/${HOTEL.id}`);
     expect(queryClient.getQueryState(listQueryKey)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryData(hotelQueryKey(HOTEL.id))).toEqual(HOTEL);
@@ -529,7 +545,7 @@ describe("HotelCreatePage 서버 오류 처리", () => {
     expect(fields.password).toHaveAccessibleDescription(
       describedText("password", "비밀번호 서버 오류"),
     );
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(showToast).not.toHaveBeenCalled();
     expect(getSubmitButton()).not.toBeDisabled();
   });
 
@@ -553,7 +569,7 @@ describe("HotelCreatePage 서버 오류 처리", () => {
     expect(loginId).toHaveAccessibleDescription(
       describedText("loginId", message),
     );
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(showToast).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -577,17 +593,21 @@ describe("HotelCreatePage 서버 오류 처리", () => {
       500,
       createErrorBody("INTERNAL_SERVER_ERROR", "서버 내부 오류가 발생했습니다."),
     ],
-  ])("%s이면 서버 문구를 제출 버튼 위 알림으로 보여준다", async (_, status, body) => {
+  ])("%s이면 서버 문구를 폼 안이 아닌 오류 토스트로 보여준다", async (_, status, body) => {
     vi.mocked(createHotel).mockRejectedValue(createAxiosError(status, body));
     const { user } = await renderHotelCreatePage();
 
     await submitValidForm(user);
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(body.error.message);
-    expectBetweenFieldsAndButtons(alert);
+    await vi.waitFor(() => {
+      expect(getSubmitButton()).not.toBeDisabled();
+    });
+    expect(showToast).toHaveBeenCalledExactlyOnceWith({
+      type: "error",
+      message: body.error.message,
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(getInvalidFields()).toEqual([]);
-    expect(getSubmitButton()).not.toBeDisabled();
   });
 
   it.each([
@@ -595,19 +615,24 @@ describe("HotelCreatePage 서버 오류 처리", () => {
     ["요청 검증 오류", new RequestValidationError("createHotel", [])],
     ["응답 검증 오류", new ResponseValidationError("createHotel", [])],
     ["형식이 다른 오류 응답", createAxiosError(502, "<html>Bad Gateway</html>")],
-  ])("%s면 일반 오류 문구를 제출 버튼 위 알림으로 보여준다", async (_, error) => {
+  ])("%s면 일반 오류 문구를 오류 토스트로 보여준다", async (_, error) => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(createHotel).mockRejectedValue(error);
     const { user } = await renderHotelCreatePage();
 
     await submitValidForm(user);
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(COMMON_MESSAGES.requestFailed);
-    expectBetweenFieldsAndButtons(alert);
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalledExactlyOnceWith({
+        type: "error",
+        message: COMMON_MESSAGES.requestFailed,
+      });
+    });
   });
 
-  it("제출 버튼 위 알림이 있을 때 다시 제출하면 알림을 지운다", async () => {
+  it("폼이 띄운 오류 토스트는 다시 제출하면 지운다", async () => {
+    const toastId = 7;
+    vi.mocked(showToast).mockReturnValue(toastId);
     vi.mocked(createHotel)
       .mockRejectedValueOnce(
         createAxiosError(
@@ -619,15 +644,18 @@ describe("HotelCreatePage 서버 오류 처리", () => {
     const { user } = await renderHotelCreatePage();
 
     await submitValidForm(user);
-    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalledOnce();
+    });
+    expect(dismissToast).not.toHaveBeenCalled();
 
     await user.click(getSubmitButton());
 
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(dismissToast).toHaveBeenCalledExactlyOnceWith(toastId);
     expect(createHotel).toHaveBeenCalledTimes(2);
   });
 
-  it("로그인이 필요하다는 응답은 전역 오류 처리기로 넘긴다", async () => {
+  it("로그인이 필요하다는 응답은 전역 오류 처리기로 넘기고 토스트를 띄우지 않는다", async () => {
     const error = createAxiosError(
       401,
       createErrorBody(API_ERROR_CODES.unauthorized, "로그인이 필요합니다."),
@@ -641,5 +669,9 @@ describe("HotelCreatePage 서버 오류 처리", () => {
       expect(onMutationError).toHaveBeenCalledOnce();
     });
     expect(onMutationError.mock.lastCall?.[0]).toBe(error);
+    await vi.waitFor(() => {
+      expect(getSubmitButton()).not.toBeDisabled();
+    });
+    expect(showToast).not.toHaveBeenCalled();
   });
 });

@@ -15,7 +15,6 @@ export function HotelUpdateForm({
   const {
     fields,
     alert,
-    canReload,
     status,
     reloadButtonRef,
     handleSubmit,
@@ -30,7 +29,6 @@ export function HotelUpdateForm({
       hotelId={hotelId}
       fields={fields}
       alert={alert}
-      canReload={canReload}
       status={status}
       reloadButtonRef={reloadButtonRef}
       onSubmit={handleSubmit}

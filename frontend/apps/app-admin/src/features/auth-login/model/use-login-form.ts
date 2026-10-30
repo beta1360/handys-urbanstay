@@ -7,6 +7,7 @@ import {
   SUBMIT_ONLY_VALIDATION,
   toFieldPropsMap,
 } from "@/shared/lib/form";
+import { showToast } from "@/shared/lib/toast";
 import { useLogin } from "../api/use-login";
 import { LOGIN_FIELDS, loginFormSchema } from "./login-form-schema";
 
@@ -25,7 +26,8 @@ export function useLoginForm(redirectTo: string) {
 
   const submit = form.handleSubmit(async (body) => {
     try {
-      await login(body);
+      const { message } = await login(body);
+      showToast({ type: "success", message });
       await navigate({ href: redirectTo });
     } catch (error) {
       showSubmitError(error, { fields: LOGIN_FIELDS, setError: form.setError });

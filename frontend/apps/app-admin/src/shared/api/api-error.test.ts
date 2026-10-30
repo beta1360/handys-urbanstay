@@ -34,6 +34,7 @@ describe("getApiError", () => {
     const error = createAxiosError(401, {
       success: false,
       data: null,
+      message: null,
       error: INVALID_CREDENTIALS_ERROR,
     });
 

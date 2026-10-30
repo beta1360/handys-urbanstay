@@ -47,11 +47,18 @@ const GetHotelsSuccessResponse = GetHotelsResponse.extend({
 
 const GetHotelSuccessResponse = GetHotelResponse.extend(HOTEL_SUCCESS_SHAPE);
 
-const CreateHotelSuccessResponse =
-  CreateHotelResponse.extend(HOTEL_SUCCESS_SHAPE);
+const HOTEL_CHANGE_SUCCESS_SHAPE = {
+  ...HOTEL_SUCCESS_SHAPE,
+  message: z.string(),
+};
 
-const UpdateHotelSuccessResponse =
-  UpdateHotelResponse.extend(HOTEL_SUCCESS_SHAPE);
+const CreateHotelSuccessResponse = CreateHotelResponse.extend(
+  HOTEL_CHANGE_SUCCESS_SHAPE,
+);
+
+const UpdateHotelSuccessResponse = UpdateHotelResponse.extend(
+  HOTEL_CHANGE_SUCCESS_SHAPE,
+);
 
 type RequestOptions = {
   signal?: AbortSignal;
@@ -98,11 +105,12 @@ export async function createHotel(body: CreateHotelBody) {
     body,
   );
   const response = await generated.createHotel(validBody);
-  return parseResponseBody(
+  const { data, message } = parseResponseBody(
     "createHotel",
     CreateHotelSuccessResponse,
     response,
-  ).data;
+  );
+  return { data, message };
 }
 
 export async function updateHotel(hotelId: number, body: UpdateHotelBody) {
@@ -115,9 +123,10 @@ export async function updateHotel(hotelId: number, body: UpdateHotelBody) {
     body,
   );
   const response = await generated.updateHotel(validParams.hotelId, validBody);
-  return parseResponseBody(
+  const { data, message } = parseResponseBody(
     "updateHotel",
     UpdateHotelSuccessResponse,
     response,
-  ).data;
+  );
+  return { data, message };
 }

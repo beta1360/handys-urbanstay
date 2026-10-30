@@ -21,6 +21,7 @@ const LOGIN_BODY = {
 const ACCOUNT_RESPONSE = {
   success: true,
   data: { id: 1, loginId: "admin@urbanstay.com", name: "관리자" },
+  message: null,
   error: null,
 };
 
@@ -34,7 +35,24 @@ const UNSUCCESSFUL_ACCOUNT_RESPONSES = [
   ["data가 null", { ...ACCOUNT_RESPONSE, data: null }],
 ] as const;
 
-const LOGOUT_RESPONSE = { success: true, data: null, error: null };
+const LOGIN_MESSAGE = "로그인했습니다.";
+
+const LOGIN_RESPONSE = { ...ACCOUNT_RESPONSE, message: LOGIN_MESSAGE };
+
+const UNSUCCESSFUL_LOGIN_RESPONSES = [
+  ["success가 false", { ...LOGIN_RESPONSE, success: false }],
+  ["data가 null", { ...LOGIN_RESPONSE, data: null }],
+  ["message가 null", { ...LOGIN_RESPONSE, message: null }],
+] as const;
+
+const LOGOUT_MESSAGE = "로그아웃했습니다.";
+
+const LOGOUT_RESPONSE = {
+  success: true,
+  data: null,
+  message: LOGOUT_MESSAGE,
+  error: null,
+};
 
 let consoleError: ReturnType<typeof vi.spyOn>;
 
@@ -80,16 +98,17 @@ describe("fetchMe", () => {
 });
 
 describe("loginAccount", () => {
-  it("요청 본문과 응답이 스키마와 맞으면 요청을 보내고 계정 정보를 돌려준다", async () => {
-    vi.mocked(login).mockResolvedValue(ACCOUNT_RESPONSE);
+  it("요청 본문과 응답이 스키마와 맞으면 요청을 보내고 계정 정보와 성공 문구를 돌려준다", async () => {
+    vi.mocked(login).mockResolvedValue(LOGIN_RESPONSE);
 
-    await expect(loginAccount(LOGIN_BODY)).resolves.toEqual(
-      ACCOUNT_RESPONSE.data,
-    );
+    await expect(loginAccount(LOGIN_BODY)).resolves.toEqual({
+      data: LOGIN_RESPONSE.data,
+      message: LOGIN_MESSAGE,
+    });
     expect(login).toHaveBeenCalledWith(LOGIN_BODY);
   });
 
-  it.each(UNSUCCESSFUL_ACCOUNT_RESPONSES)(
+  it.each(UNSUCCESSFUL_LOGIN_RESPONSES)(
     "성공 응답의 %s면 응답 검증 오류를 던진다",
     async (_, response) => {
       vi.mocked(login).mockResolvedValue(response);
@@ -108,7 +127,10 @@ describe("loginAccount", () => {
   });
 
   it("응답이 스키마와 맞지 않으면 응답 검증 오류를 던진다", async () => {
-    vi.mocked(login).mockResolvedValue(ACCOUNT_RESPONSE_WITH_WRONG_ID as never);
+    vi.mocked(login).mockResolvedValue({
+      ...LOGIN_RESPONSE,
+      data: ACCOUNT_RESPONSE_WITH_WRONG_ID.data,
+    } as never);
 
     await expect(loginAccount(LOGIN_BODY)).rejects.toBeInstanceOf(
       ResponseValidationError,
@@ -117,10 +139,20 @@ describe("loginAccount", () => {
 });
 
 describe("logoutAccount", () => {
-  it("응답이 스키마와 맞으면 값 없이 끝난다", async () => {
+  it("응답이 스키마와 맞으면 성공 문구를 돌려준다", async () => {
     vi.mocked(logout).mockResolvedValue(LOGOUT_RESPONSE);
 
-    await expect(logoutAccount()).resolves.toBeUndefined();
+    await expect(logoutAccount()).resolves.toEqual({
+      message: LOGOUT_MESSAGE,
+    });
+  });
+
+  it("성공 응답의 message가 null이면 응답 검증 오류를 던진다", async () => {
+    vi.mocked(logout).mockResolvedValue({ ...LOGOUT_RESPONSE, message: null });
+
+    await expect(logoutAccount()).rejects.toBeInstanceOf(
+      ResponseValidationError,
+    );
   });
 
   it("응답이 스키마와 맞지 않으면 응답 검증 오류를 던진다", async () => {

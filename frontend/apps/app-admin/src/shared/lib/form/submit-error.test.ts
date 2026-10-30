@@ -29,6 +29,7 @@ function createApiError({
       data: {
         success: false,
         data: null,
+        message: null,
         error: { code, message, fieldErrors },
       },
       status: 400,
@@ -113,4 +114,42 @@ describe("showSubmitError", () => {
       expect(show(error)).toEqual([[FORM_ALERT, { type: code, message }]]);
     },
   );
+
+  it.each([
+    [
+      "본문을 쓸 수 없는 오류",
+      new AxiosError("Network Error", AxiosError.ERR_NETWORK),
+      { code: undefined, message: COMMON_MESSAGES.requestFailed },
+    ],
+    [
+      "칸과 묶이지 않는 오류 코드",
+      createApiError({ code: API_ERROR_CODES.hotelDuplicated }),
+      {
+        code: API_ERROR_CODES.hotelDuplicated,
+        message: "입력값이 올바르지 않습니다.",
+      },
+    ],
+  ])("%s는 폼 알림을 세우고 onAlert로도 알린다", (_, error, alert) => {
+    const setError = vi.fn<UseFormSetError<Values>>();
+    const onAlert = vi.fn();
+
+    showSubmitError<Values>(error, { fields: FIELDS, setError, onAlert });
+
+    expect(setError).toHaveBeenCalledExactlyOnceWith(FORM_ALERT, {
+      type: alert.code,
+      message: alert.message,
+    });
+    expect(onAlert).toHaveBeenCalledExactlyOnceWith(alert);
+  });
+
+  it("로그인이 필요하다는 오류는 전역 오류 처리기가 맡으므로 폼 알림만 세우고 onAlert로 알리지 않는다", () => {
+    const setError = vi.fn<UseFormSetError<Values>>();
+    const onAlert = vi.fn();
+    const error = createApiError({ code: API_ERROR_CODES.unauthorized });
+
+    showSubmitError<Values>(error, { fields: FIELDS, setError, onAlert });
+
+    expect(setError).toHaveBeenCalledOnce();
+    expect(onAlert).not.toHaveBeenCalled();
+  });
 });

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useLogout as useLogoutRequest } from "@/features/auth-logout";
+import { showToast } from "@/shared/lib/toast";
 
 export type LogoutStatus = "idle" | "pending" | "failed";
 
@@ -14,11 +15,15 @@ export function useLogout() {
       return;
     }
     setStatus("pending");
+    let message: string | undefined;
     try {
-      await requestLogout();
+      message = (await requestLogout()).message;
     } catch {
       setStatus("failed");
       return;
+    }
+    if (message !== undefined) {
+      showToast({ type: "success", message });
     }
     await navigate({ to: "/login" });
   }
