@@ -61,18 +61,20 @@ apps/app-admin/
    │  │  │        └─ edit.tsx    # /hotels/$hotelId/edit (호텔 수정)
    │  │  └─ login.tsx            # /login (?redirect=)
    │  └─ styles/
-   ├─ pages/           # error(화면 오류), hotel-create(호텔 등록: features/hotel-create의 HotelCreateForm 배치), hotel-detail(호텔 상세: 경로 파라미터를 읽고 widgets/hotel-detail을 배치), hotel-edit(호텔 수정: 경로 파라미터를 읽고 features/hotel-update의 HotelUpdate 배치), hotel-list(호텔 목록: 검색·페이지·URL search 스키마, 호텔 등록 버튼), login(로그인 화면 틀. redirect를 읽어 features/auth-login의 LoginForm 배치)
+   ├─ pages/           # error(화면 오류), hotel-create(호텔 등록: features/hotel-create의 HotelCreateForm 배치), hotel-detail(호텔 상세: 경로 파라미터를 읽고 widgets/hotel-detail을 배치), hotel-edit(호텔 수정: 경로 파라미터를 읽고 features/hotel-update의 HotelUpdate 배치), hotel-list(호텔 목록: URL search 스키마. keyword·page를 읽어 features/hotel-search의 HotelSearchForm, 호텔 등록 링크, widgets/hotel-list의 HotelList 배치), login(로그인 화면 틀. redirect를 읽어 features/auth-login의 LoginForm 배치)
    ├─ widgets/
    │  ├─ admin-layout/ # 사이드바 메뉴(config/menu.ts), 위쪽 영역. model: useAdminHeader(화면 제목·계정 이름·로그아웃 상태). ui: AdminHeader(연결)·AdminHeaderBar(표현)
-   │  └─ hotel-detail/ # 호텔 상세. HotelDetail(연결)이 useHotel의 상태 값으로 찾을 수 없음 또는 링크 줄 + 불러오는 중·실패·내용을 고른다
+   │  ├─ hotel-detail/ # 호텔 상세. HotelDetail(연결)이 useHotel의 상태 값으로 찾을 수 없음 또는 링크 줄 + 불러오는 중·실패·내용을 고른다
+   │  └─ hotel-list/   # 호텔 목록. model: useHotelList(상태 값 loading·failed·empty·ready, 마지막 페이지를 넘으면 바로잡기, 페이지 이동). ui: HotelList(연결)·표·페이지 이동·상태별 화면(표현)
    ├─ features/
    │  ├─ hotel-create/    # 호텔 등록 폼. api: 등록 변경 훅(성공하면 entities/hotel의 캐시 규칙). model: 폼 스키마(마스터 계정 포함), useHotelCreateForm(react-hook-form, 성공하면 상세로 이동). ui: HotelCreateForm(연결)·HotelCreateFormView·MasterAccountFields(표현)
    │  ├─ hotel-update/    # 호텔 수정. api: 수정 변경 훅(성공하면 entities/hotel의 캐시 규칙). model: 폼 스키마(version 포함), useHotelUpdateForm(react-hook-form, 처음 값으로 한 번만 채움, 수정 충돌 시 최신 내용 불러오기, 성공하면 상세로 이동). ui: HotelUpdate(연결: useHotel 상태로 불러오는 중·실패·찾을 수 없음·폼을 고름)·HotelUpdateForm(연결)·HotelUpdateFormView(표현)
    │  ├─ auth-login/      # 로그인 폼. api: 로그인(성공하면 로그인 상태 시작). model: 폼 스키마, useLoginForm(react-hook-form, 성공하면 redirect로 이동). ui: LoginForm(연결)·LoginFormView(표현)
-   │  └─ auth-logout/     # api: 로그아웃. 성공하거나 401이면 로그인 상태를 끝낸다
+   │  ├─ auth-logout/     # api: 로그아웃. 성공하거나 401이면 로그인 상태를 끝낸다
+   │  └─ hotel-search/    # 호텔 목록 검색. model: useHotelSearchForm(react-hook-form, URL 검색어를 따라감, 검색하면 1페이지 목록으로 이동). ui: HotelSearchForm(연결)·표현
    ├─ entities/
    │  ├─ account/      # api: 내 정보 조회, 로그인 상태 캐시 규칙(시작·끝·내 정보 지우기)
-   │  └─ hotel/        # api: 호텔 상세·목록 조회 훅, 캐시 규칙. lib: 목록 페이지 계산. config: 호텔 항목 이름(HOTEL_FIELD_LABELS). 호텔 id 경로 파라미터 검사, 호텔 하나 조회(상태 값 하나, 404는 notFound), 상태별 화면·상세 내용 목록(HotelInformation), 등록·수정이 함께 쓰는 호텔 정보 입력 칸(HotelInfoFields)과 폼 스키마 조각
+   │  └─ hotel/        # api: 호텔 상세·목록 조회 훅, 캐시 규칙. lib: 목록 페이지 계산, 요청할 수 있는 페이지 범위, 검색어 정리(URL 스키마·검색·목록이 함께 쓴다). config: 호텔 항목 이름(HOTEL_FIELD_LABELS). 호텔 id 경로 파라미터 검사, 호텔 하나 조회(상태 값 하나, 404는 notFound), 상태별 화면·상세 내용 목록(HotelInformation), 등록·수정이 함께 쓰는 호텔 정보 입력 칸(HotelInfoFields)과 폼 스키마 조각
    └─ shared/
       ├─ api/          # 검증된 API만 index.ts로 내보낸다. TanStack Query를 쓰지 않는다
       │  ├─ account.ts          # 내 정보 조회와 쿼리 키, 로그인, 로그아웃, 로그인 요청 스키마
