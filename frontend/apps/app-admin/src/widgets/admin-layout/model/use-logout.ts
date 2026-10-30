@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useLogout as useLogoutRequest } from "@/features/auth-logout";
 
-type LogoutStatus = "idle" | "pending" | "failed";
+export type LogoutStatus = "idle" | "pending" | "failed";
 
 export function useLogout() {
   const { logout: requestLogout } = useLogoutRequest();
@@ -23,9 +23,5 @@ export function useLogout() {
     await navigate({ to: "/login" });
   }
 
-  return {
-    logout,
-    isPending: status === "pending",
-    isFailed: status === "failed",
-  };
+  return { status, logout };
 }

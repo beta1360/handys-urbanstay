@@ -1,21 +1,33 @@
 import { getRouteApi } from "@tanstack/react-router";
-import { HotelLoadState, HotelNotFound, useHotel } from "@/entities/hotel";
+import {
+  HotelLoadFailed,
+  HotelLoading,
+  HotelNotFound,
+  useHotel,
+} from "@/entities/hotel";
 import { HotelEditForm } from "./hotel-edit-form";
 
 const hotelRoute = getRouteApi("/_authenticated/hotels/$hotelId");
 
 function HotelEditContent({ hotelId }: { hotelId: number }) {
-  const { hotel, isNotFound, isLoadFailed, retry } = useHotel(hotelId);
+  const state = useHotel(hotelId);
 
-  if (hotel !== undefined) {
-    return (
-      <HotelEditForm key={hotelId} hotelId={hotelId} initialHotel={hotel} />
-    );
+  switch (state.status) {
+    case "ready":
+      return (
+        <HotelEditForm
+          key={hotelId}
+          hotelId={hotelId}
+          initialHotel={state.hotel}
+        />
+      );
+    case "notFound":
+      return <HotelNotFound />;
+    case "failed":
+      return <HotelLoadFailed onRetry={state.retry} />;
+    case "loading":
+      return <HotelLoading />;
   }
-  if (isNotFound) {
-    return <HotelNotFound />;
-  }
-  return <HotelLoadState isLoadFailed={isLoadFailed} onRetry={retry} />;
 }
 
 export function HotelEditPage() {

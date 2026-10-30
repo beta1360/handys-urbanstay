@@ -3,13 +3,12 @@ import { Card } from "@repo/ui/card";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { HOTEL_LOAD_MESSAGES } from "../config/messages";
 
-type HotelLoadStateProps = {
-  isLoadFailed: boolean;
+type HotelLoadFailedProps = {
   onRetry: () => void;
 };
 
-export function HotelLoadState({ isLoadFailed, onRetry }: HotelLoadStateProps) {
-  return isLoadFailed ? (
+export function HotelLoadFailed({ onRetry }: HotelLoadFailedProps) {
+  return (
     <Card>
       <div className="flex flex-col items-center gap-4">
         <p role="alert" className="text-sm text-neutral-700">
@@ -19,12 +18,6 @@ export function HotelLoadState({ isLoadFailed, onRetry }: HotelLoadStateProps) {
           {COMMON_MESSAGES.retry}
         </Button>
       </div>
-    </Card>
-  ) : (
-    <Card>
-      <p role="status" className="text-center text-sm text-neutral-500">
-        {COMMON_MESSAGES.loading}
-      </p>
     </Card>
   );
 }

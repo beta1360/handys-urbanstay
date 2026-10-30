@@ -12,6 +12,7 @@ import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   HOTEL_FIELD_LABELS,
+  HOTEL_INFORMATION_MESSAGES,
   HOTEL_LOAD_MESSAGES,
   HOTEL_NOT_FOUND_MESSAGES,
   parseHotelPathParams,
@@ -21,7 +22,7 @@ import { API_ERROR_CODES } from "@/shared/api";
 import type { Hotel } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
-import { HOTEL_DETAIL_MESSAGES } from "../config/messages";
+import { HOTEL_DETAIL_ACTION_MESSAGES } from "@/widgets/hotel-detail";
 import { HotelDetailPage } from "./hotel-detail-page";
 
 const { fetchHotel } = vi.hoisted(() => ({ fetchHotel: vi.fn() }));
@@ -180,7 +181,7 @@ describe("HotelDetailPage 정보", () => {
 
     expect(await screen.findByText(HOTEL.name)).toBeInTheDocument();
     expect(getDescriptionTexts().at(-1)).toBe(
-      HOTEL_DETAIL_MESSAGES.emptyDescription,
+      HOTEL_INFORMATION_MESSAGES.emptyDescription,
     );
   });
 
@@ -295,7 +296,7 @@ describe("HotelDetailPage 수정 버튼", () => {
     const router = renderHotelDetailPage();
 
     const editLink = await screen.findByRole("link", {
-      name: HOTEL_DETAIL_MESSAGES.edit,
+      name: HOTEL_DETAIL_ACTION_MESSAGES.edit,
     });
     expect(editLink).toHaveAttribute("href", `${hotelPath(HOTEL.id)}/edit`);
     expect(editLink.parentElement).toBe(getBackLink().parentElement);
@@ -325,7 +326,7 @@ describe("HotelDetailPage 수정 버튼", () => {
 
     expect(await screen.findByRole(role)).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: HOTEL_DETAIL_MESSAGES.edit }),
+      screen.queryByRole("link", { name: HOTEL_DETAIL_ACTION_MESSAGES.edit }),
     ).not.toBeInTheDocument();
   });
 });
