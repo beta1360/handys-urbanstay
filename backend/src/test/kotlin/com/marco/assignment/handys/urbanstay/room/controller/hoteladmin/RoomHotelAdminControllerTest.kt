@@ -47,6 +47,7 @@ import org.springframework.test.web.servlet.put
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.databind.node.ObjectNode
+import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -445,6 +446,20 @@ class RoomHotelAdminControllerTest {
 		val room = saveRoom(hotel, NAME)
 
 		update(room.id!!, updateBody(0, field to value)).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(TYPE))
+	}
+
+	@Test
+	fun `정수 항목, 객실 id, page가 타입 범위를 넘으면 그 이름과 형식 메시지로 400 응답하고 바꾸지 않는다`() {
+		val room = saveRoom(hotel, NAME)
+
+		create(createBody("capacity" to 3000000000L)).andExpectError(CommonErrorCode.INVALID_INPUT, "capacity" to message(TYPE))
+		create(createBody("floor" to -3000000000L)).andExpectError(CommonErrorCode.INVALID_INPUT, "floor" to message(TYPE))
+		update(room.id!!, updateBody(0, "version" to BigInteger("99999999999999999999")))
+			.andExpectError(CommonErrorCode.INVALID_INPUT, "version" to message(TYPE))
+		mockMvc.get("$ROOMS/99999999999999999999") { with(user(masterPrincipal)) }.andExpectError(CommonErrorCode.INVALID_INPUT, "roomId" to message(TYPE))
+		getRooms("page" to "99999999999").andExpectError(CommonErrorCode.INVALID_INPUT, "page" to message(TYPE))
+		assertThat(roomNames(hotel)).containsExactly(NAME)
+		assertUnchanged(room)
 	}
 
 	@ParameterizedTest
