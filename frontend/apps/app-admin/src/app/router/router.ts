@@ -1,4 +1,5 @@
 import { createRouter } from "@tanstack/react-router";
+import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { handleUnauthorizedError } from "../auth/unauthorized-handler";
 import { createQueryClient } from "../query/query-client";
 import { routeTree } from "./route-tree.gen";
@@ -10,6 +11,8 @@ export const queryClient = createQueryClient((error, queryKey) =>
 export const router = createRouter({
   routeTree,
   context: { queryClient },
+  parseSearch,
+  stringifySearch,
   defaultPreload: "intent",
   scrollRestoration: true,
 });

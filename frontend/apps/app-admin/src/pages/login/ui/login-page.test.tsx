@@ -25,6 +25,7 @@ import {
   ResponseValidationError,
 } from "@/shared/api";
 import { APP_INFO } from "@/shared/config";
+import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { LOGIN_MESSAGES } from "../config/messages";
 import { LoginPage } from "./login-page";
 
@@ -33,7 +34,7 @@ vi.mock("@/shared/api", async (importOriginal) => ({
   loginAccount: vi.fn(),
 }));
 
-const REDIRECT_HREF = "/hotels?page=2";
+const REDIRECT_HREF = "/hotels?keyword=101&page=2";
 
 const ACCOUNT = { id: 1, loginId: "admin@urbanstay.com", name: "관리자" };
 
@@ -80,6 +81,8 @@ function renderLoginPage() {
     history: createMemoryHistory({
       initialEntries: [`/login?redirect=${encodeURIComponent(REDIRECT_HREF)}`],
     }),
+    parseSearch,
+    stringifySearch,
   });
 
   render(

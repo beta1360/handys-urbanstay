@@ -8,11 +8,12 @@ import {
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { API_ERROR_CODES, meQueryOptions } from "@/shared/api";
+import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { LOGIN_PATH } from "./login-redirect";
 import { handleUnauthorizedError } from "./unauthorized-handler";
 
 const ACCOUNT = { id: 1, loginId: "admin@urbanstay.com", name: "관리자" };
-const CURRENT_HREF = "/hotels?page=2";
+const CURRENT_HREF = "/hotels?keyword=101&page=2";
 const OTHER_QUERY_KEY = ["hotels"];
 
 function createApiError(status: number, code: string) {
@@ -42,6 +43,8 @@ async function setup(initialPath: string, { hasMe = true } = {}) {
       createRoute({ getParentRoute: () => rootRoute, path: "login" }),
     ]),
     history: createMemoryHistory({ initialEntries: [initialPath] }),
+    parseSearch,
+    stringifySearch,
   });
   await router.load();
   const queryClient = new QueryClient();
@@ -73,6 +76,9 @@ describe("handleUnauthorizedError", () => {
       await vi.waitFor(() => {
         expect(router.state.location.pathname).toBe(LOGIN_PATH);
       });
+      expect(router.state.location.href).toBe(
+        "/login?redirect=%2Fhotels%3Fkeyword%3D101%26page%3D2",
+      );
       expect(router.state.location.search).toEqual({ redirect: CURRENT_HREF });
       expect(
         queryClient.getQueryData(meQueryOptions().queryKey),

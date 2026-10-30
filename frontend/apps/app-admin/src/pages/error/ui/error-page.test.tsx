@@ -7,6 +7,7 @@ import {
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { ERROR_PAGE_MESSAGES } from "../config/messages";
 import { ErrorPage } from "./error-page";
 
@@ -14,6 +15,8 @@ function renderErrorPage() {
   const router = createRouter({
     routeTree: createRootRoute({ component: ErrorPage }),
     history: createMemoryHistory({ initialEntries: ["/"] }),
+    parseSearch,
+    stringifySearch,
   });
 
   render(<RouterProvider router={router} />);

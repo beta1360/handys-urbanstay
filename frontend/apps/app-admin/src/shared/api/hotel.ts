@@ -22,6 +22,8 @@ export const createHotelBodySchema = HotelCreateAppAdminRequest;
 
 export const updateHotelBodySchema = HotelUpdateAppAdminRequest;
 
+export const hotelListParamsSchema = GetHotelsQueryParams;
+
 export type CreateHotelBody = z.input<typeof HotelCreateAppAdminRequest>;
 
 export type UpdateHotelBody = z.input<typeof HotelUpdateAppAdminRequest>;
