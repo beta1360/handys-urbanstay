@@ -49,6 +49,7 @@ urbanstay/
   - non-null 프로퍼티의 빠진 필드·null, 빠진 필수 요청 파라미터: `validation.required`
   - non-null 원소 목록(예: `List<String>`)의 null 원소도 `validation.required`이고 필드는 원소 경로(예: `tags[0]`)다. Kotlin 모듈의 `StrictNullChecks`(기본 켜짐)가 막는다. `List<String?>`는 null 원소를 받는다.
   - 타입이 틀린 값(예: 문자열 자리에 배열·객체), 쿼리·경로 파라미터 타입 불일치: `validation.type`
+  - 정수(`Int`·`Long`, nullable·목록 원소·중첩 객체 포함)의 타입 범위를 넘는 값도 `validation.type`이고 필드는 그 경로(예: `capacity`, `ids[1]`)다. Jackson은 이 오류를 `MismatchedInputException`이 아닌 `InputCoercionException`(경로는 담겨 있다)으로 던지므로 `GlobalExceptionHandler`가 함께 처리한다. 쿼리·경로 파라미터의 범위 초과도 `validation.type`이다.
   - enum은 상수 이름 문자열만 받는다(대소문자 구분). 숫자(예: `0`)와 없는 이름은 `validation.type`이다(`spring.jackson.datatype.enum.fail-on-numbers-for-enums=true`).
   - `LocalDate`, `LocalDateTime`, `OffsetDateTime`은 ISO 8601 문자열(예: `2026-10-29`, `2026-10-29T10:00:00`, `2026-10-29T10:00:00+09:00`)만 받는다. 숫자(타임스탬프), 배열, 숫자 문자열, 다른 형식은 `validation.type`이다(`JacksonConfig`의 `isoDateTimeModule`, `@JsonFormat` 패턴으로 바꿀 수 없다). `OffsetDateTime`은 UTC로 바꿔 읽는다. 다른 날짜·시간 타입(예: `Instant`)을 요청에 쓰려면 먼저 `isoDateTimeModule`에 등록한다.
   - `LocalTime`은 시와 분이 두 자리씩인 `HH:mm` 문자열(`00:00`~`23:59`, 예: `15:00`, `09:30`)만 받는다. 초가 붙은 값(`15:00:00`), 한 자리 시(`9:30`), `24:00`, 앞뒤 공백이 붙은 값, 숫자, 배열은 `validation.type`이다(`isoDateTimeModule`에 등록한 `ResolverStyle.STRICT`의 `HH:mm` 포매터). 응답도 같은 포매터의 `LocalTimeSerializer`(`isoDateTimeModule`에 등록)로 `HH:mm` 문자열이다. Jackson 기본 직렬화는 `15:00:00`이다.

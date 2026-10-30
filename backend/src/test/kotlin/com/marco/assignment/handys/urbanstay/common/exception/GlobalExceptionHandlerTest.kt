@@ -172,6 +172,19 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	fun `정수 필드는 타입 범위의 끝 값까지 읽는다`() {
+		postNumbers(numberBody(*NUMBER_BOUNDS))
+			.andExpectEnvelope(200, """{"success":true,"data":${numberBody(*NUMBER_BOUNDS)},"error":null}""")
+	}
+
+	@ParameterizedTest
+	@MethodSource("integerMismatches")
+	fun `정수 필드에 타입 범위를 넘는 정수나 실수를 보내면 바꾸지 않고 그 필드 경로와 형식 메시지로 400 응답한다`(field: String, value: String, path: String) {
+		postNumbers(numberBody(field to value))
+			.andExpectError(CommonErrorCode.INVALID_INPUT, fieldErrors(path, TYPE))
+	}
+
+	@Test
 	fun `목록 안 필드의 Bean Validation 경로도 같은 형식이다`() {
 		postDetail(detailBody("rooms" to """[{"name":"101"},{"name":""}]"""))
 			.andExpectError(CommonErrorCode.INVALID_INPUT, fieldErrors("rooms[1].name", REQUIRED))
@@ -183,15 +196,17 @@ class GlobalExceptionHandlerTest {
 		postDetail(body).andExpectError(CommonErrorCode.INVALID_INPUT)
 	}
 
-	@Test
-	fun `경로 변수 타입이 맞지 않으면 변수 이름과 형식 메시지로 400 응답한다`() {
-		mockMvc.get("$TEST_PATH/items/abc")
+	@ParameterizedTest
+	@ValueSource(strings = ["abc", "9223372036854775808", "-9223372036854775809", "99999999999999999999"])
+	fun `경로 변수 타입이 맞지 않거나 타입 범위를 넘으면 변수 이름과 형식 메시지로 400 응답한다`(id: String) {
+		mockMvc.get("$TEST_PATH/items/$id")
 			.andExpectError(CommonErrorCode.INVALID_INPUT, fieldErrors("id", TYPE))
 	}
 
-	@Test
-	fun `요청 파라미터 타입이 맞지 않으면 파라미터 이름과 형식 메시지로 400 응답한다`() {
-		mockMvc.get("$TEST_PATH/search?keyword=room&page=abc")
+	@ParameterizedTest
+	@ValueSource(strings = ["abc", "2147483648", "-2147483649", "99999999999"])
+	fun `요청 파라미터 타입이 맞지 않거나 타입 범위를 넘으면 파라미터 이름과 형식 메시지로 400 응답한다`(page: String) {
+		mockMvc.get("$TEST_PATH/search?keyword=room&page=$page")
 			.andExpectError(CommonErrorCode.INVALID_INPUT, fieldErrors("page", TYPE))
 	}
 
@@ -293,6 +308,14 @@ class GlobalExceptionHandlerTest {
 			content = body
 		}
 
+	private fun postNumbers(body: String): ResultActionsDsl =
+		mockMvc.post("$TEST_PATH/numbers") {
+			contentType = MediaType.APPLICATION_JSON
+			content = body
+		}
+
+	private fun numberBody(vararg fields: Pair<String, String>): String = json(VALID_NUMBERS + fields)
+
 	private fun detailBody(vararg fields: Pair<String, String>): String = json(VALID_DETAIL + fields)
 
 	private fun detailBodyWithout(field: String): String = json(VALID_DETAIL - field)
@@ -335,6 +358,18 @@ class GlobalExceptionHandlerTest {
 		val name: String,
 	)
 
+	data class TestNumberRequest(
+		val int: Int,
+		val nullableInt: Int?,
+		val long: Long,
+		val nullableLong: Long?,
+		val ints: List<Int>,
+		val longs: List<Long?>,
+		val nested: TestNumberNested,
+	)
+
+	data class TestNumberNested(val int: Int, val long: Long)
+
 	data class TestItem(val id: Long, val name: String)
 
 	@RestController
@@ -351,6 +386,10 @@ class GlobalExceptionHandlerTest {
 
 		@PostMapping("/details")
 		fun createDetail(@Valid @RequestBody request: TestDetailRequest): ApiResponse<TestDetailRequest> =
+			ApiResponse.success(request)
+
+		@PostMapping("/numbers")
+		fun createNumbers(@RequestBody request: TestNumberRequest): ApiResponse<TestNumberRequest> =
 			ApiResponse.success(request)
 
 		@GetMapping("/search")
@@ -398,9 +437,49 @@ class GlobalExceptionHandlerTest {
 			"offsetDateTime" to "\"2026-10-29T10:00:00Z\"",
 			"time" to "\"15:00\"",
 		)
+		private val VALID_NUMBERS = linkedMapOf(
+			"int" to "1",
+			"nullableInt" to "1",
+			"long" to "1",
+			"nullableLong" to "1",
+			"ints" to "[1]",
+			"longs" to "[1]",
+			"nested" to """{"int":1,"long":1}""",
+		)
+		private val NUMBER_BOUNDS = arrayOf(
+			"int" to "${Int.MAX_VALUE}",
+			"nullableInt" to "${Int.MIN_VALUE}",
+			"long" to "${Long.MAX_VALUE}",
+			"nullableLong" to "${Long.MIN_VALUE}",
+			"ints" to "[${Int.MIN_VALUE},${Int.MAX_VALUE}]",
+			"longs" to "[${Long.MIN_VALUE},${Long.MAX_VALUE}]",
+			"nested" to """{"int":${Int.MIN_VALUE},"long":${Long.MAX_VALUE}}""",
+		)
 
 		@JvmStatic
 		fun detailFields(): List<String> = VALID_DETAIL.keys.toList()
+
+		@JvmStatic
+		fun integerMismatches(): List<Arguments> = listOf(
+			Arguments.of("int", "2147483648", "int"),
+			Arguments.of("int", "-2147483649", "int"),
+			Arguments.of("int", "99999999999999999999", "int"),
+			Arguments.of("nullableInt", "3000000000", "nullableInt"),
+			Arguments.of("long", "9223372036854775808", "long"),
+			Arguments.of("long", "-9223372036854775809", "long"),
+			Arguments.of("nullableLong", "99999999999999999999", "nullableLong"),
+			Arguments.of("ints", "[1,2147483648]", "ints[1]"),
+			Arguments.of("longs", "[9223372036854775808]", "longs[0]"),
+			Arguments.of("nested", """{"int":2147483648,"long":1}""", "nested.int"),
+			Arguments.of("nested", """{"int":1,"long":9223372036854775808}""", "nested.long"),
+			Arguments.of("int", "1.5", "int"),
+			Arguments.of("int", "1e30", "int"),
+			Arguments.of("nullableInt", "1.0", "nullableInt"),
+			Arguments.of("long", "1e30", "long"),
+			Arguments.of("nullableLong", "1.5", "nullableLong"),
+			Arguments.of("ints", "[1e30]", "ints[0]"),
+			Arguments.of("nested", """{"int":1,"long":1.5}""", "nested.long"),
+		)
 
 		@JvmStatic
 		fun typeMismatches(): List<Arguments> = listOf(

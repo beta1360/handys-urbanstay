@@ -19,6 +19,7 @@ import org.springframework.web.servlet.NoHandlerFoundException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 import tools.jackson.core.JacksonException
 import tools.jackson.core.JsonToken
+import tools.jackson.core.exc.InputCoercionException
 import tools.jackson.databind.exc.InvalidNullException
 import tools.jackson.databind.exc.MismatchedInputException
 import tools.jackson.databind.exc.UnrecognizedPropertyException
@@ -89,13 +90,14 @@ class GlobalExceptionHandler(private val errorResponseFactory: ErrorResponseFact
 		ResponseEntity.status(errorCode.status).body(errorResponseFactory.create(errorCode, fieldErrors))
 
 	private fun bodyFieldError(cause: Throwable?): FieldErrorResponse? {
-		if (cause !is MismatchedInputException) {
+		if (cause !is MismatchedInputException && cause !is InputCoercionException) {
 			return null
 		}
 		val field = fieldPath(cause.path).ifEmpty { return null }
 		val messageKey = when {
 			cause is UnrecognizedPropertyException -> UNKNOWN_FIELD_MESSAGE_KEY
-			cause is InvalidNullException || cause.currentToken in MISSING_OR_NULL_TOKENS -> REQUIRED_MESSAGE_KEY
+			cause is InvalidNullException -> REQUIRED_MESSAGE_KEY
+			cause is MismatchedInputException && cause.currentToken in MISSING_OR_NULL_TOKENS -> REQUIRED_MESSAGE_KEY
 			else -> TYPE_MESSAGE_KEY
 		}
 		return errorResponseFactory.fieldError(field, messageKey)
