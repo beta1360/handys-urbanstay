@@ -248,12 +248,12 @@ class SecurityConfigTest {
 		mockMvc.get(api.samples).andReturn().response.getCookie(XSRF_COOKIE)!!
 
 	private fun ResultActionsDsl.andExpectSuccess(): ResultActionsDsl =
-		andExpectEnvelope(HttpStatus.OK.value(), """{"success":true,"data":"$SAMPLE","error":null}""")
+		andExpectEnvelope(HttpStatus.OK.value(), """{"success":true,"data":"$SAMPLE","message":null,"error":null}""")
 
 	private fun ResultActionsDsl.andExpectError(errorCode: ErrorCode): ResultActionsDsl =
 		andExpectEnvelope(
 			errorCode.status.value(),
-			"""{"success":false,"data":null,"error":{"code":"${errorCode.code}","message":"${message(errorCode)}","fieldErrors":[]}}""",
+			"""{"success":false,"data":null,"message":null,"error":{"code":"${errorCode.code}","message":"${message(errorCode)}","fieldErrors":[]}}""",
 		)
 
 	private fun ResultActionsDsl.andExpectEnvelope(httpStatus: Int, json: String): ResultActionsDsl =

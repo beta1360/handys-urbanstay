@@ -31,6 +31,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
@@ -474,14 +475,18 @@ class AccountHotelMasterAppAdminControllerTest {
 	}
 
 	private fun ResultActionsDsl.andExpectSuccess(): JsonNode {
-		val response = andReturn().response
-		val body = json(response)
-		assertThat(response.status).isEqualTo(HttpStatus.OK.value())
-		assertThat(body.properties().map { it.key }).containsExactly("success", "data", "error")
+		val result = andReturn()
+		val body = json(result.response)
+		assertThat(result.response.status).isEqualTo(HttpStatus.OK.value())
+		assertThat(body.properties().map { it.key }).containsExactly("success", "data", "message", "error")
 		assertThat(body["success"].booleanValue()).isTrue()
+		assertThat(body["message"].stringValue(null)).isEqualTo(successMessage(result.request))
 		assertThat(body["error"].isNull).isTrue()
 		return body["data"]
 	}
+
+	private fun successMessage(request: MockHttpServletRequest): String? =
+		SUCCESS_MESSAGE_KEYS.entries.firstOrNull { it.key.matches("${request.method} ${request.requestURI}") }?.value?.let(::message)
 
 	private fun ResultActionsDsl.andExpectError(errorCode: ErrorCode, vararg fieldErrors: Pair<String, String>) =
 		assertError(andReturn().response, errorCode, *fieldErrors)
@@ -490,7 +495,7 @@ class AccountHotelMasterAppAdminControllerTest {
 		val body = json(response)
 		val actualFieldErrors = (body["error"] as ObjectNode).remove(FIELD_ERRORS)
 			.values().map { it["field"].stringValue() to it["message"].stringValue() }
-		val expected = mapOf("success" to false, "data" to null, "error" to mapOf("code" to errorCode.code, "message" to message(errorCode.messageKey)))
+		val expected = mapOf("success" to false, "data" to null, "message" to null, "error" to mapOf("code" to errorCode.code, "message" to message(errorCode.messageKey)))
 
 		assertThat(response.status).isEqualTo(errorCode.status.value())
 		assertThat(body).isEqualTo(json(jsonMapper.writeValueAsString(expected)))
@@ -546,6 +551,10 @@ class AccountHotelMasterAppAdminControllerTest {
 		private const val CONCURRENT_REQUESTS = 2
 		private const val TIMEOUT_SECONDS = 10L
 		private const val DELETE_HOTEL_ADMINS = "delete from hotel_admin where hotel_id = ?"
+		private val SUCCESS_MESSAGE_KEYS = mapOf(
+			Regex("PUT ${ApiPaths.APP_ADMIN}/hotels/\\d+/master") to "success.hotel-master.updated",
+			Regex("PUT ${ApiPaths.APP_ADMIN}/hotels/\\d+/master/password") to "success.password.reset",
+		)
 		private val APP_ADMIN_ROLES = listOf(Role.APP_ADMIN)
 		private val HOTEL_MASTER_ROLES = listOf(Role.HOTEL_ADMIN, Role.HOTEL_MASTER)
 

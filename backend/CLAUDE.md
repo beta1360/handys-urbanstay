@@ -42,7 +42,7 @@ urbanstay/
 
 ## 응답과 예외
 
-- 모든 응답은 API 규약의 공통 형식(`success / data / error`)으로 감싼다. 에러도 같은 형식이다.
+- 모든 응답은 API 규약의 공통 형식(`success / data / message / error`)으로 감싼다. 에러도 같은 형식이다.
 - 예외는 전역에서 처리해 공통 에러 형식으로 바꾼다.
 - 요청 본문을 읽지 못했거나 요청 파라미터가 맞지 않으면 400 `INVALID_INPUT`이다. 어느 필드인지 알 수 있으면 `fieldErrors`에 하나를 담는다(`GlobalExceptionHandler`).
   - 문서에 없는 필드: `validation.unknown-field`. 모든 앱의 JSON 본문에 적용한다(`spring.jackson.deserialization.fail-on-unknown-properties=true`).
@@ -234,6 +234,11 @@ urbanstay/
 - 응답 메시지는 `src/main/resources/messages.properties`에 두고 MessageSource로 읽는다.
 - 에러 코드는 별도 문자열 없이 enum 이름을 쓴다. 메시지 키는 `ErrorCode.messageKey`(`error.{CODE}`)다.
 - 도메인 ErrorCode enum을 추가하면 `messages.properties`에 키를 추가하고, `ErrorCodeMessageTest`의 목록에 등록한다.
+- 상태를 바꾸는 요청(POST·PUT·PATCH·DELETE)이 성공하면 응답의 `message`에 결과 문구를 담는다(API 규약의 성공 메시지).
+  - 핸들러에 `@SuccessMessage("success.{대상}.{동작}")`(`common/response`)를 붙인다. `SuccessMessageAdvice`가 그 핸들러의 `ApiResponse`에 키의 문구를 채우므로 컨트롤러는 `ApiResponse.success(data)`를 그대로 반환한다.
+  - 문구는 요청 값과 관계없이 고정이다. 같은 문구는 같은 키를 함께 쓴다. 예: 두 어드민 앱의 로그인 `success.auth.login`, 마스터·운영자 비밀번호 재설정 `success.password.reset`
+  - 상태를 바꾸는 핸들러에는 모두 붙이고 GET 핸들러에는 붙이지 않는다(GET의 `message`는 null). `SuccessMessageConventionTest`가 확인한다.
+  - 실패 응답의 `message`는 null이다. 어노테이션이 붙은 핸들러가 예외를 던져도 예외 처리기의 응답에는 문구를 채우지 않는다.
 - 입력 검증 메시지는 제약마다 하나인 공용 키(`validation.{제약}`)를 `messages.properties`에 두고 어노테이션에서 `{키}`로 쓴다. 예: `@NotBlank(message = "{validation.required}")`
   - 키 이름: `validation.required`(필수), `validation.email`(이메일 형식), `validation.max-length`(최대 길이, 문구에 `{max}`를 넣는다), `validation.min`·`validation.max`(숫자 범위, 문구에 `{value}`를 넣는다), `validation.phone`(전화번호 형식), `validation.password`(비밀번호 규칙), `validation.type`(타입이 틀린 값), `validation.unknown-field`(문서에 없는 필드)
   - `validation.type`, `validation.unknown-field`는 어노테이션이 아니라 `GlobalExceptionHandler`가 본문·파라미터 오류에 쓴다.
@@ -307,11 +312,11 @@ urbanstay/
   - 오퍼레이션: `openapi.{group}.operation.{operationId}.summary` (필요하면 `.description`)
   - 요청 파라미터: `openapi.{group}.operation.{operationId}.parameter.{name}` (`@Parameter(description = ...)`)
   - 스키마 필드: `openapi.schema.{SchemaName}.{field}`
-- 400·500 공통 에러 응답은 모든 API에 자동으로 붙는다. 어드민 그룹에는 401·403도 붙고(`SecurityConfig.PUBLIC_ADMIN_APIS`의 열린 API는 빼고), 상태를 바꾸는 operation(POST·PUT·PATCH·DELETE)의 403에는 `INVALID_CSRF_TOKEN` 예시가 함께 붙는다. 에러 응답 스키마는 `ErrorApiResponse`다.
+- 400·500 공통 에러 응답은 모든 API에 자동으로 붙는다. 어드민 그룹에는 401·403도 붙고(`SecurityConfig.PUBLIC_ADMIN_APIS`의 열린 API는 빼고), 상태를 바꾸는 operation(POST·PUT·PATCH·DELETE)의 403에는 `INVALID_CSRF_TOKEN` 예시가 함께 붙는다. 에러 응답 스키마는 `ErrorApiResponse`이고 `data`와 `message`는 `null` 타입이다.
 - operation이 내는 도메인 에러는 도메인 어노테이션으로 적는다. 예: `@AccountApiErrors(AccountErrorCode.INVALID_CREDENTIALS)`. 자동 에러와 합쳐 상태 코드별로 예시가 붙는다.
   - 도메인마다 `{Domain}ErrorCode` 옆(`exception/`)에 `@ApiErrors`를 붙인 `annotation class {Domain}ApiErrors(vararg val value: {Domain}ErrorCode)`를 둔다(대상 FUNCTION, 유지 RUNTIME).
   - `CommonErrorResponseCustomizer`가 `@ApiErrors`가 붙은 어노테이션을 찾아 `value`를 읽는다. `value`가 ErrorCode enum 배열이 아니면 문서 생성이 실패한다.
-- 돌려줄 data가 없으면 `ApiResponse<Nothing?>`를 반환하고 `ApiResponse.success(null)`로 응답한다. 문서에는 data가 null인 `EmptyApiResponse`로 나온다.
+- 돌려줄 data가 없으면 `ApiResponse<Nothing?>`를 반환하고 `ApiResponse.success(null)`로 응답한다. 문서에는 data가 null인 `EmptyApiResponse`로 나온다. `message`는 다른 성공 응답처럼 `string | null`이다.
 - 문서 전체에 적용하는 처리는 `GlobalOpenApiCustomizer`로 만든다. `OpenApiCustomizer`는 그룹 문서에 적용되지 않는다.
 - 생성 응답(201)은 `@ResponseStatus(HttpStatus.CREATED)`를 붙이고 `ApiResponse<T>`를 반환한다.
 - 요청 DTO와 응답 DTO는 분리한다. 응답 스키마는 모든 필드가 required(nullable 필드는 `| null`)로, 요청 스키마는 non-null 필드만 required로 문서화된다.

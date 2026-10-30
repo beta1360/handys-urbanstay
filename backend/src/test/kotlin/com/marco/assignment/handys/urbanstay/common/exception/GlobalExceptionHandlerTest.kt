@@ -68,7 +68,7 @@ class GlobalExceptionHandlerTest {
 	@Test
 	fun `성공 응답은 data를 담고 error는 null이다`() {
 		mockMvc.get("$TEST_PATH/items/1")
-			.andExpectEnvelope(200, """{"success":true,"data":{"id":1,"name":"item"},"error":null}""")
+			.andExpectEnvelope(200, """{"success":true,"data":{"id":1,"name":"item"},"message":null,"error":null}""")
 	}
 
 	@Test
@@ -76,7 +76,7 @@ class GlobalExceptionHandlerTest {
 		mockMvc.post("$TEST_PATH/items") {
 			contentType = MediaType.APPLICATION_JSON
 			content = """{"name":"room","count":1}"""
-		}.andExpectEnvelope(201, """{"success":true,"data":{"id":1,"name":"room"},"error":null}""")
+		}.andExpectEnvelope(201, """{"success":true,"data":{"id":1,"name":"room"},"message":null,"error":null}""")
 	}
 
 	@Test
@@ -115,26 +115,26 @@ class GlobalExceptionHandlerTest {
 	@Test
 	fun `올바른 본문은 문자열, 숫자, 불리언, enum, 날짜·시간, 중첩 객체, 목록을 그대로 읽는다`() {
 		postDetail(detailBody())
-			.andExpectEnvelope(200, """{"success":true,"data":${detailBody()},"error":null}""")
+			.andExpectEnvelope(200, """{"success":true,"data":${detailBody()},"message":null,"error":null}""")
 	}
 
 	@Test
 	fun `null을 허용하는 목록 원소는 null을 받는다`() {
 		postDetail(detailBody("notes" to "[null]"))
-			.andExpectEnvelope(200, """{"success":true,"data":${detailBody("notes" to "[null]")},"error":null}""")
+			.andExpectEnvelope(200, """{"success":true,"data":${detailBody("notes" to "[null]")},"message":null,"error":null}""")
 	}
 
 	@Test
 	fun `ISO 형식이면 오프셋이 있는 날짜·시간을 받아 UTC로 읽는다`() {
 		postDetail(detailBody("offsetDateTime" to "\"2026-10-29T19:00:00+09:00\""))
-			.andExpectEnvelope(200, """{"success":true,"data":${detailBody()},"error":null}""")
+			.andExpectEnvelope(200, """{"success":true,"data":${detailBody()},"message":null,"error":null}""")
 	}
 
 	@ParameterizedTest
 	@ValueSource(strings = ["00:00", "09:30", "12:05", "23:59"])
 	fun `시각은 시와 분이 두 자리씩인 문자열을 받아 같은 형식의 문자열로 응답한다`(time: String) {
 		postDetail(detailBody("time" to "\"$time\""))
-			.andExpectEnvelope(200, """{"success":true,"data":${detailBody("time" to "\"$time\"")},"error":null}""")
+			.andExpectEnvelope(200, """{"success":true,"data":${detailBody("time" to "\"$time\"")},"message":null,"error":null}""")
 	}
 
 	@Test
@@ -174,7 +174,7 @@ class GlobalExceptionHandlerTest {
 	@Test
 	fun `정수 필드는 타입 범위의 끝 값까지 읽는다`() {
 		postNumbers(numberBody(*NUMBER_BOUNDS))
-			.andExpectEnvelope(200, """{"success":true,"data":${numberBody(*NUMBER_BOUNDS)},"error":null}""")
+			.andExpectEnvelope(200, """{"success":true,"data":${numberBody(*NUMBER_BOUNDS)},"message":null,"error":null}""")
 	}
 
 	@ParameterizedTest
@@ -212,9 +212,9 @@ class GlobalExceptionHandlerTest {
 
 	@Test
 	fun `불리언 요청 파라미터는 소문자 true와 false를 읽고 보내지 않은 선택 파라미터는 null이다`() {
-		mockMvc.get("$TEST_PATH/flags?active=true&visible=false").andExpectEnvelope(200, """{"success":true,"data":[true,false],"error":null}""")
-		mockMvc.get("$TEST_PATH/flags?active=false&visible=true").andExpectEnvelope(200, """{"success":true,"data":[false,true],"error":null}""")
-		mockMvc.get("$TEST_PATH/flags").andExpectEnvelope(200, """{"success":true,"data":[null,false],"error":null}""")
+		mockMvc.get("$TEST_PATH/flags?active=true&visible=false").andExpectEnvelope(200, """{"success":true,"data":[true,false],"message":null,"error":null}""")
+		mockMvc.get("$TEST_PATH/flags?active=false&visible=true").andExpectEnvelope(200, """{"success":true,"data":[false,true],"message":null,"error":null}""")
+		mockMvc.get("$TEST_PATH/flags").andExpectEnvelope(200, """{"success":true,"data":[null,false],"message":null,"error":null}""")
 	}
 
 	@ParameterizedTest
@@ -231,7 +231,7 @@ class GlobalExceptionHandlerTest {
 
 	@Test
 	fun `기본값이 있는 요청 파라미터에 빈 값을 보내면 Spring이 변환 전에 기본값으로 바꾼다`() {
-		mockMvc.get("$TEST_PATH/flags?visible=").andExpectEnvelope(200, """{"success":true,"data":[null,false],"error":null}""")
+		mockMvc.get("$TEST_PATH/flags?visible=").andExpectEnvelope(200, """{"success":true,"data":[null,false],"message":null,"error":null}""")
 	}
 
 	@Test
@@ -294,7 +294,7 @@ class GlobalExceptionHandlerTest {
 	private fun ResultActionsDsl.andExpectError(errorCode: ErrorCode, fieldErrors: String = "[]"): ResultActionsDsl =
 		andExpectEnvelope(
 			errorCode.status.value(),
-			"""{"success":false,"data":null,"error":{"code":"${errorCode.code}","message":"${message(errorCode.messageKey)}","fieldErrors":$fieldErrors}}""",
+			"""{"success":false,"data":null,"message":null,"error":{"code":"${errorCode.code}","message":"${message(errorCode.messageKey)}","fieldErrors":$fieldErrors}}""",
 		)
 
 	private fun fieldErrors(field: String, messageKey: String): String =

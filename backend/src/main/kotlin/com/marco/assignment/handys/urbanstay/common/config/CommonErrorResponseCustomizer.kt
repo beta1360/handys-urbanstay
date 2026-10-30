@@ -95,6 +95,7 @@ class CommonErrorResponseCustomizer(
 			.resolveAsResolvedSchema(AnnotatedType(ApiResponse::class.java))
 			.schema
 			.addProperty(ApiResponse<*>::data.name, Schema<Any>().typesItem(NULL_TYPE))
+			.addProperty(ApiResponse<*>::message.name, Schema<Any>().typesItem(NULL_TYPE))
 			.addProperty(ApiResponse<*>::error.name, error)
 	}
 

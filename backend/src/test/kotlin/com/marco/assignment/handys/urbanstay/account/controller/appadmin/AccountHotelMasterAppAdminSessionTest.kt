@@ -175,7 +175,7 @@ class AccountHotelMasterAppAdminSessionTest {
 	private fun assertError(response: HttpResponse<String>, errorCode: ErrorCode) {
 		assertThat(response.statusCode()).isEqualTo(errorCode.status.value())
 		assertThat(json(response.body())).isEqualTo(
-			json("""{"success":false,"data":null,"error":{"code":"${errorCode.code}","message":"${message(errorCode.messageKey)}","fieldErrors":[]}}"""),
+			json("""{"success":false,"data":null,"message":null,"error":{"code":"${errorCode.code}","message":"${message(errorCode.messageKey)}","fieldErrors":[]}}"""),
 		)
 	}
 

@@ -7,6 +7,7 @@ import com.marco.assignment.handys.urbanstay.common.request.PageParams
 import com.marco.assignment.handys.urbanstay.common.request.TrimmedStringEditor
 import com.marco.assignment.handys.urbanstay.common.response.ApiResponse
 import com.marco.assignment.handys.urbanstay.common.response.PageResponse
+import com.marco.assignment.handys.urbanstay.common.response.SuccessMessage
 import com.marco.assignment.handys.urbanstay.hotel.dto.appadmin.HotelAppAdminResponse
 import com.marco.assignment.handys.urbanstay.hotel.dto.appadmin.HotelCreateAppAdminRequest
 import com.marco.assignment.handys.urbanstay.hotel.dto.appadmin.HotelUpdateAppAdminRequest
@@ -44,6 +45,7 @@ class HotelAppAdminController(
 	@Operation(summary = "openapi.app-admin.operation.createHotel.summary", description = "openapi.app-admin.operation.createHotel.description")
 	@HotelApiErrors(HotelErrorCode.HOTEL_DUPLICATED)
 	@AccountApiErrors(AccountErrorCode.LOGIN_ID_DUPLICATED)
+	@SuccessMessage("success.hotel.created")
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	fun createHotel(@Valid @RequestBody request: HotelCreateAppAdminRequest): ApiResponse<HotelAppAdminResponse> {
@@ -92,6 +94,7 @@ class HotelAppAdminController(
 
 	@Operation(summary = "openapi.app-admin.operation.updateHotel.summary", description = "openapi.app-admin.operation.updateHotel.description")
 	@HotelApiErrors(HotelErrorCode.HOTEL_NOT_FOUND, HotelErrorCode.HOTEL_DUPLICATED, HotelErrorCode.HOTEL_MODIFIED)
+	@SuccessMessage("success.hotel.updated")
 	@PutMapping("/{hotelId}")
 	fun updateHotel(
 		@PathVariable hotelId: Long,

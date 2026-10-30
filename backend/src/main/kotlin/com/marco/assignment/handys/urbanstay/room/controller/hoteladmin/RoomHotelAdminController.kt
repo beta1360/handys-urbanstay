@@ -6,6 +6,7 @@ import com.marco.assignment.handys.urbanstay.common.request.PageParams
 import com.marco.assignment.handys.urbanstay.common.request.TrimmedStringEditor
 import com.marco.assignment.handys.urbanstay.common.response.ApiResponse
 import com.marco.assignment.handys.urbanstay.common.response.PageResponse
+import com.marco.assignment.handys.urbanstay.common.response.SuccessMessage
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomCreateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomHotelAdminResponse
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomStatusHistoryHotelAdminResponse
@@ -50,6 +51,7 @@ class RoomHotelAdminController(
 
 	@Operation(summary = "openapi.hotel-admin.operation.createRoom.summary", description = "openapi.hotel-admin.operation.createRoom.description")
 	@RoomApiErrors(RoomErrorCode.ROOM_DUPLICATED)
+	@SuccessMessage("success.room.created")
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	fun createRoom(
@@ -105,6 +107,7 @@ class RoomHotelAdminController(
 
 	@Operation(summary = "openapi.hotel-admin.operation.updateRoom.summary", description = "openapi.hotel-admin.operation.updateRoom.description")
 	@RoomApiErrors(RoomErrorCode.ROOM_NOT_FOUND, RoomErrorCode.ROOM_DUPLICATED, RoomErrorCode.ROOM_MODIFIED)
+	@SuccessMessage("success.room.updated")
 	@PutMapping("/{roomId}")
 	fun updateRoom(
 		@AuthenticationPrincipal hotelAdmin: HotelAdminPrincipal,
@@ -128,6 +131,7 @@ class RoomHotelAdminController(
 
 	@Operation(summary = "openapi.hotel-admin.operation.updateRoomStatus.summary", description = "openapi.hotel-admin.operation.updateRoomStatus.description")
 	@RoomApiErrors(RoomErrorCode.ROOM_NOT_FOUND, RoomErrorCode.ROOM_STATUS_TRANSITION_NOT_ALLOWED, RoomErrorCode.ROOM_STATUS_CHANGED)
+	@SuccessMessage("success.room.status-changed")
 	@PutMapping("/{roomId}/status")
 	fun updateRoomStatus(
 		@AuthenticationPrincipal hotelAdmin: HotelAdminPrincipal,

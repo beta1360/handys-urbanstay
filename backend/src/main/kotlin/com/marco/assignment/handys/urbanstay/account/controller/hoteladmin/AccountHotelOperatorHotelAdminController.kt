@@ -14,6 +14,7 @@ import com.marco.assignment.handys.urbanstay.common.request.PageParams
 import com.marco.assignment.handys.urbanstay.common.request.TrimmedStringEditor
 import com.marco.assignment.handys.urbanstay.common.response.ApiResponse
 import com.marco.assignment.handys.urbanstay.common.response.PageResponse
+import com.marco.assignment.handys.urbanstay.common.response.SuccessMessage
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -49,6 +50,7 @@ class AccountHotelOperatorHotelAdminController(
 
 	@Operation(summary = "openapi.hotel-admin.operation.createHotelOperator.summary", description = "openapi.hotel-admin.operation.createHotelOperator.description")
 	@AccountApiErrors(AccountErrorCode.LOGIN_ID_DUPLICATED)
+	@SuccessMessage("success.operator.created")
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	fun createHotelOperator(
@@ -96,6 +98,7 @@ class AccountHotelOperatorHotelAdminController(
 
 	@Operation(summary = "openapi.hotel-admin.operation.updateHotelOperator.summary", description = "openapi.hotel-admin.operation.updateHotelOperator.description")
 	@AccountApiErrors(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND, AccountErrorCode.LOGIN_ID_DUPLICATED, AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+	@SuccessMessage("success.operator.updated")
 	@PutMapping("/{operatorId}")
 	fun updateHotelOperator(
 		@AuthenticationPrincipal master: HotelAdminPrincipal,
@@ -111,6 +114,7 @@ class AccountHotelOperatorHotelAdminController(
 		description = "openapi.hotel-admin.operation.resetHotelOperatorPassword.description",
 	)
 	@AccountApiErrors(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND, AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+	@SuccessMessage("success.password.reset")
 	@PutMapping("/{operatorId}/password")
 	fun resetHotelOperatorPassword(
 		@AuthenticationPrincipal master: HotelAdminPrincipal,
@@ -126,6 +130,7 @@ class AccountHotelOperatorHotelAdminController(
 		description = "openapi.hotel-admin.operation.updateHotelOperatorActive.description",
 	)
 	@AccountApiErrors(AccountErrorCode.HOTEL_OPERATOR_NOT_FOUND, AccountErrorCode.HOTEL_ADMIN_MODIFIED)
+	@SuccessMessage("success.operator.active-changed")
 	@PutMapping("/{operatorId}/active")
 	fun updateHotelOperatorActive(
 		@AuthenticationPrincipal master: HotelAdminPrincipal,
