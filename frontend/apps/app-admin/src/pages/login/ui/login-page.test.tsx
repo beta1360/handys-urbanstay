@@ -20,7 +20,7 @@ import {
 } from "vitest";
 import {
   loginAccount,
-  meQueryOptions,
+  meQueryKey,
   RequestValidationError,
   ResponseValidationError,
 } from "@/shared/api";
@@ -278,9 +278,7 @@ describe("LoginPage 제출", () => {
       expect(router.state.location.href).toBe(REDIRECT_HREF);
     });
     expect(queryClient.getQueryData(OTHER_QUERY_KEY)).toBeUndefined();
-    expect(queryClient.getQueryData(meQueryOptions().queryKey)).toEqual(
-      ACCOUNT,
-    );
+    expect(queryClient.getQueryData(meQueryKey())).toEqual(ACCOUNT);
   });
 });
 

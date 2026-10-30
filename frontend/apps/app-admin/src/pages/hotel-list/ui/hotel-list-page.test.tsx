@@ -34,12 +34,8 @@ vi.mock("@/shared/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/api")>();
   return {
     ...actual,
-    hotelListQueryOptions: (
-      params: Parameters<typeof actual.hotelListQueryOptions>[0],
-    ) => ({
-      ...actual.hotelListQueryOptions(params),
-      queryFn: () => fetchHotels(params),
-    }),
+    fetchHotels: (params: Parameters<typeof actual.fetchHotels>[0]) =>
+      fetchHotels(params),
   };
 });
 

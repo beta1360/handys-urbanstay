@@ -7,9 +7,10 @@ import {
 } from "./generated/zod";
 import {
   createHotel,
+  fetchHotel,
+  fetchHotels,
   hotelListQueryKey,
-  hotelListQueryOptions,
-  hotelQueryOptions,
+  hotelQueryKey,
   updateHotel,
 } from "./hotel";
 import {
@@ -83,10 +84,10 @@ const INVALID_HOTELS = [
 
 const HOTEL_OPERATIONS = [
   {
-    name: "hotelQueryOptions",
+    name: "fetchHotel",
     mockResponse: (response: unknown) =>
       vi.mocked(generated.getHotel).mockResolvedValue(response as never),
-    run: () => new QueryClient().fetchQuery(hotelQueryOptions(HOTEL_ID)),
+    run: () => fetchHotel(HOTEL_ID),
   },
   {
     name: "createHotel",
@@ -102,10 +103,6 @@ const HOTEL_OPERATIONS = [
   },
 ];
 
-function fetchHotelList(params: Parameters<typeof hotelListQueryOptions>[0]) {
-  return new QueryClient().fetchQuery(hotelListQueryOptions(params));
-}
-
 beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -115,33 +112,30 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("hotelListQueryOptions", () => {
-  it("생성된 쿼리 키를 쓰고 파라미터와 signal을 넘겨 목록 페이지를 돌려준다", async () => {
+describe("fetchHotels", () => {
+  it("파라미터와 signal을 넘겨 목록 페이지를 돌려준다", async () => {
     vi.mocked(generated.getHotels).mockResolvedValue(HOTEL_PAGE_RESPONSE);
-    const options = hotelListQueryOptions(LIST_PARAMS);
+    const { signal } = new AbortController();
 
-    const data = await new QueryClient().fetchQuery(options);
-
-    expect(options.queryKey).toEqual(
-      generated.getGetHotelsQueryKey(LIST_PARAMS),
+    await expect(fetchHotels(LIST_PARAMS, { signal })).resolves.toEqual(
+      HOTEL_PAGE,
     );
-    expect(data).toEqual(HOTEL_PAGE);
     expect(generated.getHotels).toHaveBeenCalledWith(
       LIST_PARAMS,
       undefined,
-      expect.any(AbortSignal),
+      signal,
     );
   });
 
   it("빠진 page·size는 스키마 기본값을 채워 보낸다", async () => {
     vi.mocked(generated.getHotels).mockResolvedValue(HOTEL_PAGE_RESPONSE);
 
-    await fetchHotelList({});
+    await fetchHotels({});
 
     expect(generated.getHotels).toHaveBeenCalledWith(
       { page: getHotelsQueryPageDefault, size: getHotelsQuerySizeDefault },
       undefined,
-      expect.any(AbortSignal),
+      undefined,
     );
   });
 
@@ -150,7 +144,7 @@ describe("hotelListQueryOptions", () => {
     ["page가 정수가 아니면", { page: 1.5 }],
     ["keyword가 100자를 넘으면", { keyword: "a".repeat(101) }],
   ])("%s 요청을 보내지 않고 요청 검증 오류를 던진다", async (_, params) => {
-    await expect(fetchHotelList(params)).rejects.toBeInstanceOf(
+    await expect(fetchHotels(params)).rejects.toBeInstanceOf(
       RequestValidationError,
     );
     expect(generated.getHotels).not.toHaveBeenCalled();
@@ -164,7 +158,7 @@ describe("hotelListQueryOptions", () => {
         ...override,
       });
 
-      await expect(fetchHotelList(LIST_PARAMS)).rejects.toBeInstanceOf(
+      await expect(fetchHotels(LIST_PARAMS)).rejects.toBeInstanceOf(
         ResponseValidationError,
       );
     },
@@ -182,7 +176,7 @@ describe("hotelListQueryOptions", () => {
       data: page,
     } as never);
 
-    await expect(fetchHotelList(LIST_PARAMS)).rejects.toBeInstanceOf(
+    await expect(fetchHotels(LIST_PARAMS)).rejects.toBeInstanceOf(
       ResponseValidationError,
     );
   });
@@ -193,52 +187,63 @@ describe("hotelListQueryOptions", () => {
       data: { ...HOTEL_PAGE, items: [HOTEL_WITH_EXTRA_FIELD] },
     });
 
-    await expect(fetchHotelList(LIST_PARAMS)).resolves.toEqual(HOTEL_PAGE);
+    await expect(fetchHotels(LIST_PARAMS)).resolves.toEqual(HOTEL_PAGE);
   });
 });
 
 describe("hotelListQueryKey", () => {
-  it("모든 목록 쿼리를 가리키고 상세 쿼리는 가리키지 않는다", async () => {
+  it("파라미터가 있으면 생성된 목록 쿼리 키를 쓴다", () => {
+    expect(hotelListQueryKey(LIST_PARAMS)).toEqual(
+      generated.getGetHotelsQueryKey(LIST_PARAMS),
+    );
+  });
+
+  it("파라미터 없이 만들면 모든 목록 쿼리를 가리키고 상세 쿼리는 가리키지 않는다", async () => {
     const queryClient = new QueryClient();
-    const firstPage = hotelListQueryOptions({});
-    const searched = hotelListQueryOptions(LIST_PARAMS);
-    const detail = hotelQueryOptions(HOTEL_ID);
-    queryClient.setQueryData(firstPage.queryKey, HOTEL_PAGE);
-    queryClient.setQueryData(searched.queryKey, HOTEL_PAGE);
-    queryClient.setQueryData(detail.queryKey, HOTEL);
+    const firstPageKey = hotelListQueryKey({});
+    const searchedKey = hotelListQueryKey(LIST_PARAMS);
+    const detailKey = hotelQueryKey(HOTEL_ID);
+    queryClient.setQueryData(firstPageKey, HOTEL_PAGE);
+    queryClient.setQueryData(searchedKey, HOTEL_PAGE);
+    queryClient.setQueryData(detailKey, HOTEL);
 
     await queryClient.invalidateQueries({ queryKey: hotelListQueryKey() });
 
     const isInvalidated = (queryKey: readonly unknown[]) =>
       queryClient.getQueryState(queryKey)?.isInvalidated;
-    expect(isInvalidated(firstPage.queryKey)).toBe(true);
-    expect(isInvalidated(searched.queryKey)).toBe(true);
-    expect(isInvalidated(detail.queryKey)).toBe(false);
+    expect(isInvalidated(firstPageKey)).toBe(true);
+    expect(isInvalidated(searchedKey)).toBe(true);
+    expect(isInvalidated(detailKey)).toBe(false);
   });
 });
 
-describe("hotelQueryOptions", () => {
-  it("생성된 쿼리 키를 쓰고 호텔 ID와 signal을 넘겨 호텔을 돌려준다", async () => {
+describe("hotelQueryKey", () => {
+  it("생성된 상세 쿼리 키를 쓴다", () => {
+    expect(hotelQueryKey(HOTEL_ID)).toEqual(
+      generated.getGetHotelQueryKey(HOTEL_ID),
+    );
+  });
+});
+
+describe("fetchHotel", () => {
+  it("호텔 ID와 signal을 넘겨 호텔을 돌려준다", async () => {
     vi.mocked(generated.getHotel).mockResolvedValue(HOTEL_RESPONSE);
-    const options = hotelQueryOptions(HOTEL_ID);
+    const { signal } = new AbortController();
 
-    const data = await new QueryClient().fetchQuery(options);
-
-    expect(options.queryKey).toEqual(generated.getGetHotelQueryKey(HOTEL_ID));
-    expect(data).toEqual(HOTEL);
+    await expect(fetchHotel(HOTEL_ID, { signal })).resolves.toEqual(HOTEL);
     expect(generated.getHotel).toHaveBeenCalledWith(
       HOTEL_ID,
       undefined,
-      expect.any(AbortSignal),
+      signal,
     );
   });
 
   it.each([Number.NaN, 1.5])(
     "호텔 ID가 %s면 요청을 보내지 않고 요청 검증 오류를 던진다",
     async (hotelId) => {
-      await expect(
-        new QueryClient().fetchQuery(hotelQueryOptions(hotelId)),
-      ).rejects.toBeInstanceOf(RequestValidationError);
+      await expect(fetchHotel(hotelId)).rejects.toBeInstanceOf(
+        RequestValidationError,
+      );
       expect(generated.getHotel).not.toHaveBeenCalled();
     },
   );

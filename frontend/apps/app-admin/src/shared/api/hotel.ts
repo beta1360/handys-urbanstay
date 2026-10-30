@@ -1,4 +1,3 @@
-import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 import * as generated from "./generated";
 import {
@@ -34,7 +33,7 @@ export type Hotel = z.output<typeof HotelAppAdminResponse>;
 
 export type HotelPage = z.output<typeof PageResponseHotelAppAdminResponse>;
 
-type HotelListParams = z.input<typeof GetHotelsQueryParams>;
+export type HotelListParams = z.input<typeof GetHotelsQueryParams>;
 
 const HOTEL_SUCCESS_SHAPE = {
   success: z.literal(true),
@@ -54,50 +53,42 @@ const CreateHotelSuccessResponse =
 const UpdateHotelSuccessResponse =
   UpdateHotelResponse.extend(HOTEL_SUCCESS_SHAPE);
 
-export function hotelListQueryKey() {
-  return generated.getGetHotelsQueryKey();
+type RequestOptions = {
+  signal?: AbortSignal;
+};
+
+export function hotelListQueryKey(params?: HotelListParams) {
+  return generated.getGetHotelsQueryKey(params);
 }
 
-export function hotelListQueryOptions(params: HotelListParams) {
-  return queryOptions({
-    queryKey: generated.getGetHotelsQueryKey(params),
-    queryFn: async ({ signal }) => {
-      const validParams = parseRequest(
-        "getHotels",
-        GetHotelsQueryParams,
-        params,
-      );
-      const response = await generated.getHotels(
-        validParams,
-        undefined,
-        signal,
-      );
-      return parseResponseBody(
-        "getHotels",
-        GetHotelsSuccessResponse,
-        response,
-      ).data;
-    },
-  });
+export function hotelQueryKey(hotelId: number) {
+  return generated.getGetHotelQueryKey(hotelId);
 }
 
-export function hotelQueryOptions(hotelId: number) {
-  return queryOptions({
-    queryKey: generated.getGetHotelQueryKey(hotelId),
-    queryFn: async ({ signal }) => {
-      const validParams = parseRequest("getHotel", GetHotelParams, { hotelId });
-      const response = await generated.getHotel(
-        validParams.hotelId,
-        undefined,
-        signal,
-      );
-      return parseResponseBody(
-        "getHotel",
-        GetHotelSuccessResponse,
-        response,
-      ).data;
-    },
-  });
+export async function fetchHotels(
+  params: HotelListParams,
+  { signal }: RequestOptions = {},
+) {
+  const validParams = parseRequest("getHotels", GetHotelsQueryParams, params);
+  const response = await generated.getHotels(validParams, undefined, signal);
+  return parseResponseBody(
+    "getHotels",
+    GetHotelsSuccessResponse,
+    response,
+  ).data;
+}
+
+export async function fetchHotel(
+  hotelId: number,
+  { signal }: RequestOptions = {},
+) {
+  const validParams = parseRequest("getHotel", GetHotelParams, { hotelId });
+  const response = await generated.getHotel(
+    validParams.hotelId,
+    undefined,
+    signal,
+  );
+  return parseResponseBody("getHotel", GetHotelSuccessResponse, response).data;
 }
 
 export async function createHotel(body: CreateHotelBody) {

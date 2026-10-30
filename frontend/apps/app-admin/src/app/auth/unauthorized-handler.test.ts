@@ -7,7 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { API_ERROR_CODES, meQueryOptions } from "@/shared/api";
+import { API_ERROR_CODES, meQueryKey } from "@/shared/api";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { LOGIN_PATH } from "./login-redirect";
 import { handleUnauthorizedError } from "./unauthorized-handler";
@@ -49,7 +49,7 @@ async function setup(initialPath: string, { hasMe = true } = {}) {
   await router.load();
   const queryClient = new QueryClient();
   if (hasMe) {
-    queryClient.setQueryData(meQueryOptions().queryKey, ACCOUNT);
+    queryClient.setQueryData(meQueryKey(), ACCOUNT);
   }
   return { router, queryClient };
 }
@@ -62,7 +62,7 @@ describe("handleUnauthorizedError", () => {
   it.each([
     ["쿼리", OTHER_QUERY_KEY],
     ["뮤테이션", undefined],
-    ["데이터가 있는 내 정보 쿼리", meQueryOptions().queryKey],
+    ["데이터가 있는 내 정보 쿼리", meQueryKey()],
   ])(
     "%s가 401로 실패하면 내 정보를 지우고 현재 위치를 redirect에 담아 로그인 화면으로 보낸다",
     async (_, queryKey) => {
@@ -80,9 +80,7 @@ describe("handleUnauthorizedError", () => {
         "/login?redirect=%2Fhotels%3Fkeyword%3D101%26page%3D2",
       );
       expect(router.state.location.search).toEqual({ redirect: CURRENT_HREF });
-      expect(
-        queryClient.getQueryData(meQueryOptions().queryKey),
-      ).toBeUndefined();
+      expect(queryClient.getQueryData(meQueryKey())).toBeUndefined();
     },
   );
 
@@ -92,7 +90,7 @@ describe("handleUnauthorizedError", () => {
     });
     const navigate = vi.spyOn(router, "navigate");
 
-    handleUnauthorizedError(UNAUTHORIZED_ERROR, meQueryOptions().queryKey, {
+    handleUnauthorizedError(UNAUTHORIZED_ERROR, meQueryKey(), {
       queryClient,
       router,
     });
@@ -123,8 +121,6 @@ describe("handleUnauthorizedError", () => {
     handleUnauthorizedError(error, OTHER_QUERY_KEY, { queryClient, router });
 
     expect(navigate).not.toHaveBeenCalled();
-    expect(queryClient.getQueryData(meQueryOptions().queryKey)).toEqual(
-      ACCOUNT,
-    );
+    expect(queryClient.getQueryData(meQueryKey())).toEqual(ACCOUNT);
   });
 });

@@ -14,7 +14,7 @@ import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { API_ERROR_CODES, logoutAccount, meQueryOptions } from "@/shared/api";
+import { API_ERROR_CODES, logoutAccount, meQueryKey } from "@/shared/api";
 import { APP_INFO } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { ADMIN_LAYOUT_MESSAGES } from "../config/messages";
@@ -27,7 +27,7 @@ vi.mock("@/shared/api", async (importOriginal) => {
   return {
     ...actual,
     logoutAccount: vi.fn(),
-    meQueryOptions: () => ({ ...actual.meQueryOptions(), queryFn: fetchMe }),
+    fetchMe,
   };
 });
 
@@ -59,7 +59,7 @@ function renderAdminLayout(initialPath: string) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  queryClient.setQueryData(meQueryOptions().queryKey, ACCOUNT);
+  queryClient.setQueryData(meQueryKey(), ACCOUNT);
 
   const rootRoute = createRootRoute();
   const layoutRoute = createRoute({
@@ -295,9 +295,7 @@ describe("AdminLayout 로그아웃", () => {
       ADMIN_LAYOUT_MESSAGES.logoutFailed,
     );
     expect(router.state.location.pathname).toBe("/hotels");
-    expect(queryClient.getQueryData(meQueryOptions().queryKey)).toEqual(
-      ACCOUNT,
-    );
+    expect(queryClient.getQueryData(meQueryKey())).toEqual(ACCOUNT);
     expect(await findLogoutButton()).not.toBeDisabled();
   });
 });

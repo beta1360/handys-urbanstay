@@ -28,8 +28,8 @@ import {
 import type { HotelInfoField } from "@/features/hotel-info-form";
 import {
   API_ERROR_CODES,
-  hotelListQueryOptions,
-  hotelQueryOptions,
+  hotelListQueryKey,
+  hotelQueryKey,
   updateHotel,
 } from "@/shared/api";
 import type { Hotel, HotelPage } from "@/shared/api";
@@ -45,10 +45,7 @@ vi.mock("@/shared/api", async (importOriginal) => {
   return {
     ...actual,
     updateHotel: vi.fn(),
-    hotelQueryOptions: (hotelId: number) => ({
-      ...actual.hotelQueryOptions(hotelId),
-      queryFn: () => fetchHotel(hotelId),
-    }),
+    fetchHotel: (hotelId: number) => fetchHotel(hotelId),
   };
 });
 
@@ -136,10 +133,7 @@ function renderHotelEditPage({
     mutationCache: new MutationCache({ onError: onMutationError }),
   });
   if (cachedHotel !== undefined) {
-    queryClient.setQueryData(
-      hotelQueryOptions(cachedHotel.id).queryKey,
-      cachedHotel,
-    );
+    queryClient.setQueryData(hotelQueryKey(cachedHotel.id), cachedHotel);
   }
   const rootRoute = createRootRoute();
   const layoutRoute = createRoute({
@@ -352,14 +346,12 @@ describe("HotelEditPage 불러오기", () => {
     fetchHotel.mockResolvedValue(LATEST_HOTEL);
 
     await act(() =>
-      queryClient.invalidateQueries({
-        queryKey: hotelQueryOptions(HOTEL.id).queryKey,
-      }),
+      queryClient.invalidateQueries({ queryKey: hotelQueryKey(HOTEL.id) }),
     );
 
-    expect(
-      queryClient.getQueryData(hotelQueryOptions(HOTEL.id).queryKey),
-    ).toEqual(LATEST_HOTEL);
+    expect(queryClient.getQueryData(hotelQueryKey(HOTEL.id))).toEqual(
+      LATEST_HOTEL,
+    );
     expectFormValues({ ...valuesOf(HOTEL), name: "입력 중인 이름" });
 
     await user.click(getSubmitButton());
@@ -521,16 +513,16 @@ describe("HotelEditPage 저장", () => {
     const updatedHotel = { ...LATEST_HOTEL, version: HOTEL.version + 1 };
     vi.mocked(updateHotel).mockResolvedValue(updatedHotel);
     const { user, router, queryClient } = await renderLoadedHotelEditPage();
-    const listQueryKey = hotelListQueryOptions({ page: 0 }).queryKey;
+    const listQueryKey = hotelListQueryKey({ page: 0 });
     queryClient.setQueryData(listQueryKey, EMPTY_HOTEL_PAGE);
 
     await user.click(getSubmitButton());
 
     expect(await screen.findByText(DETAIL_PAGE_TEXT)).toBeInTheDocument();
     expect(router.state.location.href).toBe(hotelPath(HOTEL.id));
-    expect(
-      queryClient.getQueryData(hotelQueryOptions(HOTEL.id).queryKey),
-    ).toEqual(updatedHotel);
+    expect(queryClient.getQueryData(hotelQueryKey(HOTEL.id))).toEqual(
+      updatedHotel,
+    );
     expect(queryClient.getQueryState(listQueryKey)?.isInvalidated).toBe(true);
     expect(router.history.length).toBe(2);
   });
