@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { API_ERROR_CODES, getApiError, hotelQueryOptions } from "@/shared/api";
+import { API_ERROR_CODES, getApiError } from "@/shared/api";
+import { useHotelQuery } from "../api/hotel-query";
 
 export function useHotel(hotelId: number) {
-  const { data, error, refetch } = useQuery(hotelQueryOptions(hotelId));
+  const { data, error, refetch } = useHotelQuery(hotelId);
 
   return {
     hotel: data,

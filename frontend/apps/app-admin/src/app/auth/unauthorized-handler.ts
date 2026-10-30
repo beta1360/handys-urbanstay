@@ -1,7 +1,7 @@
-import { hashKey } from "@tanstack/react-query";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
-import { API_ERROR_CODES, getApiError, meQueryOptions } from "@/shared/api";
+import { forgetMe, isPendingMeQuery } from "@/entities/account";
+import { API_ERROR_CODES, getApiError } from "@/shared/api";
 import { LOGIN_PATH } from "./login-redirect";
 
 type UnauthorizedHandlerTargets = {
@@ -9,24 +9,12 @@ type UnauthorizedHandlerTargets = {
   router: AnyRouter;
 };
 
-function isMeQueryWithoutData(
-  queryClient: QueryClient,
-  queryKey: QueryKey | undefined,
-) {
-  const meQueryKey = meQueryOptions().queryKey;
-  return (
-    queryKey !== undefined &&
-    hashKey(queryKey) === hashKey(meQueryKey) &&
-    queryClient.getQueryData(meQueryKey) === undefined
-  );
-}
-
 export function handleUnauthorizedError(
   error: unknown,
   queryKey: QueryKey | undefined,
   { queryClient, router }: UnauthorizedHandlerTargets,
 ) {
-  if (isMeQueryWithoutData(queryClient, queryKey)) {
+  if (isPendingMeQuery(queryClient, queryKey)) {
     return;
   }
   const { pathname, href } = router.state.location;
@@ -36,9 +24,6 @@ export function handleUnauthorizedError(
   if (getApiError(error)?.code !== API_ERROR_CODES.unauthorized) {
     return;
   }
-  queryClient.removeQueries({
-    queryKey: meQueryOptions().queryKey,
-    exact: true,
-  });
+  forgetMe(queryClient);
   void router.navigate({ to: LOGIN_PATH, search: { redirect: href } });
 }

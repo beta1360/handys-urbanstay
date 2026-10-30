@@ -1,32 +1,22 @@
 import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { hotelListQueryOptions } from "@/shared/api";
-import type { HotelPage } from "@/shared/api";
 import {
   getLastPage,
   HOTEL_LIST_FIRST_PAGE,
   isBeyondLastPage,
-  isRequestablePage,
-  toHotelListParams,
-} from "./hotel-list-search";
+  useHotelListQuery,
+} from "@/entities/hotel";
+import { isRequestablePage, toHotelListParams } from "./hotel-list-search";
 import type { HotelListSearch } from "./hotel-list-search";
 
 const hotelListRoute = getRouteApi("/_authenticated/hotels/");
 
-function keepPreviousPageInRange(previousData: HotelPage | undefined) {
-  return previousData && !isBeyondLastPage(previousData)
-    ? previousData
-    : undefined;
-}
-
 export function useHotelList() {
   const search = hotelListRoute.useSearch();
   const navigate = hotelListRoute.useNavigate();
-  const { data, isError, isPlaceholderData, refetch } = useQuery({
-    ...hotelListQueryOptions(toHotelListParams(search)),
-    placeholderData: keepPreviousPageInRange,
-  });
+  const { data, isError, isPlaceholderData, refetch } = useHotelListQuery(
+    toHotelListParams(search),
+  );
   const { keyword, page } = search;
   const isOverflow = data !== undefined && isBeyondLastPage(data);
   const totalPages = data?.totalPages ?? 0;

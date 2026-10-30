@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { getApiError, loginAccount, meQueryOptions } from "@/shared/api";
+import { useLogin } from "@/features/auth-login";
+import { getApiError } from "@/shared/api";
 import type { ApiError } from "@/shared/api";
 import { LOGIN_MESSAGES } from "../config/messages";
 import { LOGIN_FIELDS, loginFormSchema } from "./login-form-schema";
@@ -31,7 +31,7 @@ function toLoginFieldErrors(fieldErrors: ApiError["fieldErrors"]) {
 
 export function useLoginForm() {
   const { redirect: redirectTo } = loginRoute.useSearch();
-  const queryClient = useQueryClient();
+  const { login } = useLogin();
   const navigate = useNavigate();
   const [values, setValues] = useState(INITIAL_VALUES);
   const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
@@ -83,9 +83,7 @@ export function useLoginForm() {
     setFieldErrors({});
     setIsSubmitting(true);
     try {
-      const account = await loginAccount(values);
-      queryClient.clear();
-      queryClient.setQueryData(meQueryOptions().queryKey, account);
+      await login(values);
       await navigate({ href: redirectTo });
     } catch (error) {
       setIsSubmitting(false);

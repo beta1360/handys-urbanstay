@@ -2,19 +2,16 @@ import { QueryClient } from "@tanstack/react-query";
 import { isRedirect } from "@tanstack/react-router";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { API_ERROR_CODES, meQueryOptions } from "@/shared/api";
+import { API_ERROR_CODES, meQueryKey } from "@/shared/api";
 import { ensureLoggedIn, redirectIfLoggedIn } from "./login-guard";
 import { LOGIN_PATH } from "./login-redirect";
 
 const { fetchMe } = vi.hoisted(() => ({ fetchMe: vi.fn() }));
 
-vi.mock("@/shared/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/shared/api")>();
-  return {
-    ...actual,
-    meQueryOptions: () => ({ ...actual.meQueryOptions(), queryFn: fetchMe }),
-  };
-});
+vi.mock("@/shared/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/shared/api")>()),
+  fetchMe,
+}));
 
 const ACCOUNT = { id: 1, loginId: "admin@urbanstay.com", name: "관리자" };
 const CURRENT_HREF = "/hotels?page=2";
@@ -47,7 +44,7 @@ function createQueryClient() {
 
 function createLoggedInQueryClient() {
   const queryClient = createQueryClient();
-  queryClient.setQueryData(meQueryOptions().queryKey, ACCOUNT);
+  queryClient.setQueryData(meQueryKey(), ACCOUNT);
   return queryClient;
 }
 

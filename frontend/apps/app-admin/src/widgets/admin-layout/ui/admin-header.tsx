@@ -1,16 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@repo/ui/button";
-import { meQueryOptions } from "@/shared/api";
+import { useMe } from "@/entities/account";
 import { ADMIN_LAYOUT_MESSAGES } from "../config/messages";
 import { useCurrentTitle } from "../model/use-current-title";
 import { useLogout } from "../model/use-logout";
 
 export function AdminHeader() {
   const currentTitle = useCurrentTitle();
-  const { data: account } = useQuery({
-    ...meQueryOptions(),
-    refetchOnMount: false,
-  });
+  const { data: account } = useMe();
   const { logout, isPending, isFailed } = useLogout();
 
   return (

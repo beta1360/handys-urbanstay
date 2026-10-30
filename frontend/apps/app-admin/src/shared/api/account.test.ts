@@ -1,6 +1,5 @@
-import { QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { loginAccount, logoutAccount, meQueryOptions } from "./account";
+import { fetchMe, loginAccount, logoutAccount, meQueryKey } from "./account";
 import { getGetMeQueryKey, getMe, login, logout } from "./generated";
 import {
   RequestValidationError,
@@ -49,16 +48,19 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("meQueryOptions", () => {
-  it("생성된 쿼리 키를 쓰고 응답이 스키마와 맞으면 계정 정보를 돌려준다", async () => {
+describe("meQueryKey", () => {
+  it("생성된 쿼리 키를 쓴다", () => {
+    expect(meQueryKey()).toEqual(getGetMeQueryKey());
+  });
+});
+
+describe("fetchMe", () => {
+  it("signal을 넘기고 응답이 스키마와 맞으면 계정 정보를 돌려준다", async () => {
     vi.mocked(getMe).mockResolvedValue(ACCOUNT_RESPONSE);
-    const options = meQueryOptions();
+    const { signal } = new AbortController();
 
-    const data = await new QueryClient().fetchQuery(options);
-
-    expect(options.queryKey).toEqual(getGetMeQueryKey());
-    expect(data).toEqual(ACCOUNT_RESPONSE.data);
-    expect(getMe).toHaveBeenCalledWith(undefined, expect.any(AbortSignal));
+    await expect(fetchMe({ signal })).resolves.toEqual(ACCOUNT_RESPONSE.data);
+    expect(getMe).toHaveBeenCalledWith(undefined, signal);
   });
 
   it.each(UNSUCCESSFUL_ACCOUNT_RESPONSES)(
@@ -66,18 +68,14 @@ describe("meQueryOptions", () => {
     async (_, response) => {
       vi.mocked(getMe).mockResolvedValue(response);
 
-      await expect(
-        new QueryClient().fetchQuery(meQueryOptions()),
-      ).rejects.toBeInstanceOf(ResponseValidationError);
+      await expect(fetchMe()).rejects.toBeInstanceOf(ResponseValidationError);
     },
   );
 
   it("응답이 스키마와 맞지 않으면 응답 검증 오류를 던진다", async () => {
     vi.mocked(getMe).mockResolvedValue(ACCOUNT_RESPONSE_WITH_WRONG_ID as never);
 
-    await expect(
-      new QueryClient().fetchQuery(meQueryOptions()),
-    ).rejects.toBeInstanceOf(ResponseValidationError);
+    await expect(fetchMe()).rejects.toBeInstanceOf(ResponseValidationError);
   });
 });
 

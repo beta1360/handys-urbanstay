@@ -19,8 +19,8 @@ import { HOTEL_INFO_MESSAGES } from "@/features/hotel-info-form";
 import {
   API_ERROR_CODES,
   createHotel,
-  hotelListQueryOptions,
-  hotelQueryOptions,
+  hotelListQueryKey,
+  hotelQueryKey,
   RequestValidationError,
   ResponseValidationError,
 } from "@/shared/api";
@@ -462,7 +462,7 @@ describe("HotelCreatePage 요청", () => {
   it("등록에 성공하면 목록 캐시를 무효화하고 상세 캐시에 넣은 뒤 방문 기록을 바꿔 상세로 이동한다", async () => {
     vi.mocked(createHotel).mockResolvedValue(HOTEL);
     const { user, router, queryClient } = await renderHotelCreatePage();
-    const listQueryKey = hotelListQueryOptions({ page: 0 }).queryKey;
+    const listQueryKey = hotelListQueryKey({ page: 0 });
     queryClient.setQueryData(listQueryKey, EMPTY_HOTEL_PAGE);
 
     await submitValidForm(user);
@@ -470,9 +470,7 @@ describe("HotelCreatePage 요청", () => {
     expect(await screen.findByText(DETAIL_PAGE_TEXT)).toBeInTheDocument();
     expect(router.state.location.href).toBe(`/hotels/${HOTEL.id}`);
     expect(queryClient.getQueryState(listQueryKey)?.isInvalidated).toBe(true);
-    expect(
-      queryClient.getQueryData(hotelQueryOptions(HOTEL.id).queryKey),
-    ).toEqual(HOTEL);
+    expect(queryClient.getQueryData(hotelQueryKey(HOTEL.id))).toEqual(HOTEL);
     expect(router.history.length).toBe(2);
 
     router.history.back();

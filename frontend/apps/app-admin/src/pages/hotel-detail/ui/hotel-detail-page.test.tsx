@@ -28,10 +28,7 @@ vi.mock("@/shared/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/api")>();
   return {
     ...actual,
-    hotelQueryOptions: (hotelId: number) => ({
-      ...actual.hotelQueryOptions(hotelId),
-      queryFn: () => fetchHotel(hotelId),
-    }),
+    fetchHotel: (hotelId: number) => fetchHotel(hotelId),
   };
 });
 

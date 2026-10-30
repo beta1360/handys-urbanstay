@@ -1,19 +1,13 @@
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { flushSync } from "react-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { HOTEL_LOAD_MESSAGES } from "@/entities/hotel";
+import { HOTEL_LOAD_MESSAGES, useRefetchHotel } from "@/entities/hotel";
 import { HOTEL_INFO_FIELDS } from "@/features/hotel-info-form";
 import type { HotelInfoField } from "@/features/hotel-info-form";
-import {
-  API_ERROR_CODES,
-  getApiError,
-  hotelListQueryKey,
-  hotelQueryOptions,
-  updateHotel,
-} from "@/shared/api";
-import type { Hotel, UpdateHotelBody } from "@/shared/api";
+import { useUpdateHotel } from "@/features/hotel-update";
+import { API_ERROR_CODES, getApiError } from "@/shared/api";
+import type { Hotel } from "@/shared/api";
 import {
   focusFirstInvalidField,
   hasFieldError,
@@ -35,7 +29,8 @@ type HotelEditFormError = {
 };
 
 export function useHotelEditForm(hotelId: number, initialHotel: Hotel) {
-  const queryClient = useQueryClient();
+  const { update } = useUpdateHotel(hotelId);
+  const refetchHotel = useRefetchHotel(hotelId);
   const navigate = useNavigate();
   const formRef = useRef<HTMLFormElement>(null);
   const reloadButtonRef = useRef<HTMLButtonElement>(null);
@@ -46,13 +41,6 @@ export function useHotelEditForm(hotelId: number, initialHotel: Hotel) {
   );
   const [formError, setFormError] = useState<HotelEditFormError>();
   const [status, setStatus] = useState<HotelEditStatus>("editing");
-  const { mutate } = useMutation({
-    mutationFn: (body: UpdateHotelBody) => updateHotel(hotelId, body),
-    onSuccess: (hotel) => {
-      void queryClient.invalidateQueries({ queryKey: hotelListQueryKey() });
-      queryClient.setQueryData(hotelQueryOptions(hotel.id).queryKey, hotel);
-    },
-  });
 
   function changeField(field: HotelInfoField, value: string) {
     setForm((current) => ({
@@ -99,14 +87,8 @@ export function useHotelEditForm(hotelId: number, initialHotel: Hotel) {
       return;
     }
     setStatus("reloading");
-    const { queryKey } = hotelQueryOptions(hotelId);
     try {
-      // 진행 중인 조회가 있으면 fetchQuery가 그 결과를 함께 쓰므로 취소한 뒤 새로 조회한다.
-      await queryClient.cancelQueries({ queryKey });
-      const hotel = await queryClient.fetchQuery({
-        ...hotelQueryOptions(hotelId),
-        staleTime: 0,
-      });
+      const hotel = await refetchHotel();
       setForm(toHotelEditFormState(hotel));
       setFieldErrors({});
       setFormError(undefined);
@@ -156,7 +138,7 @@ export function useHotelEditForm(hotelId: number, initialHotel: Hotel) {
     setFieldErrors({});
     setStatus("submitting");
     // 화면을 떠난 뒤 끝난 요청은 이동하지 않도록 이동은 mutate 콜백에, 캐시 갱신은 useMutation 콜백에 둔다.
-    mutate(result.data, {
+    update(result.data, {
       onSuccess: goToHotel,
       onError: (error) => {
         setStatus("editing");

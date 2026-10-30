@@ -1,13 +1,11 @@
 import { z } from "zod";
+import { HOTEL_LIST_FIRST_PAGE, toApiPage } from "@/entities/hotel";
 import { hotelListParamsSchema } from "@/shared/api";
-import type { HotelPage } from "@/shared/api";
 
 const { keyword: keywordParamSchema, page: pageParamSchema } =
   hotelListParamsSchema.shape;
 
 const PAGE_NUMBER_PATTERN = /^\d+$/;
-
-export const HOTEL_LIST_FIRST_PAGE = 1;
 
 export const HOTEL_KEYWORD_MAX_LENGTH =
   keywordParamSchema.unwrap().maxLength ?? undefined;
@@ -18,10 +16,6 @@ export function normalizeHotelKeyword(value: string | undefined) {
     return undefined;
   }
   return keyword;
-}
-
-function toApiPage(page: number) {
-  return page - HOTEL_LIST_FIRST_PAGE;
 }
 
 export function isRequestablePage(page: number) {
@@ -63,12 +57,4 @@ export const HOTEL_LIST_DEFAULT_SEARCH = {
 
 export function toHotelListParams({ keyword, page }: HotelListSearch) {
   return { keyword, page: toApiPage(page) };
-}
-
-export function getLastPage(totalPages: number) {
-  return Math.max(totalPages, HOTEL_LIST_FIRST_PAGE);
-}
-
-export function isBeyondLastPage({ page, totalPages }: HotelPage) {
-  return page > toApiPage(getLastPage(totalPages));
 }
