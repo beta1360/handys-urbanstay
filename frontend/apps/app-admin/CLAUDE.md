@@ -20,6 +20,7 @@
 - `/`에는 화면을 두지 않고 호텔 목록(`/hotels`)으로 보낸다(방문 기록을 바꾸는 이동). 이동은 `src/app/router/index-redirect.ts`의 함수로 두고 `_authenticated/index.tsx`의 `beforeLoad`가 연결한다. 로그인 뒤 기본 이동(`/`)도 호텔 목록으로 이어진다.
 - QueryClient와 라우터는 `src/app/router/router.ts`에서 함께 만든다. 라우터 context에 QueryClient를 넣고, QueryClient의 오류 처리기에 라우터를 넘기기 위해서다. `QueryProvider`도 여기서 만든 QueryClient를 쓴다.
 - 라우터의 URL search 직렬화는 `src/shared/lib/search-params`의 `parseSearch`·`stringifySearch`를 쓴다(일반 쿼리 문자열). 테스트용 memory 라우터도 같은 함수를 넣는다. 규칙은 `frontend/docs/admin-app.md`의 '구조'를 따른다.
+- 경로 파라미터(`$hotelId`)는 라우트의 `params.parse`·`params.stringify`로 읽고 쓴다. 두 함수는 그 화면의 pages slice(`pages/hotel-detail`)에 둔다. 규칙은 `frontend/docs/admin-app.md`의 '상세 화면'을 따른다.
 - 라우트 트리는 `src/app/router/route-tree.gen.ts`에 생성된다. 직접 수정하지 않고 커밋한다.
 - 라우트 생성 설정은 `tsr.config.json`에만 둔다.
 
@@ -46,15 +47,16 @@ apps/app-admin/
    │  │  ├─ _authenticated/      # 로그인이 필요한 화면
    │  │  │  ├─ index.tsx         # / (/hotels로 보낸다)
    │  │  │  └─ hotels/
-   │  │  │     └─ index.tsx      # /hotels (?keyword=&page=)
+   │  │  │     ├─ index.tsx      # /hotels (?keyword=&page=)
+   │  │  │     └─ $hotelId.tsx   # /hotels/$hotelId (호텔 상세)
    │  │  └─ login.tsx            # /login (?redirect=)
    │  └─ styles/
-   ├─ pages/           # error(화면 오류), hotel-list(호텔 목록: 검색·페이지·URL search 스키마), login(로그인 폼)
+   ├─ pages/           # error(화면 오류), hotel-detail(호텔 상세: 경로 파라미터 검사, 찾을 수 없음), hotel-list(호텔 목록: 검색·페이지·URL search 스키마), login(로그인 폼)
    ├─ widgets/         # admin-layout: 사이드바 메뉴(config/menu.ts), 위쪽 화면 제목·계정 이름·로그아웃
    └─ shared/
       ├─ api/          # 검증된 API만 index.ts로 내보낸다
       │  ├─ account.ts          # 내 정보 쿼리 옵션, 로그인, 로그아웃, 로그인 요청 스키마
-      │  ├─ hotel.ts            # 호텔 목록·상세 쿼리 옵션, 목록 전체 쿼리 키, 등록, 수정, 목록 파라미터·등록·수정 요청 스키마
+      │  ├─ hotel.ts            # 호텔 목록·상세 쿼리 옵션, 목록 전체 쿼리 키, 등록, 수정, 목록·상세 파라미터·등록·수정 요청 스키마
       │  ├─ api-error.ts        # 서버 오류 정보 읽기 (getApiError), 오류 코드 (API_ERROR_CODES)
       │  ├─ validate.ts         # 요청(본문·파라미터)·응답 zod 검증, 개발 콘솔 로그
       │  ├─ validation-error.ts # RequestValidationError, ResponseValidationError
