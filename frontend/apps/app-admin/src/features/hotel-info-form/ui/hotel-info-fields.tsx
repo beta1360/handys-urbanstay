@@ -1,6 +1,7 @@
 import { FormSection } from "@repo/ui/form-section";
 import { TextField } from "@repo/ui/text-field";
 import { TextareaField } from "@repo/ui/textarea-field";
+import { HOTEL_FIELD_LABELS } from "@/entities/hotel";
 import { HOTEL_INFO_MESSAGES } from "../config/messages";
 import type { HotelInfoField, HotelInfoValues } from "../model/hotel-info-form";
 
@@ -20,21 +21,21 @@ export function HotelInfoFields({
   return (
     <FormSection legend={HOTEL_INFO_MESSAGES.legend}>
       <TextField
-        label={HOTEL_INFO_MESSAGES.nameLabel}
+        label={HOTEL_FIELD_LABELS.name}
         name="name"
         value={values.name}
         onChange={(event) => onChange("name", event.target.value)}
         error={errors.name}
       />
       <TextField
-        label={HOTEL_INFO_MESSAGES.addressLabel}
+        label={HOTEL_FIELD_LABELS.address}
         name="address"
         value={values.address}
         onChange={(event) => onChange("address", event.target.value)}
         error={errors.address}
       />
       <TextField
-        label={HOTEL_INFO_MESSAGES.phoneLabel}
+        label={HOTEL_FIELD_LABELS.phone}
         name="phone"
         hint={HOTEL_INFO_MESSAGES.phoneHint}
         value={values.phone}
@@ -44,7 +45,7 @@ export function HotelInfoFields({
       <TextareaField
         label={
           <>
-            {HOTEL_INFO_MESSAGES.descriptionLabel}{" "}
+            {HOTEL_FIELD_LABELS.description}{" "}
             <span className="font-normal text-neutral-500">
               {HOTEL_INFO_MESSAGES.optional}
             </span>

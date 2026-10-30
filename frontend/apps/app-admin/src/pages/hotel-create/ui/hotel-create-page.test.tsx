@@ -15,6 +15,7 @@ import userEvent from "@testing-library/user-event";
 import type { UserEvent } from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { HOTEL_FIELD_LABELS } from "@/entities/hotel";
 import { HOTEL_INFO_MESSAGES } from "@/features/hotel-info-form";
 import {
   API_ERROR_CODES,
@@ -25,7 +26,7 @@ import {
   ResponseValidationError,
 } from "@/shared/api";
 import type { Hotel, HotelPage } from "@/shared/api";
-import { FORM_VALIDATION_MESSAGES } from "@/shared/config";
+import { COMMON_MESSAGES, FORM_VALIDATION_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { HOTEL_CREATE_MESSAGES } from "../config/messages";
 import { HotelCreatePage } from "./hotel-create-page";
@@ -165,11 +166,11 @@ function getFields(): Record<InputField, HTMLElement> {
   const hotelInfo = within(getHotelInfoGroup());
   const master = within(getMasterGroup());
   return {
-    name: hotelInfo.getByLabelText(HOTEL_INFO_MESSAGES.nameLabel),
-    address: hotelInfo.getByLabelText(HOTEL_INFO_MESSAGES.addressLabel),
-    phone: hotelInfo.getByLabelText(HOTEL_INFO_MESSAGES.phoneLabel),
+    name: hotelInfo.getByLabelText(HOTEL_FIELD_LABELS.name),
+    address: hotelInfo.getByLabelText(HOTEL_FIELD_LABELS.address),
+    phone: hotelInfo.getByLabelText(HOTEL_FIELD_LABELS.phone),
     description: hotelInfo.getByLabelText(
-      `${HOTEL_INFO_MESSAGES.descriptionLabel} ${HOTEL_INFO_MESSAGES.optional}`,
+      `${HOTEL_FIELD_LABELS.description} ${HOTEL_INFO_MESSAGES.optional}`,
     ),
     loginId: master.getByLabelText(HOTEL_CREATE_MESSAGES.masterLoginIdLabel),
     masterName: master.getByLabelText(HOTEL_CREATE_MESSAGES.masterNameLabel),
@@ -179,6 +180,10 @@ function getFields(): Record<InputField, HTMLElement> {
 
 function getSubmitButton() {
   return screen.getByRole("button", { name: HOTEL_CREATE_MESSAGES.submit });
+}
+
+function getCancelLink() {
+  return screen.getByRole("link", { name: COMMON_MESSAGES.cancel });
 }
 
 function expectBetweenFieldsAndButtons(element: HTMLElement) {
@@ -230,9 +235,9 @@ describe("HotelCreatePage 화면", () => {
       fields.masterName,
     ]);
     expect(getSubmitButton()).toHaveAttribute("type", "submit");
-    expect(
-      screen.getByRole("button", { name: HOTEL_CREATE_MESSAGES.cancel }),
-    ).toHaveAttribute("type", "button");
+    const cancelLink = getCancelLink();
+    expect(cancelLink).toHaveAttribute("href", "/hotels");
+    expect(cancelLink).not.toHaveAttribute("aria-current");
   });
 
   it("형식이 있는 칸에만 안내 문구를 보여주고 입력창과 연결한다", async () => {
@@ -483,9 +488,7 @@ describe("HotelCreatePage 요청", () => {
     const { user, router } = await renderHotelCreatePage();
 
     await fillForm(user);
-    await user.click(
-      screen.getByRole("button", { name: HOTEL_CREATE_MESSAGES.cancel }),
-    );
+    await user.click(getCancelLink());
 
     await vi.waitFor(() => {
       expect(router.state.location.href).toBe("/hotels");
@@ -601,7 +604,7 @@ describe("HotelCreatePage 서버 오류 처리", () => {
     await submitValidForm(user);
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(HOTEL_CREATE_MESSAGES.requestFailed);
+    expect(alert).toHaveTextContent(COMMON_MESSAGES.requestFailed);
     expectBetweenFieldsAndButtons(alert);
   });
 

@@ -24,7 +24,7 @@ import {
   RequestValidationError,
   ResponseValidationError,
 } from "@/shared/api";
-import { APP_INFO } from "@/shared/config";
+import { APP_INFO, COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { LOGIN_MESSAGES } from "../config/messages";
 import { LoginPage } from "./login-page";
@@ -349,7 +349,7 @@ describe("LoginPage 서버 오류 처리", () => {
     await user.click(getSubmitButton());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      LOGIN_MESSAGES.requestFailed,
+      COMMON_MESSAGES.requestFailed,
     );
   });
 });

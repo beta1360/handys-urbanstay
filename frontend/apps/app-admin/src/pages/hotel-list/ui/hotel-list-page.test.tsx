@@ -19,7 +19,9 @@ import {
   onTestFinished,
   vi,
 } from "vitest";
+import { HOTEL_FIELD_LABELS } from "@/entities/hotel";
 import type { Hotel, HotelPage } from "@/shared/api";
+import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { HOTEL_LIST_MESSAGES } from "../config/messages";
 import {
@@ -195,9 +197,9 @@ describe("HotelListPage 목록", () => {
     const table = await screen.findByRole("table");
     const headers = within(table).getAllByRole("columnheader");
     expect(headers.map((header) => header.textContent)).toEqual([
-      HOTEL_LIST_MESSAGES.nameColumn,
-      HOTEL_LIST_MESSAGES.addressColumn,
-      HOTEL_LIST_MESSAGES.phoneColumn,
+      HOTEL_FIELD_LABELS.name,
+      HOTEL_FIELD_LABELS.address,
+      HOTEL_FIELD_LABELS.phone,
     ]);
     const [, ...rows] = within(table).getAllByRole("row");
     expect(rows.map(getRowTexts)).toEqual(
@@ -228,9 +230,12 @@ describe("HotelListPage 목록", () => {
     const user = userEvent.setup();
     const router = renderHotelListPage(hotelsPath({ keyword: KEYWORD }));
 
-    await user.click(
-      await screen.findByRole("button", { name: HOTEL_LIST_MESSAGES.create }),
-    );
+    const createLink = await screen.findByRole("link", {
+      name: HOTEL_LIST_MESSAGES.create,
+    });
+    expect(createLink).toHaveAttribute("href", "/hotels/new");
+
+    await user.click(createLink);
 
     await vi.waitFor(() => {
       expect(router.state.location.href).toBe("/hotels/new");
@@ -242,7 +247,7 @@ describe("HotelListPage 목록", () => {
     renderHotelListPage();
 
     expect(await screen.findByRole("status")).toHaveTextContent(
-      HOTEL_LIST_MESSAGES.loading,
+      COMMON_MESSAGES.loading,
     );
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
@@ -437,7 +442,7 @@ describe("HotelListPage 마지막 페이지를 넘은 페이지", () => {
     expect(router.history.length).toBe(1);
     expect(fetchHotels).toHaveBeenLastCalledWith({ keyword: KEYWORD, page: 1 });
     expect(screen.getByRole("status")).toHaveTextContent(
-      HOTEL_LIST_MESSAGES.loading,
+      COMMON_MESSAGES.loading,
     );
 
     lastPage.resolve(createHotelPage({ page: 1, totalPages: 2 }));
@@ -480,7 +485,7 @@ describe("HotelListPage 오류", () => {
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
 
     await user.click(
-      screen.getByRole("button", { name: HOTEL_LIST_MESSAGES.retry }),
+      screen.getByRole("button", { name: COMMON_MESSAGES.retry }),
     );
 
     expect(await screen.findByRole("table")).toBeInTheDocument();

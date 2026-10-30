@@ -5,7 +5,7 @@ import { z } from "zod";
 import { useLogin } from "@/features/auth-login";
 import { getApiError } from "@/shared/api";
 import type { ApiError } from "@/shared/api";
-import { LOGIN_MESSAGES } from "../config/messages";
+import { COMMON_MESSAGES } from "@/shared/config";
 import { LOGIN_FIELDS, loginFormSchema } from "./login-form-schema";
 import type { LoginField, LoginFormValues } from "./login-form-schema";
 
@@ -58,7 +58,7 @@ export function useLoginForm() {
   function showLoginError(error: unknown) {
     const apiError = getApiError(error);
     if (apiError === undefined) {
-      setFormError(LOGIN_MESSAGES.requestFailed);
+      setFormError(COMMON_MESSAGES.requestFailed);
       return;
     }
     const errors = toLoginFieldErrors(apiError.fieldErrors);

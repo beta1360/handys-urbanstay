@@ -7,6 +7,7 @@ import {
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { ERROR_PAGE_MESSAGES } from "../config/messages";
 import { ErrorPage } from "./error-page";
@@ -31,7 +32,7 @@ describe("ErrorPage", () => {
       await screen.findByText(ERROR_PAGE_MESSAGES.description),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: ERROR_PAGE_MESSAGES.retry }),
+      screen.getByRole("button", { name: COMMON_MESSAGES.retry }),
     ).toBeInTheDocument();
   });
 
@@ -41,7 +42,7 @@ describe("ErrorPage", () => {
     const invalidate = vi.spyOn(router, "invalidate");
 
     await user.click(
-      await screen.findByRole("button", { name: ERROR_PAGE_MESSAGES.retry }),
+      await screen.findByRole("button", { name: COMMON_MESSAGES.retry }),
     );
 
     expect(invalidate).toHaveBeenCalledOnce();

@@ -1,23 +1,22 @@
-import { useNavigate } from "@tanstack/react-router";
-import { Button } from "@repo/ui/button";
 import { Card } from "@repo/ui/card";
+import { COMMON_MESSAGES } from "@/shared/config";
+import { ButtonLink } from "@/shared/ui";
 import { HOTEL_NOT_FOUND_MESSAGES } from "../config/messages";
 
 export function HotelNotFound() {
-  const navigate = useNavigate();
-
   return (
     <Card>
       <div className="flex flex-col items-center gap-4">
         <p role="alert" className="text-sm text-neutral-700">
           {HOTEL_NOT_FOUND_MESSAGES.description}
         </p>
-        <Button
+        <ButtonLink
+          to="/hotels"
+          activeOptions={{ exact: true }}
           variant="secondary"
-          onClick={() => void navigate({ to: "/hotels" })}
         >
-          {HOTEL_NOT_FOUND_MESSAGES.backToList}
-        </Button>
+          {COMMON_MESSAGES.backToList}
+        </ButtonLink>
       </div>
     </Card>
   );

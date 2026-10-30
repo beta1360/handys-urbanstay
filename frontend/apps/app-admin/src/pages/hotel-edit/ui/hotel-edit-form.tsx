@@ -2,6 +2,8 @@ import { Button } from "@repo/ui/button";
 import { HotelNotFound } from "@/entities/hotel";
 import { HotelInfoFields } from "@/features/hotel-info-form";
 import type { Hotel } from "@/shared/api";
+import { COMMON_MESSAGES } from "@/shared/config";
+import { ButtonLink } from "@/shared/ui";
 import { HOTEL_EDIT_MESSAGES } from "../config/messages";
 import { useHotelEditForm } from "../model/use-hotel-edit-form";
 
@@ -21,7 +23,6 @@ export function HotelEditForm({ hotelId, initialHotel }: HotelEditFormProps) {
     changeField,
     handleSubmit,
     reload,
-    cancel,
   } = useHotelEditForm(hotelId, initialHotel);
 
   if (status === "notFound") {
@@ -66,9 +67,14 @@ export function HotelEditForm({ hotelId, initialHotel }: HotelEditFormProps) {
         >
           {HOTEL_EDIT_MESSAGES.submit}
         </Button>
-        <Button type="button" variant="secondary" onClick={cancel}>
-          {HOTEL_EDIT_MESSAGES.cancel}
-        </Button>
+        <ButtonLink
+          to="/hotels/$hotelId"
+          params={{ hotelId }}
+          activeOptions={{ exact: true }}
+          variant="secondary"
+        >
+          {COMMON_MESSAGES.cancel}
+        </ButtonLink>
       </div>
     </form>
   );

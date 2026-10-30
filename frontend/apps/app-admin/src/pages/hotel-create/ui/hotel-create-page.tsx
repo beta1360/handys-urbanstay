@@ -1,5 +1,7 @@
 import { Button } from "@repo/ui/button";
 import { HotelInfoFields } from "@/features/hotel-info-form";
+import { COMMON_MESSAGES } from "@/shared/config";
+import { ButtonLink } from "@/shared/ui";
 import { HOTEL_CREATE_MESSAGES } from "../config/messages";
 import { useHotelCreateForm } from "../model/use-hotel-create-form";
 import { MasterAccountFields } from "./master-account-fields";
@@ -14,7 +16,6 @@ export function HotelCreatePage() {
     changeHotelInfo,
     changeMaster,
     handleSubmit,
-    cancel,
   } = useHotelCreateForm();
 
   return (
@@ -43,9 +44,13 @@ export function HotelCreatePage() {
         <Button type="submit" variant="primary" loading={isSubmitting}>
           {HOTEL_CREATE_MESSAGES.submit}
         </Button>
-        <Button type="button" variant="secondary" onClick={cancel}>
-          {HOTEL_CREATE_MESSAGES.cancel}
-        </Button>
+        <ButtonLink
+          to="/hotels"
+          activeOptions={{ exact: true }}
+          variant="secondary"
+        >
+          {COMMON_MESSAGES.cancel}
+        </ButtonLink>
       </div>
     </form>
   );

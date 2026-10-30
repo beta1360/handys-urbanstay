@@ -5,13 +5,13 @@ import { useCreateHotel } from "@/features/hotel-create";
 import type { HotelInfoField } from "@/features/hotel-info-form";
 import { API_ERROR_CODES, getApiError } from "@/shared/api";
 import type { Hotel } from "@/shared/api";
+import { COMMON_MESSAGES } from "@/shared/config";
 import {
   focusFirstInvalidField,
   hasFieldError,
   toFieldErrors,
   toIssueFieldMessages,
 } from "@/shared/lib/form";
-import { HOTEL_CREATE_MESSAGES } from "../config/messages";
 import {
   EMPTY_HOTEL_CREATE_VALUES,
   HOTEL_CREATE_FIELDS,
@@ -57,7 +57,7 @@ export function useHotelCreateForm() {
   function showSubmitError(error: unknown) {
     const apiError = getApiError(error);
     if (apiError === undefined) {
-      setFormError(HOTEL_CREATE_MESSAGES.requestFailed);
+      setFormError(COMMON_MESSAGES.requestFailed);
       return;
     }
     const errors: HotelCreateFieldErrors =
@@ -113,6 +113,5 @@ export function useHotelCreateForm() {
     changeHotelInfo,
     changeMaster,
     handleSubmit,
-    cancel: () => void navigate({ to: "/hotels" }),
   };
 }
