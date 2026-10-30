@@ -7,6 +7,7 @@
     "./styles.css": "./src/styles.css",
     "./button": "./src/button.tsx",
     "./card": "./src/card.tsx",
+    "./description-list": "./src/description-list.tsx",
     "./pagination": "./src/pagination.tsx",
     "./sidebar": "./src/sidebar.tsx",
     "./table": "./src/table.tsx",

@@ -102,9 +102,13 @@ function renderHotelListPage(initialPath = hotelsPath()) {
     search: { middlewares: [stripSearchParams(HOTEL_LIST_DEFAULT_SEARCH)] },
     component: HotelListPage,
   });
+  const hotelDetailRoute = createRoute({
+    getParentRoute: () => layoutRoute,
+    path: "hotels/$hotelId",
+  });
   const router = createRouter({
     routeTree: rootRoute.addChildren([
-      layoutRoute.addChildren([hotelListRoute]),
+      layoutRoute.addChildren([hotelListRoute, hotelDetailRoute]),
     ]),
     history: createMemoryHistory({ initialEntries: [initialPath] }),
     parseSearch,
@@ -200,6 +204,20 @@ describe("HotelListPage 목록", () => {
       screen.getByText(HOTEL_LIST_MESSAGES.pageStatus(1, 1)),
     ).toBeInTheDocument();
     expect(fetchHotels).toHaveBeenCalledExactlyOnceWith({ page: 0 });
+  });
+
+  it("호텔 이름은 그 호텔의 상세 화면으로 가는 링크다", async () => {
+    const user = userEvent.setup();
+    const router = renderHotelListPage(hotelsPath({ keyword: KEYWORD }));
+
+    const nameLink = await screen.findByRole("link", { name: HOTELS[0].name });
+    expect(nameLink).toHaveAttribute("href", `/hotels/${HOTELS[0].id}`);
+
+    await user.click(nameLink);
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe(`/hotels/${HOTELS[0].id}`);
+    });
   });
 
   it("처음 불러오는 동안 불러오는 중 문구를 보여준다", async () => {

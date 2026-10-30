@@ -13,6 +13,7 @@ export {
   hotelListParamsSchema,
   hotelListQueryKey,
   hotelListQueryOptions,
+  hotelParamsSchema,
   hotelQueryOptions,
   updateHotel,
   updateHotelBodySchema,
