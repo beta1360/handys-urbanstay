@@ -7,7 +7,9 @@ import {
   showSubmitError,
   SUBMIT_ONLY_VALIDATION,
   toFieldPropsMap,
+  useFormErrorToast,
 } from "@/shared/lib/form";
+import { showToast } from "@/shared/lib/toast";
 import { useCreateHotel } from "../api/use-create-hotel";
 import {
   EMPTY_HOTEL_CREATE_VALUES,
@@ -18,6 +20,7 @@ import {
 export function useHotelCreateForm() {
   const { create } = useCreateHotel();
   const navigate = useNavigate();
+  const errorToast = useFormErrorToast();
   const form = useForm({
     ...SUBMIT_ONLY_VALIDATION,
     resolver: zodResolver(hotelCreateFormSchema),
@@ -25,7 +28,6 @@ export function useHotelCreateForm() {
   });
   const { formState } = form;
   const fields = toFieldPropsMap(form, HOTEL_CREATE_FIELDS);
-  const alert = formState.errors.root?.server?.message;
   const isSubmitting = formState.isSubmitting || formState.isSubmitSuccessful;
 
   const submit = form.handleSubmit(
@@ -33,7 +35,8 @@ export function useHotelCreateForm() {
       new Promise<void>((resolve) => {
         // 화면을 떠난 뒤 끝난 요청은 이동하지 않도록 이동은 mutate 콜백에, 캐시 갱신은 useMutation 콜백에 둔다.
         create(body, {
-          onSuccess: ({ data: hotel }) => {
+          onSuccess: ({ data: hotel, message }) => {
+            showToast({ type: "success", message });
             void navigate({
               to: "/hotels/$hotelId",
               params: { hotelId: hotel.id },
@@ -48,6 +51,7 @@ export function useHotelCreateForm() {
               fieldOfCode: {
                 [API_ERROR_CODES.loginIdDuplicated]: "master.loginId",
               },
+              onAlert: ({ message }) => errorToast.show(message),
             });
             resolve();
           },
@@ -60,8 +64,9 @@ export function useHotelCreateForm() {
       event.preventDefault();
       return;
     }
+    errorToast.dismiss();
     void submit(event);
   }
 
-  return { fields, alert, isSubmitting, handleSubmit };
+  return { fields, isSubmitting, handleSubmit };
 }

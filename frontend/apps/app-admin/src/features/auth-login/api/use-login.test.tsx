@@ -20,6 +20,8 @@ const LOGIN_BODY = { loginId: "admin@urbanstay.com", password: "password1234" };
 
 const ACCOUNT = { id: 1, loginId: LOGIN_BODY.loginId, name: "관리자" };
 
+const MESSAGE = "로그인했습니다.";
+
 function renderUseLogin() {
   const queryClient = new QueryClient();
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -33,14 +35,16 @@ afterEach(() => {
 });
 
 describe("useLogin", () => {
-  it("로그인에 성공하면 받은 계정으로 로그인 상태를 시작한다", async () => {
+  it("로그인에 성공하면 받은 계정으로 로그인 상태를 시작하고 서버의 성공 문구를 돌려준다", async () => {
     vi.mocked(loginAccount).mockResolvedValue({
       data: ACCOUNT,
-      message: "로그인했습니다.",
+      message: MESSAGE,
     });
     const { result, queryClient } = renderUseLogin();
 
-    await result.current.login(LOGIN_BODY);
+    await expect(result.current.login(LOGIN_BODY)).resolves.toEqual({
+      message: MESSAGE,
+    });
 
     expect(loginAccount).toHaveBeenCalledExactlyOnceWith(LOGIN_BODY);
     expect(startSession).toHaveBeenCalledExactlyOnceWith(queryClient, ACCOUNT);

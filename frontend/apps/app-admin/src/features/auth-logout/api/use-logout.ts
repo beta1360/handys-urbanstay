@@ -6,14 +6,16 @@ export function useLogout() {
   const queryClient = useQueryClient();
 
   async function logout() {
+    let message: string | undefined;
     try {
-      await logoutAccount();
+      message = (await logoutAccount()).message;
     } catch (error) {
       if (getApiError(error)?.code !== API_ERROR_CODES.unauthorized) {
         throw error;
       }
     }
     endSession(queryClient);
+    return { message };
   }
 
   return { logout };

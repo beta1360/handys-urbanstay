@@ -46,6 +46,7 @@ apps/app-admin/
    │  │  └─ unauthorized-handler.ts # 사용 중 401이면 /login으로 보낸다
    │  ├─ entrypoint/   # main.tsx, app-providers.tsx (Provider 조합)
    │  ├─ query/        # QueryClient 생성(재시도 규칙, 오류 처리기), QueryProvider (Devtools 포함)
+   │  ├─ toast/        # ToastProvider (라우터 바깥에서 토스트 영역을 그린다)
    │  ├─ router/       # QueryClient·라우터 생성, route-tree.gen.ts, index-redirect.ts(/ → /hotels)
    │  ├─ routes/       # TanStack Router 라우트 파일
    │  │  ├─ __root.tsx           # 탭 제목, 오류 화면
@@ -85,10 +86,11 @@ apps/app-admin/
       │  ├─ http.ts             # orval mutator
       │  └─ generated/ # orval 생성 코드. 직접 수정하지 않고 shared/api 밖에서 import하지 않는다
       │     └─ zod/    # orval 생성 zod 스키마
-      ├─ config/       # APP_INFO (앱 이름), FORM_VALIDATION_MESSAGES (서버와 같은 입력 검증 문구), COMMON_MESSAGES (여러 화면이 함께 쓰는 문구)
+      ├─ config/       # APP_INFO (앱 이름), FORM_VALIDATION_MESSAGES (서버와 같은 입력 검증 문구), COMMON_MESSAGES (여러 화면이 함께 쓰는 문구), TOAST_MESSAGES (토스트 영역·닫기 버튼 이름)
       ├─ lib/
-      │  ├─ form/          # 필수·선택 문자열·비밀번호 검사(폼 스키마 조각). react-hook-form 공통: 제출할 때만 검사(SUBMIT_ONLY_VALIDATION), 칸 props와 고치면 그 칸 오류 지우기(toFieldProps), 서버 오류를 칸 오류(첫 칸 초점)와 폼 알림(root.server)으로 나누기(showSubmitError)
-      │  └─ search-params/ # URL search 직렬화(일반 쿼리 문자열). 라우터와 테스트용 라우터가 쓴다
+      │  ├─ form/          # 필수·선택 문자열·비밀번호 검사(폼 스키마 조각). react-hook-form 공통: 제출할 때만 검사(SUBMIT_ONLY_VALIDATION), 칸 props와 고치면 그 칸 오류 지우기(toFieldProps), 서버 오류를 칸 오류(첫 칸 초점)와 폼 알림(root.server, onAlert로 토스트도)으로 나누기(showSubmitError), 그 폼이 띄운 오류 토스트를 다시 제출할 때 지우기(useFormErrorToast)
+      │  ├─ search-params/ # URL search 직렬화(일반 쿼리 문자열). 라우터와 테스트용 라우터가 쓴다
+      │  └─ toast/         # 토스트 store(showToast·dismissToast·useToasts). 성공 4초 뒤 사라짐, 최대 3개
       └─ ui/           # ButtonLink (버튼 모양의 링크), TextLink (글자 링크)
 ```
 

@@ -16,7 +16,10 @@ import {
   showSubmitError,
   SUBMIT_ONLY_VALIDATION,
   toFieldPropsMap,
+  useFormErrorToast,
 } from "@/shared/lib/form";
+import type { FormAlert } from "@/shared/lib/form";
+import { showToast } from "@/shared/lib/toast";
 import { useUpdateHotel } from "../api/use-update-hotel";
 import {
   hotelUpdateFormSchema,
@@ -37,6 +40,7 @@ export function useHotelUpdateForm(hotelId: number, initialHotel: Hotel) {
   const { update } = useUpdateHotel(hotelId);
   const refetchHotel = useRefetchHotel(hotelId);
   const navigate = useNavigate();
+  const errorToast = useFormErrorToast();
   const reloadButtonRef = useRef<HTMLButtonElement>(null);
   // 다시 조회된 값으로 입력 중인 폼을 덮지 않도록 처음 받은 값으로만 채운다.
   const form = useForm({
@@ -47,20 +51,29 @@ export function useHotelUpdateForm(hotelId: number, initialHotel: Hotel) {
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const { formState } = form;
   const fields = toFieldPropsMap(form, HOTEL_INFO_FIELDS);
-  const alert = formState.errors.root?.server;
-  const canReload =
-    alert?.type === API_ERROR_CODES.hotelModified ||
-    alert?.type === RELOAD_FAILED;
+  const formAlert = formState.errors.root?.server;
+  const alert =
+    formAlert?.type === API_ERROR_CODES.hotelModified ||
+    formAlert?.type === RELOAD_FAILED
+      ? formAlert.message
+      : undefined;
   const isSubmitting = formState.isSubmitting || formState.isSubmitSuccessful;
   const status: HotelUpdateStatus =
     loadState !== "idle" ? loadState : isSubmitting ? "submitting" : "editing";
+
+  function toastFormAlert({ code, message }: FormAlert) {
+    if (code !== API_ERROR_CODES.hotelModified) {
+      errorToast.show(message);
+    }
+  }
 
   const submit = form.handleSubmit(
     (body) =>
       new Promise<void>((resolve) => {
         // 화면을 떠난 뒤 끝난 요청은 이동하지 않도록 이동은 mutate 콜백에, 캐시 갱신은 useMutation 콜백에 둔다.
         update(body, {
-          onSuccess: ({ data: hotel }) => {
+          onSuccess: ({ data: hotel, message }) => {
+            showToast({ type: "success", message });
             void navigate({
               to: "/hotels/$hotelId",
               params: { hotelId: hotel.id },
@@ -72,6 +85,7 @@ export function useHotelUpdateForm(hotelId: number, initialHotel: Hotel) {
             showSubmitError(error, {
               fields: HOTEL_INFO_FIELDS,
               setError: form.setError,
+              onAlert: toastFormAlert,
             });
             resolve();
           },
@@ -84,6 +98,7 @@ export function useHotelUpdateForm(hotelId: number, initialHotel: Hotel) {
       event.preventDefault();
       return;
     }
+    errorToast.dismiss();
     void submit(event);
   }
 
@@ -116,8 +131,7 @@ export function useHotelUpdateForm(hotelId: number, initialHotel: Hotel) {
 
   return {
     fields,
-    alert: alert?.message,
-    canReload,
+    alert,
     status,
     reloadButtonRef,
     handleSubmit,

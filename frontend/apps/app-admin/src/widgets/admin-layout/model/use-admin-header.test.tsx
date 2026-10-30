@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useMe } from "@/entities/account";
 import { useLogout } from "@/features/auth-logout";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
+import { showToast } from "@/shared/lib/toast";
 import { useAdminHeader } from "./use-admin-header";
 
 vi.mock("@/entities/account", async (importOriginal) => ({
@@ -23,11 +24,18 @@ vi.mock("@/features/auth-logout", async (importOriginal) => ({
   useLogout: vi.fn(),
 }));
 
+vi.mock("@/shared/lib/toast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/shared/lib/toast")>()),
+  showToast: vi.fn(),
+}));
+
 const ROUTE_TITLE = "호텔 목록";
 
 const ACCOUNT = { id: 1, loginId: "admin@urbanstay.com", name: "관리자" };
 
-const requestLogout = vi.fn<() => Promise<void>>();
+type LogoutResult = { message: string | undefined };
+
+const requestLogout = vi.fn<() => Promise<LogoutResult>>();
 
 function mockMe(account: typeof ACCOUNT | undefined) {
   vi.mocked(useMe).mockReturnValue({ data: account } as ReturnType<
@@ -84,7 +92,7 @@ describe("useAdminHeader", () => {
   it("로그아웃 상태는 처음에 idle, 요청 중에 pending, 요청이 실패하면 failed다", async () => {
     let rejectLogout: (error: Error) => void = () => {};
     requestLogout.mockReturnValue(
-      new Promise<void>((_, reject) => {
+      new Promise<LogoutResult>((_, reject) => {
         rejectLogout = reject;
       }),
     );
@@ -105,6 +113,21 @@ describe("useAdminHeader", () => {
     });
 
     expect(result.current.logoutStatus).toBe("failed");
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["서버의 성공 문구가 있으면 성공 토스트로 보여준다", "로그아웃했습니다."],
+    ["서버의 성공 문구가 없으면(401) 토스트를 띄우지 않는다", undefined],
+  ])("로그아웃이 끝났을 때 %s", async (_, message) => {
+    requestLogout.mockResolvedValue({ message });
+    const { result } = await renderUseAdminHeader();
+
+    await act(() => result.current.logout());
+
+    expect(vi.mocked(showToast).mock.calls).toEqual(
+      message === undefined ? [] : [[{ type: "success", message }]],
+    );
   });
 
   it("로그아웃 요청 중에 다시 로그아웃하면 요청을 다시 보내지 않는다", async () => {

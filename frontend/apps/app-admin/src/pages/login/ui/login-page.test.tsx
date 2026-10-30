@@ -27,12 +27,20 @@ import {
 import { LOGIN_MESSAGES } from "@/features/auth-login";
 import { APP_INFO, COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
+import { showToast } from "@/shared/lib/toast";
 import { LoginPage } from "./login-page";
 
 vi.mock("@/shared/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/shared/api")>()),
   loginAccount: vi.fn(),
 }));
+
+vi.mock("@/shared/lib/toast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/shared/lib/toast")>()),
+  showToast: vi.fn(),
+}));
+
+const LOGIN_MESSAGE = "로그인했습니다.";
 
 const REDIRECT_HREF = "/hotels?keyword=101&page=2";
 
@@ -270,11 +278,11 @@ describe("LoginPage 제출", () => {
     expect(loginAccount).toHaveBeenCalledOnce();
   });
 
-  it("로그인에 성공하면 캐시를 비우고 내 정보를 넣은 뒤 redirect 경로로 이동한다", async () => {
+  it("로그인에 성공하면 캐시를 비우고 내 정보를 넣은 뒤 서버의 성공 문구를 토스트로 띄우고 redirect 경로로 이동한다", async () => {
     const user = userEvent.setup();
     vi.mocked(loginAccount).mockResolvedValue({
       data: ACCOUNT,
-      message: "로그인했습니다.",
+      message: LOGIN_MESSAGE,
     });
     const { router, queryClient } = renderLoginPage();
     queryClient.setQueryData(OTHER_QUERY_KEY, ["이전 계정의 데이터"]);
@@ -287,6 +295,10 @@ describe("LoginPage 제출", () => {
     });
     expect(queryClient.getQueryData(OTHER_QUERY_KEY)).toBeUndefined();
     expect(queryClient.getQueryData(meQueryKey())).toEqual(ACCOUNT);
+    expect(showToast).toHaveBeenCalledExactlyOnceWith({
+      type: "success",
+      message: LOGIN_MESSAGE,
+    });
   });
 });
 
@@ -328,7 +340,7 @@ describe("LoginPage 서버 오류 처리", () => {
       500,
       createErrorBody("INTERNAL_ERROR", "서버에서 오류가 발생했습니다."),
     ],
-  ])("%s 응답이면 서버 문구를 알림으로 보여준다", async (_, status, body) => {
+  ])("%s 응답이면 서버 문구를 토스트가 아닌 폼 안 알림으로 보여준다", async (_, status, body) => {
     const user = userEvent.setup();
     vi.mocked(loginAccount).mockRejectedValue(createAxiosError(status, body));
     renderLoginPage();
@@ -340,6 +352,7 @@ describe("LoginPage 서버 오류 처리", () => {
       body.error.message,
     );
     expect(getSubmitButton()).not.toBeDisabled();
+    expect(showToast).not.toHaveBeenCalled();
   });
 
   it.each([

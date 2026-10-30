@@ -1,22 +1,35 @@
 import type { FieldValues, Path, UseFormSetError } from "react-hook-form";
-import { getApiError } from "@/shared/api";
+import { API_ERROR_CODES, getApiError } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 
 export const FORM_ALERT = "root.server";
+
+export type FormAlert = {
+  code: string | undefined;
+  message: string;
+};
 
 type SubmitErrorTarget<T extends FieldValues> = {
   fields: readonly Path<T>[];
   setError: UseFormSetError<T>;
   fieldOfCode?: Partial<Record<string, Path<T>>>;
+  onAlert?: (alert: FormAlert) => void;
 };
 
 export function showSubmitError<T extends FieldValues>(
   error: unknown,
-  { fields, setError, fieldOfCode = {} }: SubmitErrorTarget<T>,
+  { fields, setError, fieldOfCode = {}, onAlert }: SubmitErrorTarget<T>,
 ) {
+  function showAlert(alert: FormAlert) {
+    setError(FORM_ALERT, { type: alert.code, message: alert.message });
+    if (alert.code !== API_ERROR_CODES.unauthorized) {
+      onAlert?.(alert);
+    }
+  }
+
   const apiError = getApiError(error);
   if (apiError === undefined) {
-    setError(FORM_ALERT, { message: COMMON_MESSAGES.requestFailed });
+    showAlert({ code: undefined, message: COMMON_MESSAGES.requestFailed });
     return;
   }
   const codeField = fieldOfCode[apiError.code];
@@ -29,7 +42,7 @@ export function showSubmitError<T extends FieldValues>(
     return found === undefined ? [] : [{ field, message: found.message }];
   });
   if (fieldErrors.length === 0) {
-    setError(FORM_ALERT, { type: apiError.code, message: apiError.message });
+    showAlert({ code: apiError.code, message: apiError.message });
     return;
   }
   fieldErrors.forEach(({ field, message }, index) => {
