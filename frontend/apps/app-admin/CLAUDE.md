@@ -48,10 +48,11 @@ apps/app-admin/
    │  │  │  ├─ index.tsx         # / (/hotels로 보낸다)
    │  │  │  └─ hotels/
    │  │  │     ├─ index.tsx      # /hotels (?keyword=&page=)
+   │  │  │     ├─ new.tsx        # /hotels/new (호텔 등록). 고정 경로라 $hotelId보다 먼저 잡힌다
    │  │  │     └─ $hotelId.tsx   # /hotels/$hotelId (호텔 상세)
    │  │  └─ login.tsx            # /login (?redirect=)
    │  └─ styles/
-   ├─ pages/           # error(화면 오류), hotel-detail(호텔 상세: 경로 파라미터 검사, 찾을 수 없음), hotel-list(호텔 목록: 검색·페이지·URL search 스키마), login(로그인 폼)
+   ├─ pages/           # error(화면 오류), hotel-create(호텔 등록: 호텔 정보·마스터 계정 폼, 폼 스키마), hotel-detail(호텔 상세: 경로 파라미터 검사, 찾을 수 없음), hotel-list(호텔 목록: 검색·페이지·URL search 스키마, 호텔 등록 버튼), login(로그인 폼)
    ├─ widgets/         # admin-layout: 사이드바 메뉴(config/menu.ts), 위쪽 화면 제목·계정 이름·로그아웃
    └─ shared/
       ├─ api/          # 검증된 API만 index.ts로 내보낸다

@@ -102,13 +102,21 @@ function renderHotelListPage(initialPath = hotelsPath()) {
     search: { middlewares: [stripSearchParams(HOTEL_LIST_DEFAULT_SEARCH)] },
     component: HotelListPage,
   });
+  const hotelCreateRoute = createRoute({
+    getParentRoute: () => layoutRoute,
+    path: "hotels/new",
+  });
   const hotelDetailRoute = createRoute({
     getParentRoute: () => layoutRoute,
     path: "hotels/$hotelId",
   });
   const router = createRouter({
     routeTree: rootRoute.addChildren([
-      layoutRoute.addChildren([hotelListRoute, hotelDetailRoute]),
+      layoutRoute.addChildren([
+        hotelListRoute,
+        hotelCreateRoute,
+        hotelDetailRoute,
+      ]),
     ]),
     history: createMemoryHistory({ initialEntries: [initialPath] }),
     parseSearch,
@@ -217,6 +225,19 @@ describe("HotelListPage 목록", () => {
 
     await vi.waitFor(() => {
       expect(router.state.location.href).toBe(`/hotels/${HOTELS[0].id}`);
+    });
+  });
+
+  it("호텔 등록 버튼을 누르면 호텔 등록 화면으로 이동한다", async () => {
+    const user = userEvent.setup();
+    const router = renderHotelListPage(hotelsPath({ keyword: KEYWORD }));
+
+    await user.click(
+      await screen.findByRole("button", { name: HOTEL_LIST_MESSAGES.create }),
+    );
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe("/hotels/new");
     });
   });
 

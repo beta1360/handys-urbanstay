@@ -1,5 +1,6 @@
 export const HOTEL_LIST_MESSAGES = {
   title: "호텔",
+  create: "호텔 등록",
   keywordLabel: "호텔 이름",
   search: "검색",
   nameColumn: "이름",

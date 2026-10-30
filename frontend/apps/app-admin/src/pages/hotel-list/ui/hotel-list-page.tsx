@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@repo/ui/button";
 import { Card } from "@repo/ui/card";
 import { Pagination } from "@repo/ui/pagination";
@@ -72,10 +73,22 @@ function HotelListContent({
 
 export function HotelListPage() {
   const list = useHotelList();
+  const navigate = useNavigate();
 
   return (
     <div className="flex flex-col gap-4">
-      <HotelSearchForm keyword={list.keyword} onSearch={list.searchKeyword} />
+      <div className="flex items-end justify-between gap-4">
+        <HotelSearchForm
+          keyword={list.keyword}
+          onSearch={list.searchKeyword}
+        />
+        <Button
+          variant="primary"
+          onClick={() => void navigate({ to: "/hotels/new" })}
+        >
+          {HOTEL_LIST_MESSAGES.create}
+        </Button>
+      </div>
       <HotelListContent {...list} />
     </div>
   );
