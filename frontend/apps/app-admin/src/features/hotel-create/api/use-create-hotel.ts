@@ -6,7 +6,7 @@ export function useCreateHotel() {
   const queryClient = useQueryClient();
   const { mutate, isPending } = useMutation({
     mutationFn: createHotel,
-    onSuccess: (hotel) => cacheSavedHotel(queryClient, hotel),
+    onSuccess: ({ data }) => cacheSavedHotel(queryClient, data),
   });
 
   return { create: mutate, isPending };

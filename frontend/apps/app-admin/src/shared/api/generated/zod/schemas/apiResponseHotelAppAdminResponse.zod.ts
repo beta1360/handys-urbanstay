@@ -12,6 +12,7 @@ import { HotelAppAdminResponse } from './hotelAppAdminResponse.zod.ts';
 export const ApiResponseHotelAppAdminResponse = zod.object({
   "success": zod.boolean(),
   "data": zod.union([HotelAppAdminResponse,zod.null()]),
+  "message": zod.string().nullable(),
   "error": zod.union([ErrorResponse,zod.null()])
 });
 

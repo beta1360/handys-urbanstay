@@ -11,6 +11,7 @@ import { ErrorResponse } from './errorResponse.zod.ts';
 export const EmptyApiResponse = zod.object({
   "success": zod.boolean(),
   "data": zod.null(),
+  "message": zod.string().nullable(),
   "error": zod.union([ErrorResponse,zod.null()])
 });
 

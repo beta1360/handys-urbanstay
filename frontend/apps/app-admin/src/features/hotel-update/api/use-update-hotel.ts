@@ -7,7 +7,7 @@ export function useUpdateHotel(hotelId: number) {
   const queryClient = useQueryClient();
   const { mutate, isPending } = useMutation({
     mutationFn: (body: UpdateHotelBody) => updateHotel(hotelId, body),
-    onSuccess: (hotel) => cacheSavedHotel(queryClient, hotel),
+    onSuccess: ({ data }) => cacheSavedHotel(queryClient, data),
   });
 
   return { update: mutate, isPending };

@@ -22,6 +22,7 @@ function createApiError(status: number, code: string) {
   const data = {
     success: false,
     data: null,
+    message: null,
     error: { code, message: "요청을 처리하지 못했습니다.", fieldErrors: [] },
   };
   return new AxiosError(
@@ -47,7 +48,7 @@ afterEach(() => {
 
 describe("useLogout", () => {
   it.each([
-    ["성공하면", () => Promise.resolve()],
+    ["성공하면", () => Promise.resolve({ message: "로그아웃했습니다." })],
     [
       "401로 실패하면",
       () => Promise.reject(createApiError(401, API_ERROR_CODES.unauthorized)),

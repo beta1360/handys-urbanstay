@@ -52,7 +52,12 @@ function createErrorBody(
   message: string,
   fieldErrors: FieldError[] = [],
 ) {
-  return { success: false, data: null, error: { code, message, fieldErrors } };
+  return {
+    success: false,
+    data: null,
+    message: null,
+    error: { code, message, fieldErrors },
+  };
 }
 
 function createAxiosError(status: number, data: unknown) {
@@ -267,7 +272,10 @@ describe("LoginPage 제출", () => {
 
   it("로그인에 성공하면 캐시를 비우고 내 정보를 넣은 뒤 redirect 경로로 이동한다", async () => {
     const user = userEvent.setup();
-    vi.mocked(loginAccount).mockResolvedValue(ACCOUNT);
+    vi.mocked(loginAccount).mockResolvedValue({
+      data: ACCOUNT,
+      message: "로그인했습니다.",
+    });
     const { router, queryClient } = renderLoginPage();
     queryClient.setQueryData(OTHER_QUERY_KEY, ["이전 계정의 데이터"]);
 

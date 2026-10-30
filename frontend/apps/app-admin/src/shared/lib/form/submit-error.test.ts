@@ -29,6 +29,7 @@ function createApiError({
       data: {
         success: false,
         data: null,
+        message: null,
         error: { code, message, fieldErrors },
       },
       status: 400,

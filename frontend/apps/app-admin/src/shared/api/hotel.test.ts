@@ -39,7 +39,20 @@ const HOTEL = {
 
 const HOTEL_WITH_EXTRA_FIELD = { ...HOTEL, createdAt: "2026-10-30T00:00:00Z" };
 
-const HOTEL_RESPONSE = { success: true, data: HOTEL, error: null };
+const HOTEL_RESPONSE = {
+  success: true,
+  data: HOTEL,
+  message: null,
+  error: null,
+};
+
+const CREATE_MESSAGE = "호텔을 등록했습니다.";
+
+const UPDATE_MESSAGE = "호텔 정보를 수정했습니다.";
+
+const CREATED_HOTEL_RESPONSE = { ...HOTEL_RESPONSE, message: CREATE_MESSAGE };
+
+const UPDATED_HOTEL_RESPONSE = { ...HOTEL_RESPONSE, message: UPDATE_MESSAGE };
 
 const HOTEL_PAGE = {
   items: [HOTEL],
@@ -49,7 +62,12 @@ const HOTEL_PAGE = {
   totalPages: 1,
 };
 
-const HOTEL_PAGE_RESPONSE = { success: true, data: HOTEL_PAGE, error: null };
+const HOTEL_PAGE_RESPONSE = {
+  success: true,
+  data: HOTEL_PAGE,
+  message: null,
+  error: null,
+};
 
 const LIST_PARAMS = { keyword: "강남", page: 1, size: 10 };
 
@@ -82,25 +100,35 @@ const INVALID_HOTELS = [
   ["타입이 틀리면", { ...HOTEL, id: String(HOTEL_ID) }],
 ] as const;
 
-const HOTEL_OPERATIONS = [
-  {
-    name: "fetchHotel",
-    mockResponse: (response: unknown) =>
-      vi.mocked(generated.getHotel).mockResolvedValue(response as never),
-    run: () => fetchHotel(HOTEL_ID),
-  },
+const HOTEL_CHANGE_OPERATIONS = [
   {
     name: "createHotel",
+    response: CREATED_HOTEL_RESPONSE,
     mockResponse: (response: unknown) =>
       vi.mocked(generated.createHotel).mockResolvedValue(response as never),
     run: () => createHotel(CREATE_BODY),
+    toResult: (hotel: unknown) => ({ data: hotel, message: CREATE_MESSAGE }),
   },
   {
     name: "updateHotel",
+    response: UPDATED_HOTEL_RESPONSE,
     mockResponse: (response: unknown) =>
       vi.mocked(generated.updateHotel).mockResolvedValue(response as never),
     run: () => updateHotel(HOTEL_ID, UPDATE_BODY),
+    toResult: (hotel: unknown) => ({ data: hotel, message: UPDATE_MESSAGE }),
   },
+];
+
+const HOTEL_OPERATIONS = [
+  {
+    name: "fetchHotel",
+    response: HOTEL_RESPONSE,
+    mockResponse: (response: unknown) =>
+      vi.mocked(generated.getHotel).mockResolvedValue(response as never),
+    run: () => fetchHotel(HOTEL_ID),
+    toResult: (hotel: unknown) => hotel,
+  },
+  ...HOTEL_CHANGE_OPERATIONS,
 ];
 
 beforeEach(() => {
@@ -250,15 +278,18 @@ describe("fetchHotel", () => {
 });
 
 describe("createHotel", () => {
-  it("검증한 본문을 보내고 등록한 호텔을 돌려준다", async () => {
-    vi.mocked(generated.createHotel).mockResolvedValue(HOTEL_RESPONSE);
+  it("검증한 본문을 보내고 등록한 호텔과 성공 문구를 돌려준다", async () => {
+    vi.mocked(generated.createHotel).mockResolvedValue(CREATED_HOTEL_RESPONSE);
 
-    await expect(createHotel(CREATE_BODY)).resolves.toEqual(HOTEL);
+    await expect(createHotel(CREATE_BODY)).resolves.toEqual({
+      data: HOTEL,
+      message: CREATE_MESSAGE,
+    });
     expect(generated.createHotel).toHaveBeenCalledWith(CREATE_BODY);
   });
 
   it("본문에 스키마에 없는 필드가 있으면 버리고 보낸다", async () => {
-    vi.mocked(generated.createHotel).mockResolvedValue(HOTEL_RESPONSE);
+    vi.mocked(generated.createHotel).mockResolvedValue(CREATED_HOTEL_RESPONSE);
     const bodyWithExtraFields = {
       ...CREATE_BODY,
       extra: true,
@@ -292,10 +323,13 @@ describe("createHotel", () => {
 });
 
 describe("updateHotel", () => {
-  it("호텔 ID와 검증한 본문을 보내고 수정한 호텔을 돌려준다", async () => {
-    vi.mocked(generated.updateHotel).mockResolvedValue(HOTEL_RESPONSE);
+  it("호텔 ID와 검증한 본문을 보내고 수정한 호텔과 성공 문구를 돌려준다", async () => {
+    vi.mocked(generated.updateHotel).mockResolvedValue(UPDATED_HOTEL_RESPONSE);
 
-    await expect(updateHotel(HOTEL_ID, UPDATE_BODY)).resolves.toEqual(HOTEL);
+    await expect(updateHotel(HOTEL_ID, UPDATE_BODY)).resolves.toEqual({
+      data: HOTEL,
+      message: UPDATE_MESSAGE,
+    });
     expect(generated.updateHotel).toHaveBeenCalledWith(HOTEL_ID, UPDATE_BODY);
   });
 
@@ -317,28 +351,42 @@ describe("updateHotel", () => {
   );
 });
 
-describe.each(HOTEL_OPERATIONS)("$name 응답 검증", ({ mockResponse, run }) => {
-  it.each(UNSUCCESSFUL_RESPONSE_OVERRIDES)(
-    "성공 응답의 %s면 응답 검증 오류를 던진다",
-    async (_, override) => {
-      mockResponse({ ...HOTEL_RESPONSE, ...override });
+describe.each(HOTEL_OPERATIONS)(
+  "$name 응답 검증",
+  ({ response, mockResponse, run, toResult }) => {
+    it.each(UNSUCCESSFUL_RESPONSE_OVERRIDES)(
+      "성공 응답의 %s면 응답 검증 오류를 던진다",
+      async (_, override) => {
+        mockResponse({ ...response, ...override });
+
+        await expect(run()).rejects.toBeInstanceOf(ResponseValidationError);
+      },
+    );
+
+    it.each(INVALID_HOTELS)(
+      "응답의 %s 응답 검증 오류를 던진다",
+      async (_, hotel) => {
+        mockResponse({ ...response, data: hotel });
+
+        await expect(run()).rejects.toBeInstanceOf(ResponseValidationError);
+      },
+    );
+
+    it("응답에 스키마에 없는 필드가 있으면 버린다", async () => {
+      mockResponse({ ...response, data: HOTEL_WITH_EXTRA_FIELD });
+
+      await expect(run()).resolves.toEqual(toResult(HOTEL));
+    });
+  },
+);
+
+describe.each(HOTEL_CHANGE_OPERATIONS)(
+  "$name 성공 문구 검증",
+  ({ response, mockResponse, run }) => {
+    it("성공 응답의 message가 null이면 응답 검증 오류를 던진다", async () => {
+      mockResponse({ ...response, message: null });
 
       await expect(run()).rejects.toBeInstanceOf(ResponseValidationError);
-    },
-  );
-
-  it.each(INVALID_HOTELS)(
-    "응답의 %s 응답 검증 오류를 던진다",
-    async (_, hotel) => {
-      mockResponse({ ...HOTEL_RESPONSE, data: hotel });
-
-      await expect(run()).rejects.toBeInstanceOf(ResponseValidationError);
-    },
-  );
-
-  it("응답에 스키마에 없는 필드가 있으면 버린다", async () => {
-    mockResponse({ ...HOTEL_RESPONSE, data: HOTEL_WITH_EXTRA_FIELD });
-
-    await expect(run()).resolves.toEqual(HOTEL);
-  });
-});
+    });
+  },
+);

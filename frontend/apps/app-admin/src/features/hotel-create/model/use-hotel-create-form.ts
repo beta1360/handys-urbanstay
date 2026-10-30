@@ -33,7 +33,7 @@ export function useHotelCreateForm() {
       new Promise<void>((resolve) => {
         // 화면을 떠난 뒤 끝난 요청은 이동하지 않도록 이동은 mutate 콜백에, 캐시 갱신은 useMutation 콜백에 둔다.
         create(body, {
-          onSuccess: (hotel) => {
+          onSuccess: ({ data: hotel }) => {
             void navigate({
               to: "/hotels/$hotelId",
               params: { hotelId: hotel.id },

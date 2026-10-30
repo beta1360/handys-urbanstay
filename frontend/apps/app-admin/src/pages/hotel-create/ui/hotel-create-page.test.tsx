@@ -97,7 +97,12 @@ function createErrorBody(
   message: string,
   fieldErrors: FieldError[] = [],
 ) {
-  return { success: false, data: null, error: { code, message, fieldErrors } };
+  return {
+    success: false,
+    data: null,
+    message: null,
+    error: { code, message, fieldErrors },
+  };
 }
 
 function createAxiosError(status: number, data: unknown) {
@@ -464,7 +469,10 @@ describe("HotelCreatePage 요청", () => {
   });
 
   it("등록에 성공하면 목록 캐시를 무효화하고 상세 캐시에 넣은 뒤 방문 기록을 바꿔 상세로 이동한다", async () => {
-    vi.mocked(createHotel).mockResolvedValue(HOTEL);
+    vi.mocked(createHotel).mockResolvedValue({
+      data: HOTEL,
+      message: "호텔을 등록했습니다.",
+    });
     const { user, router, queryClient } = await renderHotelCreatePage();
     const listQueryKey = hotelListQueryKey({ page: 0 });
     queryClient.setQueryData(listQueryKey, EMPTY_HOTEL_PAGE);

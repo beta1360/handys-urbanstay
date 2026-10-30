@@ -34,7 +34,10 @@ afterEach(() => {
 
 describe("useLogin", () => {
   it("로그인에 성공하면 받은 계정으로 로그인 상태를 시작한다", async () => {
-    vi.mocked(loginAccount).mockResolvedValue(ACCOUNT);
+    vi.mocked(loginAccount).mockResolvedValue({
+      data: ACCOUNT,
+      message: "로그인했습니다.",
+    });
     const { result, queryClient } = renderUseLogin();
 
     await result.current.login(LOGIN_BODY);

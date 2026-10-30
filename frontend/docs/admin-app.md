@@ -205,7 +205,8 @@
 - `shared/api`는 검증을 거친 요청 함수, 요청 스키마·타입, 쿼리 키 함수만 내보낸다. 생성 코드(orval이 만든 TanStack Query 훅 포함)와 `http`는 내보내지 않는다. `shared/api`는 TanStack Query를 쓰지 않는다.
   - 요청 본문과 쿼리·경로 파라미터를 스키마로 검증한 뒤 생성 함수를 부르고, 받은 응답을 스키마로 검증한 뒤 돌려준다.
   - 보내는 값은 검증을 통과한 값이다. 스키마에 없는 필드는 빠지고, 빠진 파라미터에는 스키마의 기본값이 채워진다.
-  - 결과(`data`)를 돌려주는 API는 `data`만 돌려준다. 성공 응답의 `success`가 false이거나 `data`가 null이면 응답 검증 실패로 본다.
+  - 조회 API는 결과(`data`)만 돌려준다. 상태를 바꾸는 API는 결과와 서버의 성공 문구를 `{ data, message }`로 돌려주고, 결과가 없는 API(로그아웃)는 `{ message }`만 돌려준다.
+  - 결과를 돌려주는 API는 성공 응답의 `success`가 false이거나 `data`가 null이면, 상태를 바꾸는 API는 `message`가 null이면 응답 검증 실패로 본다.
   - 조회 요청 함수는 `signal`을 받아 생성 함수에 넘긴다. 쿼리가 취소되면 요청도 취소된다.
   - 쿼리 키 함수는 생성된 `get...QueryKey`로 만든다. 키는 요청 경로를 따르는 배열일 뿐이라 TanStack Query 없이 만들 수 있다.
 - 조회 훅, 쿼리 키·조회 설정, 캐시 규칙 함수는 `entities/<도메인>/api`에, 변경 훅은 `features/<동작>/api`에 둔다(`frontend/CLAUDE.md`의 '서버 상태').
@@ -229,7 +230,7 @@
 - axios는 같은 출처 요청에서 `XSRF-TOKEN` 쿠키를 읽어 `X-XSRF-TOKEN` 헤더로 보낸다. 이 기본 동작을 그대로 쓴다.
 - 로그인 API의 401(`INVALID_CREDENTIALS`)과 다른 API의 401(`UNAUTHORIZED`)을 구분해서 처리한다.
 - 로그인 상태는 내 정보 쿼리의 캐시로 판단한다. 내 정보 조회와 로그인 상태 캐시 규칙(넣기, 지우기, 비우기)은 `entities/account`에 두고, 로그인·로그아웃은 각 동작의 features slice(`auth-login`, `auth-logout`)에 둔다. 라우터 context로 QueryClient를 넘겨 `beforeLoad`에서 쓴다.
-  - 내 정보·로그인 API는 계정 정보(`data`)만 돌려준다. 성공 응답의 `success`가 false이거나 `data`가 null이면 응답 검증 실패로 본다.
+  - 내 정보 API는 계정 정보(`data`)만, 로그인 API는 계정 정보와 성공 문구(`{ data, message }`)를 돌려준다. 성공 응답의 `success`가 false이거나 `data`가 null이면 응답 검증 실패로 본다.
 - 로그인 확인과 로그인 화면 진입은 내 정보를 캐시에서 읽고 없을 때만 조회한다(`queryClient.query`에 `staleTime: "static"`). 재시도하지 않으므로(`retry: false`) 백엔드가 응답하지 않으면 바로 실패한다.
 - 로그인 확인(`_authenticated`의 `beforeLoad`)
   - 401 `UNAUTHORIZED`면 지금 경로(쿼리 포함)를 `redirect`에 담아 `/login`으로 보낸다.

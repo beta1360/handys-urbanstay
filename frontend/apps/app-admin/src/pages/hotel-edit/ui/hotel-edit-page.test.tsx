@@ -102,7 +102,12 @@ function createErrorBody(
   message: string,
   fieldErrors: FieldError[] = [],
 ) {
-  return { success: false, data: null, error: { code, message, fieldErrors } };
+  return {
+    success: false,
+    data: null,
+    message: null,
+    error: { code, message, fieldErrors },
+  };
 }
 
 function createAxiosError(status: number, data: unknown) {
@@ -522,7 +527,10 @@ describe("HotelEditPage 저장", () => {
 
   it("저장에 성공하면 응답을 상세 캐시에 넣고 목록 캐시를 무효화한 뒤 방문 기록을 바꿔 상세로 이동한다", async () => {
     const updatedHotel = { ...LATEST_HOTEL, version: HOTEL.version + 1 };
-    vi.mocked(updateHotel).mockResolvedValue(updatedHotel);
+    vi.mocked(updateHotel).mockResolvedValue({
+      data: updatedHotel,
+      message: "호텔 정보를 수정했습니다.",
+    });
     const { user, router, queryClient } = await renderLoadedHotelEditPage();
     const listQueryKey = hotelListQueryKey({ page: 0 });
     queryClient.setQueryData(listQueryKey, EMPTY_HOTEL_PAGE);

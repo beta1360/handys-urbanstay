@@ -11,5 +11,7 @@ import type { HotelAppAdminResponse } from './hotelAppAdminResponse.ts';
 export interface ApiResponseHotelAppAdminResponse {
   success: boolean;
   data: HotelAppAdminResponse | null;
+  /** @nullable */
+  message: string | null;
   error: ErrorResponse | null;
 }

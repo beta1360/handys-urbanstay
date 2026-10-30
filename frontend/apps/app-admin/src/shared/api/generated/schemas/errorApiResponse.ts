@@ -11,5 +11,7 @@ export interface ErrorApiResponse {
   success: boolean;
   /** @nullable */
   data: null;
+  /** @nullable */
+  message: null;
   error: ErrorResponse;
 }
