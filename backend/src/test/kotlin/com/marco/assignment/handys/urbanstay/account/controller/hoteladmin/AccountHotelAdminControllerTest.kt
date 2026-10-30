@@ -376,9 +376,12 @@ class AccountHotelAdminControllerTest {
 		)
 
 	private fun assertSuccess(response: HttpResponse<String>, data: String) {
+		val expectedMessage = jsonMapper.writeValueAsString(successMessage(response.request()))
 		assertThat(response.statusCode()).isEqualTo(HttpStatus.OK.value())
-		assertThat(json(response.body())).isEqualTo(json("""{"success":true,"data":$data,"message":null,"error":null}"""))
+		assertThat(json(response.body())).isEqualTo(json("""{"success":true,"data":$data,"message":$expectedMessage,"error":null}"""))
 	}
+
+	private fun successMessage(request: HttpRequest): String? = SUCCESS_MESSAGE_KEYS["${request.method()} ${request.uri().path}"]?.let(::message)
 
 	private fun assertError(response: HttpResponse<String>, errorCode: ErrorCode, fieldErrors: Map<String, String> = emptyMap()) {
 		val body = json(response.body())
@@ -458,5 +461,6 @@ class AccountHotelAdminControllerTest {
 		private const val DELETE_HOTEL_ADMINS = "delete from hotel_admin where hotel_id = ?"
 		private const val DEACTIVATE = "update hotel_admin set active = false where id = ?"
 		private const val INCREASE_CREDENTIAL_VERSION = "update hotel_admin set credential_version = credential_version + 1 where id = ?"
+		private val SUCCESS_MESSAGE_KEYS = mapOf("POST $LOGIN" to "success.auth.login", "POST $LOGOUT" to "success.auth.logout")
 	}
 }

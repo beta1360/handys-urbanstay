@@ -34,6 +34,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.core.userdetails.User
 import org.springframework.security.core.userdetails.UserDetails
@@ -852,15 +853,18 @@ class AccountHotelOperatorHotelAdminControllerTest {
 	}
 
 	private fun ResultActionsDsl.andExpectSuccess(status: HttpStatus): JsonNode {
-		val response = andReturn().response
-		val body = json(response)
-		assertThat(response.status).isEqualTo(status.value())
+		val result = andReturn()
+		val body = json(result.response)
+		assertThat(result.response.status).isEqualTo(status.value())
 		assertThat(body.properties().map { it.key }).containsExactly("success", "data", "message", "error")
 		assertThat(body["success"].booleanValue()).isTrue()
-		assertThat(body["message"].isNull).isTrue()
+		assertThat(body["message"].stringValue(null)).isEqualTo(successMessage(result.request))
 		assertThat(body["error"].isNull).isTrue()
 		return body["data"]
 	}
+
+	private fun successMessage(request: MockHttpServletRequest): String? =
+		SUCCESS_MESSAGE_KEYS.entries.firstOrNull { it.key.matches("${request.method} ${request.requestURI}") }?.value?.let(::message)
 
 	private fun ResultActionsDsl.andExpectError(errorCode: ErrorCode, vararg fieldErrors: Pair<String, String>) =
 		assertError(andReturn().response, errorCode, *fieldErrors)
@@ -931,6 +935,12 @@ class AccountHotelOperatorHotelAdminControllerTest {
 		private const val TIMEOUT_SECONDS = 10L
 		private const val DELETE_HOTEL_ADMINS = "delete from hotel_admin where hotel_id = ?"
 		private const val SELECT_OPERATOR_IDS = "select id from hotel_admin where hotel_id = ? and role = 'OPERATOR' order by id"
+		private val SUCCESS_MESSAGE_KEYS = mapOf(
+			Regex("POST $OPERATORS") to "success.operator.created",
+			Regex("PUT $OPERATORS/\\d+") to "success.operator.updated",
+			Regex("PUT $OPERATORS/\\d+/password") to "success.password.reset",
+			Regex("PUT $OPERATORS/\\d+/active") to "success.operator.active-changed",
+		)
 
 		@JvmStatic
 		fun loginIdErrors(): List<Arguments> {

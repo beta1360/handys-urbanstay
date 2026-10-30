@@ -7,6 +7,7 @@ import com.marco.assignment.handys.urbanstay.account.exception.AccountErrorCode
 import com.marco.assignment.handys.urbanstay.account.service.HotelAdminAuthService
 import com.marco.assignment.handys.urbanstay.common.ApiPaths
 import com.marco.assignment.handys.urbanstay.common.response.ApiResponse
+import com.marco.assignment.handys.urbanstay.common.response.SuccessMessage
 import com.marco.assignment.handys.urbanstay.common.security.LoginSessionHandler
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -30,6 +31,7 @@ class AccountHotelAdminController(
 
 	@Operation(summary = "openapi.hotel-admin.operation.login.summary", description = "openapi.hotel-admin.operation.login.description")
 	@AccountApiErrors(AccountErrorCode.INVALID_CREDENTIALS)
+	@SuccessMessage("success.auth.login")
 	@PostMapping(ApiPaths.LOGIN)
 	fun login(
 		@Valid @RequestBody request: AccountLoginHotelAdminRequest,
@@ -43,6 +45,7 @@ class AccountHotelAdminController(
 	}
 
 	@Operation(summary = "openapi.hotel-admin.operation.logout.summary", description = "openapi.hotel-admin.operation.logout.description")
+	@SuccessMessage("success.auth.logout")
 	@PostMapping("/logout")
 	fun logout(httpRequest: HttpServletRequest, httpResponse: HttpServletResponse): ApiResponse<Nothing?> {
 		loginSessionHandler.logout(httpRequest, httpResponse)
