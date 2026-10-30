@@ -57,7 +57,8 @@ TanStack Router 파일 기반 라우팅이 정한 이름은 kebab-case 규칙의
 ## 린트
 
 - ESLint는 Vite 공식 React-TS 템플릿 구성(`@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`)에 `@tanstack/eslint-plugin-router` 권장 설정을 더해 쓴다.
-- Steiger는 `fsd.configs.recommended`를 예외 없이 쓴다.
+- `@tanstack/react-query`는 `src/app`, `src/entities/*/api`, `src/features/*/api`, 테스트 파일, `vitest-setup.ts`에서만 import한다. 그 밖의 파일은 `no-restricted-imports`로 막는다.
+- Steiger는 `fsd.configs.recommended`에서 `fsd/insignificant-slice`만 끈다(`frontend/CLAUDE.md`의 '레이어').
 
 ## 명령어 (`frontend/`에서 실행)
 

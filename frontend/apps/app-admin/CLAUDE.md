@@ -16,12 +16,17 @@
 
 - 라우트 파일은 `src/app/routes`에 두고, `src/pages`의 페이지를 가져와 연결만 한다.
 - `__root.tsx`에는 자체 UI를 두지 않는다. 탭 제목(`head`)과 `<HeadContent />`, `<Outlet />`, 오류 화면(`errorComponent`: `<HeadContent />`와 `ErrorPage`)만 둔다.
-- 로그인 확인·로그인 화면 진입·사용 중 401 처리는 `src/app/auth`의 함수로 두고, 라우트 파일과 라우터는 이 함수를 연결만 한다. 화면 동작은 `frontend/docs/admin-app.md`의 '로그인'을 따른다.
+- 로그인 확인·로그인 화면 진입·사용 중 401 처리는 `src/app/auth`의 함수로 두고, 라우트 파일과 라우터는 이 함수를 연결만 한다. 내 정보 조회와 캐시는 `entities/account`의 함수(`ensureMe`, `isPendingMeQuery`, `forgetMe`)로 한다. 화면 동작은 `frontend/docs/admin-app.md`의 '로그인'을 따른다.
 - `/`에는 화면을 두지 않고 호텔 목록(`/hotels`)으로 보낸다(방문 기록을 바꾸는 이동). 이동은 `src/app/router/index-redirect.ts`의 함수로 두고 `_authenticated/index.tsx`의 `beforeLoad`가 연결한다. 로그인 뒤 기본 이동(`/`)도 호텔 목록으로 이어진다.
 - QueryClient와 라우터는 `src/app/router/router.ts`에서 함께 만든다. 라우터 context에 QueryClient를 넣고, QueryClient의 오류 처리기에 라우터를 넘기기 위해서다. `QueryProvider`도 여기서 만든 QueryClient를 쓴다.
 - 라우터의 URL search 직렬화는 `src/shared/lib/search-params`의 `parseSearch`·`stringifySearch`를 쓴다(일반 쿼리 문자열). 테스트용 memory 라우터도 같은 함수를 넣는다. 규칙은 `frontend/docs/admin-app.md`의 '구조'를 따른다.
 - 경로 파라미터(`$hotelId`)는 라우트의 `params.parse`·`params.stringify`로 읽고 쓴다. 두 함수는 `entities/hotel`에 두고, 상세·수정 라우트를 감싸는 `hotels/$hotelId/route.tsx`가 한 번 연결한다. 상세(`index.tsx`)와 수정(`edit.tsx`) 화면은 이 라우트의 `useParams`로 검사한 id를 읽는다. 규칙은 `frontend/docs/admin-app.md`의 '상세 화면'을 따른다.
 - 여러 화면이 함께 쓰는 코드는 `frontend/docs/admin-app.md`의 '구조'에 따라 역할별로 둔다. 도메인과 무관한 폼 도우미는 `shared/lib/form`, 호텔 id 검사, 호텔 하나 조회(`useHotel`), 불러오는 중·불러오기 실패·찾을 수 없음 화면은 `entities/hotel`, 등록·수정이 함께 쓰는 호텔 정보 입력 칸은 `features/hotel-info-form`에 둔다.
+- 서버 상태는 `frontend/CLAUDE.md`의 '서버 상태'를 따른다.
+  - `shared/api`: 검증을 거친 요청 함수(`fetchMe`, `fetchHotels`, `fetchHotel`, 로그인·로그아웃, 등록·수정)와 쿼리 키 함수(`meQueryKey`, `hotelListQueryKey`, `hotelQueryKey`)
+  - `entities/account/api`: 내 정보 조회(`useMe`, `ensureMe`)와 로그인 상태 캐시 규칙(`startSession`, `endSession`, `forgetMe`, `isPendingMeQuery`)
+  - `entities/hotel/api`: 호텔 조회 훅(`useHotelQuery`, `useHotelListQuery`)과 캐시 규칙(`cacheSavedHotel`, `refetchHotel`·`useRefetchHotel`). 목록 페이지 계산(`getLastPage`, `isBeyondLastPage` 등)은 `entities/hotel/lib`에 둔다
+  - `features/<동작>/api`: 변경 훅. `hotel-create`(`useCreateHotel`), `hotel-update`(`useUpdateHotel`), `auth-login`(`useLogin`), `auth-logout`(`useLogout`)
 - 라우트 트리는 `src/app/router/route-tree.gen.ts`에 생성된다. 직접 수정하지 않고 커밋한다.
 - 라우트 생성 설정은 `tsr.config.json`에만 둔다.
 
@@ -58,12 +63,19 @@ apps/app-admin/
    │  └─ styles/
    ├─ pages/           # error(화면 오류), hotel-create(호텔 등록: 마스터 계정 폼, 폼 스키마), hotel-detail(호텔 상세: 수정 버튼), hotel-edit(호텔 수정: 한 번만 채우는 폼, 수정 충돌 시 최신 내용 불러오기), hotel-list(호텔 목록: 검색·페이지·URL search 스키마, 호텔 등록 버튼), login(로그인 폼)
    ├─ widgets/         # admin-layout: 사이드바 메뉴(config/menu.ts), 위쪽 화면 제목·계정 이름·로그아웃
-   ├─ features/        # hotel-info-form: 호텔 정보 입력 칸(이름·주소·대표 전화번호·소개)과 폼 스키마 조각. 등록·수정이 쓴다
-   ├─ entities/        # hotel: 호텔 id 경로 파라미터 검사, 호텔 하나 조회(404는 찾을 수 없음), 불러오는 중·불러오기 실패·찾을 수 없음 화면. 상세·수정이 쓴다
+   ├─ features/
+   │  ├─ hotel-info-form/ # 호텔 정보 입력 칸(이름·주소·대표 전화번호·소개)과 폼 스키마 조각. 등록·수정이 쓴다
+   │  ├─ hotel-create/    # api: 호텔 등록 변경 훅. 성공하면 entities/hotel의 캐시 규칙을 부른다
+   │  ├─ hotel-update/    # api: 호텔 수정 변경 훅. 성공하면 entities/hotel의 캐시 규칙을 부른다
+   │  ├─ auth-login/      # api: 로그인. 성공하면 로그인 상태를 시작한다
+   │  └─ auth-logout/     # api: 로그아웃. 성공하거나 401이면 로그인 상태를 끝낸다
+   ├─ entities/
+   │  ├─ account/      # api: 내 정보 조회, 로그인 상태 캐시 규칙(시작·끝·내 정보 지우기)
+   │  └─ hotel/        # api: 호텔 상세·목록 조회 훅, 캐시 규칙. lib: 목록 페이지 계산. 호텔 id 경로 파라미터 검사, 호텔 하나 조회(404는 찾을 수 없음), 불러오는 중·불러오기 실패·찾을 수 없음 화면
    └─ shared/
-      ├─ api/          # 검증된 API만 index.ts로 내보낸다
-      │  ├─ account.ts          # 내 정보 쿼리 옵션, 로그인, 로그아웃, 로그인 요청 스키마
-      │  ├─ hotel.ts            # 호텔 목록·상세 쿼리 옵션, 목록 전체 쿼리 키, 등록, 수정, 목록·상세 파라미터·등록·수정 요청 스키마
+      ├─ api/          # 검증된 API만 index.ts로 내보낸다. TanStack Query를 쓰지 않는다
+      │  ├─ account.ts          # 내 정보 조회와 쿼리 키, 로그인, 로그아웃, 로그인 요청 스키마
+      │  ├─ hotel.ts            # 호텔 목록·상세 조회와 쿼리 키(목록 전체 포함), 등록, 수정, 목록·상세 파라미터·등록·수정 요청 스키마
       │  ├─ api-error.ts        # 서버 오류 정보 읽기 (getApiError), 오류 코드 (API_ERROR_CODES)
       │  ├─ validate.ts         # 요청(본문·파라미터)·응답 zod 검증, 개발 콘솔 로그
       │  ├─ validation-error.ts # RequestValidationError, ResponseValidationError
@@ -91,7 +103,9 @@ TanStack Router 파일 기반 라우팅이 정한 이름은 kebab-case 규칙의
 
 - ESLint는 Vite 공식 React-TS 템플릿 구성(`@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`)에 `@tanstack/eslint-plugin-router` 권장 설정을 더해 쓴다.
 - `src/shared/api` 밖의 파일은 `no-restricted-imports`로 `shared/api/generated` import를 막는다.
-- Steiger는 `fsd.configs.recommended`를 예외 없이 쓴다.
+- `@tanstack/react-query`는 `src/app`, `src/entities/*/api`, `src/features/*/api`, 테스트 파일, `vitest-setup.ts`에서만 import한다. 그 밖의 파일(생성 코드를 뺀 `src/shared/api` 포함)은 `no-restricted-imports`로 막는다.
+  - 두 제한은 파일 묶음마다 합친 설정 하나로 둔다. 같은 규칙을 두 설정에 두면 뒤 설정이 앞 설정을 덮기 때문이다.
+- Steiger는 `fsd.configs.recommended`에서 `fsd/insignificant-slice`만 끈다(`frontend/CLAUDE.md`의 '레이어').
 
 ## 명령어 (`frontend/`에서 실행)
 
