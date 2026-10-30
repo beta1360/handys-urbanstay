@@ -1,4 +1,8 @@
 import {
+  RequestValidationError,
+  ResponseValidationError,
+} from "@repo/admin-kit/api";
+import {
   MutationCache,
   QueryClient,
   QueryClientProvider,
@@ -22,8 +26,6 @@ import {
   createHotel,
   hotelListQueryKey,
   hotelQueryKey,
-  RequestValidationError,
-  ResponseValidationError,
 } from "@/shared/api";
 import type { Hotel, HotelPage } from "@/shared/api";
 import { COMMON_MESSAGES, FORM_VALIDATION_MESSAGES } from "@/shared/config";

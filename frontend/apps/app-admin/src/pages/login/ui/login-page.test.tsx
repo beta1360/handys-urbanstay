@@ -1,3 +1,7 @@
+import {
+  RequestValidationError,
+  ResponseValidationError,
+} from "@repo/admin-kit/api";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createMemoryHistory,
@@ -18,12 +22,7 @@ import {
   onTestFinished,
   vi,
 } from "vitest";
-import {
-  loginAccount,
-  meQueryKey,
-  RequestValidationError,
-  ResponseValidationError,
-} from "@/shared/api";
+import { loginAccount, meQueryKey } from "@/shared/api";
 import { LOGIN_MESSAGES } from "@/features/auth-login";
 import { APP_INFO, COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";

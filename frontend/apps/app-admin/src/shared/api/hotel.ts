@@ -1,3 +1,4 @@
+import { parseRequest, parseResponseBody } from "@repo/admin-kit/api";
 import { z } from "zod";
 import * as generated from "./generated";
 import {
@@ -15,7 +16,6 @@ import {
   HotelUpdateAppAdminRequest,
   PageResponseHotelAppAdminResponse,
 } from "./generated/zod/schemas";
-import { parseRequest, parseResponseBody } from "./validate";
 
 export const createHotelBodySchema = HotelCreateAppAdminRequest;
 

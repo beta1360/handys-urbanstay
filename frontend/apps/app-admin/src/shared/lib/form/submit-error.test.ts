@@ -1,8 +1,8 @@
+import type { ApiError } from "@repo/admin-kit/api";
 import { AxiosError, AxiosHeaders } from "axios";
 import type { UseFormSetError } from "react-hook-form";
 import { describe, expect, it, vi } from "vitest";
 import { API_ERROR_CODES } from "@/shared/api";
-import type { ApiError } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { FORM_ALERT, showSubmitError } from "./submit-error";
 

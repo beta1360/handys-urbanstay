@@ -1,3 +1,7 @@
+import {
+  RequestValidationError,
+  ResponseValidationError,
+} from "@repo/admin-kit/api";
 import { QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as generated from "./generated";
@@ -13,10 +17,6 @@ import {
   hotelQueryKey,
   updateHotel,
 } from "./hotel";
-import {
-  RequestValidationError,
-  ResponseValidationError,
-} from "./validation-error";
 
 vi.mock("./generated", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./generated")>()),

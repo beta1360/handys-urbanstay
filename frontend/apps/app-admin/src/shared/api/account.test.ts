@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchMe, loginAccount, logoutAccount, meQueryKey } from "./account";
-import { getGetMeQueryKey, getMe, login, logout } from "./generated";
 import {
   RequestValidationError,
   ResponseValidationError,
-} from "./validation-error";
+} from "@repo/admin-kit/api";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fetchMe, loginAccount, logoutAccount, meQueryKey } from "./account";
+import { getGetMeQueryKey, getMe, login, logout } from "./generated";
 
 vi.mock("./generated", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./generated")>()),
