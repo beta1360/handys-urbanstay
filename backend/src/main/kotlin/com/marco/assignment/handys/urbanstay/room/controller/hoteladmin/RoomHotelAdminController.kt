@@ -8,6 +8,7 @@ import com.marco.assignment.handys.urbanstay.common.response.ApiResponse
 import com.marco.assignment.handys.urbanstay.common.response.PageResponse
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomCreateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomHotelAdminResponse
+import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomStatusHistoryHotelAdminResponse
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomStatusUpdateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomUpdateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.room.exception.RoomApiErrors
@@ -138,6 +139,30 @@ class RoomHotelAdminController(
 		)
 		return ApiResponse.success(RoomHotelAdminResponse.from(room))
 	}
+
+	@Operation(
+		summary = "openapi.hotel-admin.operation.getRoomStatusHistories.summary",
+		description = "openapi.hotel-admin.operation.getRoomStatusHistories.description",
+	)
+	@RoomApiErrors(RoomErrorCode.ROOM_NOT_FOUND)
+	@GetMapping("/{roomId}/status-histories")
+	fun getRoomStatusHistories(
+		@AuthenticationPrincipal hotelAdmin: HotelAdminPrincipal,
+		@PathVariable roomId: Long,
+		@RequestParam(defaultValue = PageParams.DEFAULT_PAGE)
+		@Min(value = PageParams.MIN_PAGE, message = "{validation.min}")
+		@Max(value = PageParams.MAX_PAGE, message = "{validation.max}")
+		@Parameter(description = "openapi.hotel-admin.operation.getRoomStatusHistories.parameter.page")
+		page: Int,
+		@RequestParam(defaultValue = PageParams.DEFAULT_SIZE)
+		@Min(value = PageParams.MIN_SIZE, message = "{validation.min}")
+		@Max(value = PageParams.MAX_SIZE, message = "{validation.max}")
+		@Parameter(description = "openapi.hotel-admin.operation.getRoomStatusHistories.parameter.size")
+		size: Int,
+	): ApiResponse<PageResponse<RoomStatusHistoryHotelAdminResponse>> =
+		ApiResponse.success(
+			PageResponse.from(roomService.getStatusHistories(hotelAdmin.hotelId, roomId, page, size).map(RoomStatusHistoryHotelAdminResponse::from)),
+		)
 
 	companion object {
 		const val KEYWORD_MAX_LENGTH = 100

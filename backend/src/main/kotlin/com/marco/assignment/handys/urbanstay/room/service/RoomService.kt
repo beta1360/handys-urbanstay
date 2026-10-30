@@ -97,6 +97,12 @@ class RoomService(
 		return room
 	}
 
+	@Transactional(readOnly = true)
+	fun getStatusHistories(hotelId: Long, roomId: Long, page: Int, size: Int): Page<RoomStatusHistory> {
+		findRoom(hotelId, roomId)
+		return roomStatusHistoryRepository.findByRoomId(roomId, PageRequest.of(page, size, NEWEST_FIRST))
+	}
+
 	private fun findRoom(hotelId: Long, roomId: Long): Room =
 		roomRepository.findByIdAndHotelId(roomId, hotelId) ?: throw BusinessException(RoomErrorCode.ROOM_NOT_FOUND)
 
@@ -123,5 +129,6 @@ class RoomService(
 
 	companion object {
 		private val NAME_ORDER = Sort.by(Sort.Order.asc(Room::name.name), Sort.Order.asc(Room::id.name))
+		private val NEWEST_FIRST = Sort.by(Sort.Order.desc(RoomStatusHistory::createdAt.name), Sort.Order.desc(RoomStatusHistory::id.name))
 	}
 }
