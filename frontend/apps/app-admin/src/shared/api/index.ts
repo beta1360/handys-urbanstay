@@ -10,6 +10,7 @@ export type { ApiError } from "./api-error";
 export {
   createHotel,
   createHotelBodySchema,
+  hotelListParamsSchema,
   hotelListQueryKey,
   hotelListQueryOptions,
   hotelQueryOptions,

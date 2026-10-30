@@ -32,6 +32,11 @@
 - 루트 라우트(`__root.tsx`)는 `<HeadContent />`와 `<Outlet />`만 그린다. 오류 화면(`errorComponent`)은 `<HeadContent />`와 pages의 오류 화면만 그린다. 브라우저 탭 제목은 루트 라우트의 `head`에서 `APP_INFO.name`(`shared/config`)으로 정하고, `index.html`에는 `<title>`을 두지 않는다.
 - 로그인이 필요한 화면은 경로를 만들지 않는 레이아웃 라우트 `_authenticated` 아래에 두고, 로그인 화면(`/login`)은 그 밖에 둔다. 로그인 확인은 `_authenticated`의 `beforeLoad`에서 한다.
 - 위쪽에 보여줄 현재 화면 제목은 각 화면 라우트의 `staticData.title`(선택)에 둔다. 타입은 `src/app/router/router.ts`에서 `StaticDataRouteOption`을 모듈 확장해 정한다.
+- URL search는 TanStack Router 기본 직렬화(JSON) 대신 일반 쿼리 문자열로 읽고 쓴다. 기본 직렬화는 숫자만 있는 글자 값에 따옴표를 붙여 주소가 `?keyword=%22101%22`처럼 되기 때문이다.
+  - 직렬화 함수는 `shared/lib/search-params`에 두고, 라우터 옵션 `parseSearch`·`stringifySearch`로 연결한다. 테스트용 memory 라우터에도 같은 함수를 넣는다.
+  - 모든 값은 글자로 읽는다. 같은 이름이 여러 번 오면 마지막 값을 쓴다. 쓸 때는 `undefined`·`null`인 값을 뺀다.
+  - 숫자 변환과 검사는 각 라우트의 search 스키마가 한다. 앱 안의 이동(`navigate`)은 검증된 값(숫자)을 다시 스키마에 넣으므로, 숫자 값의 스키마는 글자와 숫자를 함께 받는다.
+  - hotel-admin 라우터는 아직 바꾸지 않았다. 첫 search 파라미터(로그인 `redirect`)를 쓸 때 같은 규칙을 적용한다.
 
 ## 화면
 
@@ -39,6 +44,30 @@
 - 기본 틀은 왼쪽 사이드바(메뉴), 위쪽(현재 위치, 계정·로그아웃), 가운데(내용)로 나눈다. 로그인 화면은 이 틀 밖에 둔다.
   - 기본 틀은 widgets에 두고, `_authenticated` 레이아웃 라우트가 연결한다.
 - 라이트 테마만 지원하고, 폰트는 Pretendard를 쓴다.
+
+### 목록 화면
+
+- 검색어와 페이지는 URL search(`?keyword=&page=`)에 둔다. 새로고침·뒤로 가기·주소 공유에도 같은 목록을 보여준다.
+  - search 스키마는 그 화면의 pages slice에 두고, 라우트 파일이 `validateSearch`와 `stripSearchParams`로 연결한다.
+  - 기본값(1페이지, 검색 없음)은 URL에 남기지 않는다.
+  - 화면과 URL의 페이지는 1부터 센다. API에는 1을 뺀 값(0부터)을 보낸다.
+  - URL의 잘못된 값은 기본값으로 바꾼다. 페이지는 API가 받는 범위의 정수만, 검색어는 앞뒤 공백을 지운 뒤 비어 있지 않고 API 최대 길이 이하인 값만 쓴다. 범위는 생성된 목록 파라미터 스키마로 검사한다.
+  - 앱이 처음 뜰 때 라우터가 URL을 정리한 값으로 바꾼다(replace).
+  - URL의 페이지가 받은 응답의 마지막 페이지보다 크면, 검색어는 그대로 두고 마지막 페이지로 바꾼다(replace). 결과가 없으면 1페이지로 간다. 바꾸는 동안에는 빈 상태 문구 대신 불러오는 중 문구를 보여준다.
+  - 뒤로 가기 등으로 URL이 바뀌면 검색창의 값도 URL을 따라간다.
+- 검색은 검색창과 '검색' 버튼(Enter 포함)으로 한다.
+  - 입력할 때마다 검색하지 않는다.
+  - 검색하면 1페이지로 가고, 검색창에는 앞뒤 공백을 지운 값을 남긴다.
+  - 검색창은 API 최대 길이까지만 입력된다.
+- 페이지 이동은 이전·다음 버튼과 현재 위치(`n / m 페이지`)로 한다.
+  - 1페이지에서 이전, 마지막 페이지에서 다음은 누를 수 없다. 전체 페이지가 API가 받는 마지막 페이지보다 많아도 그 페이지에서 다음은 누를 수 없다.
+  - 페이지를 옮기는 동안 이전 목록을 그대로 보여준다(`placeholderData`). 그동안 표에 `aria-busy`를 붙여 흐리게 보여준다. 마지막 페이지를 넘은 페이지의 응답은 이전 목록으로 쓰지 않는다.
+  - 결과가 없으면 페이지 이동을 감춘다.
+- 목록 자리에는 상태에 따라 하나만 보여준다.
+  - 데이터가 있으면 표를, 항목이 없으면 빈 상태 문구를 보여준다. 빈 상태 문구는 검색어가 있을 때와 없을 때를 나눈다.
+  - 데이터 없이 실패하면 오류 문구(`role="alert"`)와 '다시 시도' 버튼(다시 조회)을 보여준다. 데이터가 있을 때 다시 조회가 실패하면 데이터를 그대로 보여준다.
+  - 401은 아래 '로그인'의 사용 중 로그인 만료를 따른다.
+  - 처음 불러오는 동안과 마지막 페이지로 옮기는 동안에는 불러오는 중 문구(`role="status"`)를 보여준다.
 
 ## UI 컴포넌트와 공유 코드
 
@@ -60,6 +89,8 @@
 | `@repo/ui/text-field` | `TextField` | label·입력창·오류 문구를 묶는다. `error`가 있으면 입력창에 `aria-invalid`와 오류 문구를 가리키는 `aria-describedby`를 붙인다 |
 | `@repo/ui/card` | `Card` | 테두리가 있는 흰색 상자. 선택 `header` 영역 |
 | `@repo/ui/sidebar` | `Sidebar`, `SidebarItem` | 왼쪽 메뉴. `Sidebar`는 `aria-label`이 필수인 `nav`다 |
+| `@repo/ui/table` | `Table` | 열 정의(`columns`: 머리글, 칸을 그리는 함수)와 `rows`로 표를 그린다. 머리글은 `scope="col"`이다. `aria-busy`면 흐리게 보여준다. `className`은 표를 감싼 상자에 붙는다. 빈 상태는 쓰는 쪽이 표 대신 보여준다 |
+| `@repo/ui/pagination` | `Pagination` | `aria-label`이 필수인 `nav` 안에 이전·다음 버튼과 현재 위치(`status`)를 둔다. `hasPrevious`·`hasNext`가 false면 그 버튼을 비활성화한다. 페이지 계산은 쓰는 쪽이 한다 |
 
 ### packages/ui에 둘 것과 앱에 둘 것
 

@@ -10,12 +10,13 @@ import {
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { API_ERROR_CODES, logoutAccount, meQueryOptions } from "@/shared/api";
 import { APP_INFO } from "@/shared/config";
+import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { ADMIN_LAYOUT_MESSAGES } from "../config/messages";
 import { AdminLayout } from "./admin-layout";
 
@@ -99,6 +100,8 @@ function renderAdminLayout(initialPath: string) {
       loginRoute,
     ]),
     history: createMemoryHistory({ initialEntries: [initialPath] }),
+    parseSearch,
+    stringifySearch,
   });
 
   render(
@@ -134,22 +137,39 @@ describe("AdminLayout", () => {
     expect(screen.getByText(APP_INFO.name)).toBeInTheDocument();
   });
 
-  it("/ 경로에서는 홈 메뉴를 현재 페이지로 표시한다", async () => {
-    renderAdminLayout("/");
-
-    expect(
-      await screen.findByRole("link", {
-        name: ADMIN_LAYOUT_MESSAGES.homeMenuLabel,
-      }),
-    ).toHaveAttribute("aria-current", "page");
-  });
-
-  it("다른 경로에서는 홈 메뉴를 현재 페이지로 표시하지 않는다", async () => {
+  it("메뉴에는 /hotels로 가는 호텔 메뉴 하나만 둔다", async () => {
     renderAdminLayout("/hotels");
 
+    const navigation = await screen.findByRole("navigation", {
+      name: ADMIN_LAYOUT_MESSAGES.sidebarLabel,
+    });
+    const links = within(navigation).getAllByRole("link");
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAccessibleName(
+      ADMIN_LAYOUT_MESSAGES.hotelMenuLabel,
+    );
+    expect(links[0]).toHaveAttribute("href", "/hotels");
+  });
+
+  it.each(["/hotels", "/hotels/new"])(
+    "%s 경로에서는 호텔 메뉴를 현재 페이지로 표시한다",
+    async (path) => {
+      renderAdminLayout(path);
+
+      expect(
+        await screen.findByRole("link", {
+          name: ADMIN_LAYOUT_MESSAGES.hotelMenuLabel,
+        }),
+      ).toHaveAttribute("aria-current", "page");
+    },
+  );
+
+  it("다른 경로에서는 호텔 메뉴를 현재 페이지로 표시하지 않는다", async () => {
+    renderAdminLayout("/untitled");
+
     expect(
       await screen.findByRole("link", {
-        name: ADMIN_LAYOUT_MESSAGES.homeMenuLabel,
+        name: ADMIN_LAYOUT_MESSAGES.hotelMenuLabel,
       }),
     ).not.toHaveAttribute("aria-current");
   });
