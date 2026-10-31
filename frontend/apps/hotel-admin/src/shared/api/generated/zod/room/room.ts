@@ -8,17 +8,21 @@
 import * as zod from 'zod';
 
 import {
+  ApiResponseListRoomTypeHotelAdminResponse,
   ApiResponsePageResponseRoomHotelAdminResponse,
   ApiResponsePageResponseRoomStatusHistoryHotelAdminResponse,
   ApiResponseRoomHotelAdminResponse,
+  ApiResponseRoomTypeHotelAdminResponse,
   RoomCreateHotelAdminRequest,
   RoomStatusUpdateHotelAdminRequest,
+  RoomTypeCreateHotelAdminRequest,
+  RoomTypeUpdateHotelAdminRequest,
   RoomUpdateHotelAdminRequest
 } from '../schemas';
 
 
 /**
- * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 객실 하나를 조회합니다. 수정 요청에 보낼 version과 상태 변경 요청의 from에 보낼 지금 상태(status)가 함께 옵니다. 지금 이용(currentStay)과 그 이용객도 함께 옵니다. 체크인·체크아웃 시각은 "HH:mm" 형식의 문자열입니다. 없는 id와 다른 호텔의 객실 id는 모두 404 ROOM_NOT_FOUND로 응답합니다.
+ * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 객실 하나를 조회합니다. 수정 요청에 보낼 version과 상태 변경 요청의 from에 보낼 지금 상태(status)가 함께 옵니다. 지금 이용(currentStay)과 그 이용객도 함께 옵니다. 객실 유형(roomType)의 이름, 최대 인원, 1박 요금, 체크인·체크아웃 시각("HH:mm")도 함께 옵니다. 없는 id와 다른 호텔의 객실 id는 모두 404 ROOM_NOT_FOUND로 응답합니다.
  * @summary 객실 조회
  */
 export const GetRoomParams = zod.object({
@@ -28,7 +32,7 @@ export const GetRoomParams = zod.object({
 export const GetRoomResponse = ApiResponseRoomHotelAdminResponse
 
 /**
- * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 객실의 모든 항목을 요청 값으로 바꿉니다. 입력값 규칙은 객실 등록과 같고, 층이나 소개를 보내지 않거나 null로 보내면 null로 바뀝니다. 조회할 때 받은 version을 함께 보냅니다. 그사이 다른 사용자가 먼저 수정해 version이 다르면 409 ROOM_MODIFIED로 응답하므로, 다시 조회한 뒤 수정합니다. 동시에 같은 version으로 수정하면 하나만 반영되고 나머지는 409 ROOM_MODIFIED입니다. 같은 호텔의 다른 객실과 이름이 같아지면(앞뒤 공백을 지운 값을 대소문자까지 그대로 비교) 409 ROOM_DUPLICATED로 응답합니다. 이름을 그대로 두는 수정은 되고, 다른 호텔의 객실과는 이름이 같아도 됩니다. version이 다르면서 이름도 겹치면 ROOM_MODIFIED입니다. 서로 다른 객실을 같은 새 이름으로 동시에 바꿔도 하나만 반영되고 나머지는 409 ROOM_DUPLICATED입니다. 성공하면 수정한 객실을 최신 version과 함께 돌려주며, 바뀐 값이 없으면 version도 그대로입니다. 객실 상태는 이 API로 바꾸지 않고(status를 보내면 400 INVALID_INPUT) 상태 변경 API로 바꿉니다. 상태는 version과 따로 움직여, 그사이 상태가 바뀌어도 조회할 때 받은 version으로 수정할 수 있고 수정해도 상태는 그대로입니다. 없는 id와 다른 호텔의 객실 id는 모두 404 ROOM_NOT_FOUND로 응답합니다.
+ * 로그인한 마스터의 호텔에 속한 객실의 모든 항목을 요청 값으로 바꿉니다. 마스터만 쓸 수 있고 운영자는 403 FORBIDDEN입니다. 입력값 규칙은 객실 생성과 같고, 층이나 소개를 보내지 않거나 null로 보내면 null로 바뀝니다. 객실 유형도 roomTypeId로 바꿀 수 있고, 없는 유형이나 다른 호텔의 유형이면 404 ROOM_TYPE_NOT_FOUND입니다(version 확인 다음, 이름 중복 확인 전). 조회할 때 받은 version을 함께 보냅니다. 그사이 다른 사용자가 먼저 수정해 version이 다르면 409 ROOM_MODIFIED로 응답하므로, 다시 조회한 뒤 수정합니다. 동시에 같은 version으로 수정하면 하나만 반영되고 나머지는 409 ROOM_MODIFIED입니다. 같은 호텔의 다른 객실과 이름이 같아지면(앞뒤 공백을 지운 값을 대소문자까지 그대로 비교) 409 ROOM_DUPLICATED로 응답합니다. 이름을 그대로 두는 수정은 되고, 다른 호텔의 객실과는 이름이 같아도 됩니다. version이 다르면서 이름도 겹치면 ROOM_MODIFIED입니다. 서로 다른 객실을 같은 새 이름으로 동시에 바꿔도 하나만 반영되고 나머지는 409 ROOM_DUPLICATED입니다. 성공하면 수정한 객실을 최신 version과 함께 돌려주며, 바뀐 값이 없으면 version도 그대로입니다. 객실 상태는 이 API로 바꾸지 않고(status를 보내면 400 INVALID_INPUT) 상태 변경 API로 바꿉니다. 상태는 version과 따로 움직여, 그사이 상태가 바뀌어도 조회할 때 받은 version으로 수정할 수 있고 수정해도 상태는 그대로입니다. 없는 id와 다른 호텔의 객실 id는 모두 404 ROOM_NOT_FOUND로 응답합니다.
  * @summary 객실 수정
  */
 export const UpdateRoomParams = zod.object({
@@ -50,6 +54,28 @@ export const UpdateRoomStatusParams = zod.object({
 export const UpdateRoomStatusBody = RoomStatusUpdateHotelAdminRequest
 
 export const UpdateRoomStatusResponse = ApiResponseRoomHotelAdminResponse
+
+/**
+ * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 객실 유형 하나를 조회합니다. 수정 요청에 보낼 version이 함께 옵니다. 없는 id와 다른 호텔의 유형 id는 모두 404 ROOM_TYPE_NOT_FOUND로 응답합니다.
+ * @summary 객실 유형 조회
+ */
+export const GetRoomTypeParams = zod.object({
+  "roomTypeId": zod.int()
+})
+
+export const GetRoomTypeResponse = ApiResponseRoomTypeHotelAdminResponse
+
+/**
+ * 로그인한 마스터의 호텔에 속한 객실 유형의 모든 항목을 요청 값으로 바꿉니다. 마스터만 쓸 수 있고 운영자는 403 FORBIDDEN입니다. 입력값 규칙은 생성과 같습니다. 조회할 때 받은 version을 함께 보내고, 그사이 다른 사용자가 먼저 수정해 version이 다르면 409 ROOM_TYPE_MODIFIED입니다. 같은 호텔의 다른 유형과 이름이 같아지면 409 ROOM_TYPE_DUPLICATED이고, version이 다르면서 이름도 겹치면 ROOM_TYPE_MODIFIED입니다. 바꾼 값은 그 유형의 모든 객실에 바로 적용되고, 1박 요금은 그 뒤의 예약부터 쓰이며 이미 한 예약의 금액은 그대로입니다. 성공하면 수정한 유형을 최신 version과 함께 돌려주며, 바뀐 값이 없으면 version도 그대로입니다. 없는 id와 다른 호텔의 유형 id는 모두 404 ROOM_TYPE_NOT_FOUND로 응답합니다.
+ * @summary 객실 유형 수정
+ */
+export const UpdateRoomTypeParams = zod.object({
+  "roomTypeId": zod.int()
+})
+
+export const UpdateRoomTypeBody = RoomTypeUpdateHotelAdminRequest
+
+export const UpdateRoomTypeResponse = ApiResponseRoomTypeHotelAdminResponse
 
 /**
  * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 객실 목록을 이름 오름차순으로 페이지로 나눠 조회합니다. 다른 호텔의 객실은 나오지 않습니다. 객실마다 지금 이용(currentStay)과 그 이용객을 함께 보여줍니다. 이름 속 숫자는 숫자 크기로 비교하고(예: 99, 101, 1001, B동 99, B동 101 순), 숫자로 시작하는 이름, 영문, 한글 순으로 놓입니다. 영문은 대소문자와 관계없이 비교하고, 대소문자만 다른 이름은 소문자가 먼저입니다(예: deluxe, Deluxe). keyword를 보내면 이름에 keyword가 들어 있는 객실만 대소문자 구분 없이 찾습니다. %, _,  같은 문자도 글자 그대로 찾습니다. keyword는 앞뒤 공백을 지운 뒤 100자 이하이고, 없거나 비어 있거나 공백만 있으면 전체를 조회합니다. status를 보내면 그 상태의 객실만 조회합니다. status는 VACANT, RESERVED, OCCUPIED, MAINTENANCE 중 하나(대소문자 구분)이고, 보내지 않거나 비어 있거나 공백만 있으면 상태로 거르지 않으며, 그 밖의 값이면 400 INVALID_INPUT으로 응답하고 fieldErrors에 status를 담습니다. keyword와 status를 함께 보내면 둘 다 맞는 객실만 이름 오름차순으로 조회합니다. page는 0~99(기본 0), size는 1~100(기본 10)입니다. totalElements와 totalPages는 검색 결과 기준이며, totalPages가 100을 넘어도 page는 99까지만 받으므로 그 뒤의 객실은 keyword로 좁혀 찾습니다. 범위를 벗어나면 400 INVALID_INPUT으로 응답하고 fieldErrors에 파라미터 이름을 담습니다.
@@ -77,15 +103,29 @@ export const GetRoomsQueryParams = zod.object({
 export const GetRoomsResponse = ApiResponsePageResponseRoomHotelAdminResponse
 
 /**
- * 로그인한 호텔 계정(마스터·운영자)의 호텔에 객실을 등록합니다. 대상 호텔은 로그인한 계정의 호텔이며 요청으로 정하지 않습니다. 이름, 객실 유형, 소개는 앞뒤 공백을 지운 뒤 검사하고 저장하며, 최대 길이도 지운 값으로 셉니다. 공백만 있는 값은 빈 값으로 보고, 소개가 없거나 비어 있거나 공백만 있으면 null로 저장합니다. 최대 인원은 1~20, 층은 -10~200이고(지하는 음수) 층은 없거나 null이어도 됩니다. 체크인·체크아웃 시각은 "HH:mm" 형식의 문자열(00:00~23:59, 예: "15:00", "09:30")만 받습니다. 초가 붙은 값("15:00:00"), 한 자리 시("9:30"), "24:00", 숫자 같은 다른 형식은 400 INVALID_INPUT으로 응답하고 fieldErrors에 그 필드를 담습니다. 체크인과 체크아웃 시각의 앞뒤는 비교하지 않으므로 체크아웃 시각이 체크인 시각보다 이르거나 같아도 됩니다. 같은 호텔에 이름이 같은 객실(앞뒤 공백을 지운 값을 대소문자까지 그대로 비교)이 이미 있으면 409 ROOM_DUPLICATED로 응답합니다. 다른 호텔의 객실과는 이름이 같아도 됩니다. 같은 이름으로 동시에 여러 번 등록해도 하나만 등록되고 나머지는 409 ROOM_DUPLICATED입니다. 새 객실의 상태는 VACANT(공실)이고 요청으로 정하지 않습니다(status를 보내면 400 INVALID_INPUT). 등록과 함께 이전 상태가 없는(null) VACANT 상태 이력을 등록한 계정으로 남깁니다. 응답은 등록한 객실이고 version은 0입니다.
- * @summary 객실 등록
+ * 로그인한 마스터의 호텔에 객실을 생성합니다. 마스터만 쓸 수 있고 운영자는 403 FORBIDDEN입니다. 대상 호텔은 로그인한 계정의 호텔이며 요청으로 정하지 않습니다. 이름과 소개는 앞뒤 공백을 지운 뒤 검사하고 저장하며, 최대 길이도 지운 값으로 셉니다. 공백만 있는 값은 빈 값으로 보고, 소개가 없거나 비어 있거나 공백만 있으면 null로 저장합니다. 층은 -10~200이고(지하는 음수) 없거나 null이어도 됩니다. 객실 유형은 객실 유형 목록의 id(roomTypeId)로 고르고, 최대 인원·1박 요금·체크인·체크아웃 시각은 그 유형의 값을 씁니다. 없는 유형이나 다른 호텔의 유형이면 404 ROOM_TYPE_NOT_FOUND입니다. 같은 호텔에 이름이 같은 객실(앞뒤 공백을 지운 값을 대소문자까지 그대로 비교)이 이미 있으면 409 ROOM_DUPLICATED로 응답합니다. 다른 호텔의 객실과는 이름이 같아도 됩니다. 같은 이름으로 동시에 여러 번 생성해도 하나만 생성되고 나머지는 409 ROOM_DUPLICATED입니다. 새 객실의 상태는 VACANT(공실)이고 요청으로 정하지 않습니다(status를 보내면 400 INVALID_INPUT). 생성과 함께 이전 상태가 없는(null) VACANT 상태 이력을 생성한 계정으로 남깁니다. 응답은 생성한 객실이고 version은 0입니다.
+ * @summary 객실 생성
  */
 export const CreateRoomBody = RoomCreateHotelAdminRequest
 
 export const CreateRoomResponse = ApiResponseRoomHotelAdminResponse
 
 /**
- * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 객실 하나의 상태 이력을 최신순(바꾼 시각 내림차순, 같으면 이력 id 내림차순)으로 페이지로 나눠 조회합니다. 객실을 등록할 때 이전 상태가 없는(fromStatus가 null) VACANT 이력이 남고, 그 뒤로 상태가 바뀔 때마다 한 줄씩 남습니다. 바꾼 사람은 호텔 계정 id와 바꿀 때의 이름으로 보여주며, 그 뒤에 계정의 이름이 바뀌거나 계정이 비활성화돼도 이력의 이름은 그대로입니다. changedAt은 UTC의 ISO 8601 문자열(예: "2026-10-30T06:59:32.123456Z")이고, 초 아래 자릿수는 저장된 값(마이크로초까지)에 따라 없거나 3자리씩 늘어납니다(예: "2026-10-30T06:59:32Z", "2026-10-30T06:59:32.120Z"). page는 0~99(기본 0), size는 1~100(기본 10)이고, 범위를 벗어나면 400 INVALID_INPUT으로 응답하고 fieldErrors에 파라미터 이름을 담습니다. 없는 id와 다른 호텔의 객실 id는 모두 404 ROOM_NOT_FOUND로 응답합니다.
+ * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 객실 유형을 모두 이름 오름차순(같으면 id 오름차순)으로 조회합니다. 객실 생성·수정의 유형 선택과 거르기에 쓰므로 페이지로 나누지 않고 전부 돌려줍니다. 이름 속 숫자는 숫자 크기로 비교하고(예: 2인실, 10인실 순), 숫자로 시작하는 이름, 영문, 한글 순이며, 대소문자만 다른 이름은 소문자가 먼저입니다(예: deluxe, Deluxe).
+ * @summary 객실 유형 목록 조회
+ */
+export const GetRoomTypesResponse = ApiResponseListRoomTypeHotelAdminResponse
+
+/**
+ * 로그인한 마스터의 호텔에 객실 유형을 만듭니다. 마스터만 쓸 수 있고 운영자는 403 FORBIDDEN입니다. 대상 호텔은 로그인한 계정의 호텔이며 요청으로 정하지 않습니다. 이름은 앞뒤 공백을 지운 뒤 1~50자, 최대 인원은 1~20, 1박 요금은 0~10,000,000원 정수입니다. 체크인·체크아웃 시각은 "HH:mm" 형식의 문자열(00:00~23:59, 예: "15:00")만 받고, 초가 붙은 값이나 한 자리 시 같은 다른 형식은 400 INVALID_INPUT으로 응답하고 fieldErrors에 그 필드를 담습니다. 체크인과 체크아웃 시각의 앞뒤는 비교하지 않습니다. 같은 호텔에 이름이 같은 유형(앞뒤 공백을 지운 값을 대소문자까지 그대로 비교)이 이미 있으면 409 ROOM_TYPE_DUPLICATED이고, 다른 호텔의 유형과는 이름이 같아도 됩니다. 응답은 만든 유형이고 version은 0입니다. 유형은 지우지 않습니다.
+ * @summary 객실 유형 생성
+ */
+export const CreateRoomTypeBody = RoomTypeCreateHotelAdminRequest
+
+export const CreateRoomTypeResponse = ApiResponseRoomTypeHotelAdminResponse
+
+/**
+ * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 객실 하나의 상태 이력을 최신순(바꾼 시각 내림차순, 같으면 이력 id 내림차순)으로 페이지로 나눠 조회합니다. 객실을 생성할 때 이전 상태가 없는(fromStatus가 null) VACANT 이력이 남고, 그 뒤로 상태가 바뀔 때마다 한 줄씩 남습니다. 바꾼 사람은 호텔 계정 id와 바꿀 때의 이름으로 보여주며, 그 뒤에 계정의 이름이 바뀌거나 계정이 비활성화돼도 이력의 이름은 그대로입니다. changedAt은 UTC의 ISO 8601 문자열(예: "2026-10-30T06:59:32.123456Z")이고, 초 아래 자릿수는 저장된 값(마이크로초까지)에 따라 없거나 3자리씩 늘어납니다(예: "2026-10-30T06:59:32Z", "2026-10-30T06:59:32.120Z"). page는 0~99(기본 0), size는 1~100(기본 10)이고, 범위를 벗어나면 400 INVALID_INPUT으로 응답하고 fieldErrors에 파라미터 이름을 담습니다. 없는 id와 다른 호텔의 객실 id는 모두 404 ROOM_NOT_FOUND로 응답합니다.
  * @summary 객실 상태 이력 조회
  */
 export const GetRoomStatusHistoriesParams = zod.object({

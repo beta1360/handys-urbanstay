@@ -20,6 +20,7 @@ import {
   ROOM_STATUS_LABELS,
   stringifyRoomPathParams,
 } from "@/entities/room";
+import { ROOM_TYPE_FIELD_LABELS } from "@/entities/room-type";
 import { STAY_FIELD_LABELS, STAY_LINK_MESSAGES } from "@/entities/stay";
 import { ROOM_STATUS_CHANGE_MESSAGES } from "@/features/room-status-change";
 import { API_ERROR_CODES, updateRoomStatus } from "@/shared/api";
@@ -34,6 +35,7 @@ import {
   ROOM_CURRENT_STAY_MESSAGES,
   ROOM_STATUS_HISTORY_MESSAGES,
 } from "@/widgets/room-detail";
+import { formatWon } from "@/shared/lib/money";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { RoomDetailPage } from "./room-detail-page";
 
@@ -63,12 +65,16 @@ vi.mock("@repo/admin-kit/toast", async (importOriginal) => ({
 const ROOM: Room = {
   id: 1,
   name: "스위트 A",
-  type: "스위트",
-  capacity: 4,
+  roomType: {
+    id: 2,
+    name: "스위트",
+    capacity: 4,
+    roomRate: 100000,
+    checkInTime: "15:00",
+    checkOutTime: "11:00",
+  },
   floor: -1,
   description: "바다가 보이는 객실입니다.\n조식을 제공합니다.",
-  checkInTime: "15:00",
-  checkOutTime: "11:00",
   status: "RESERVED",
   currentStay: null,
   version: 3,
@@ -130,7 +136,10 @@ function createApiError(
   );
 }
 
-function renderRoomDetailPage(initialEntries = [roomPath(ROOM.id)]) {
+function renderRoomDetailPage(
+  initialEntries = [roomPath(ROOM.id)],
+  isMaster = true,
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -146,6 +155,7 @@ function renderRoomDetailPage(initialEntries = [roomPath(ROOM.id)]) {
       parse: parseRoomPathParams,
       stringify: stringifyRoomPathParams,
     },
+    beforeLoad: () => ({ isMaster }),
   });
   const router = createRouter({
     routeTree: rootRoute.addChildren([
@@ -233,23 +243,25 @@ describe("RoomDetailPage 정보", () => {
     expect(screen.getAllByRole("term").map((term) => term.textContent)).toEqual(
       [
         ROOM_FIELD_LABELS.name,
-        ROOM_FIELD_LABELS.type,
-        ROOM_FIELD_LABELS.capacity,
+        ROOM_FIELD_LABELS.roomType,
+        ROOM_TYPE_FIELD_LABELS.capacity,
+        ROOM_TYPE_FIELD_LABELS.roomRate,
+        ROOM_TYPE_FIELD_LABELS.checkInTime,
+        ROOM_TYPE_FIELD_LABELS.checkOutTime,
         ROOM_FIELD_LABELS.floor,
         ROOM_FIELD_LABELS.description,
-        ROOM_FIELD_LABELS.checkInTime,
-        ROOM_FIELD_LABELS.checkOutTime,
         ROOM_FIELD_LABELS.status,
       ],
     );
     expect(getDescriptionTexts()).toEqual([
       ROOM.name,
-      ROOM.type,
+      ROOM.roomType.name,
       "4",
+      formatWon(ROOM.roomType.roomRate),
+      ROOM.roomType.checkInTime,
+      ROOM.roomType.checkOutTime,
       "-1",
       ROOM.description,
-      ROOM.checkInTime,
-      ROOM.checkOutTime,
       ROOM_STATUS_LABELS.RESERVED,
     ]);
     expect(getBackLink()).toHaveAttribute("href", "/rooms");
@@ -263,8 +275,8 @@ describe("RoomDetailPage 정보", () => {
 
     expect(await screen.findByText(ROOM.name)).toBeInTheDocument();
     const descriptions = getDescriptionTexts();
-    expect(descriptions[3]).toBe(ROOM_INFORMATION_MESSAGES.emptyFloor);
-    expect(descriptions[4]).toBe(ROOM_INFORMATION_MESSAGES.emptyDescription);
+    expect(descriptions[6]).toBe(ROOM_INFORMATION_MESSAGES.emptyFloor);
+    expect(descriptions[7]).toBe(ROOM_INFORMATION_MESSAGES.emptyDescription);
   });
 
   it("처음 불러오는 동안 불러오는 중 문구와 위쪽 목록으로 링크를 보여준다", async () => {
@@ -352,6 +364,19 @@ describe("RoomDetailPage 지금 이용", () => {
 });
 
 describe("RoomDetailPage 수정 버튼", () => {
+  it("운영자에게는 수정 버튼을 숨기고 이용 보기 링크와 상태 바꾸기 버튼은 그대로 둔다", async () => {
+    renderRoomDetailPage([roomPath(ROOM.id)], false);
+
+    expect(
+      await screen.findByRole("link", { name: STAY_LINK_MESSAGES.stays }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: COMMON_MESSAGES.edit }),
+    ).not.toBeInTheDocument();
+    expect(getStatusButtons().length).toBeGreaterThan(0);
+    getStatusButtons().forEach((button) => expect(button).toBeEnabled());
+  });
+
   it("객실 정보를 보여줄 때 목록으로 링크 줄의 오른쪽 끝에 이용 보기 링크와 수정 버튼을 두고, 수정을 누르면 수정 화면으로 이동한다", async () => {
     const { router, user } = renderRoomDetailPage();
 

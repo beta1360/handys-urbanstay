@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -10,6 +10,7 @@ import {
 } from "@repo/admin-kit/form";
 import { showToast } from "@repo/admin-kit/toast";
 import { ROOM_INFO_FIELDS } from "@/entities/room";
+import { useRoomTypeOptions } from "@/entities/room-type";
 import { API_ERROR_CODES, getApiError } from "@/shared/api";
 import { useCreateRoom } from "../api/use-create-room";
 import {
@@ -21,6 +22,7 @@ export function useRoomCreateForm() {
   const { create } = useCreateRoom();
   const navigate = useNavigate();
   const errorToast = useFormErrorToast();
+  const { roomTypeOptions, roomTypeHint } = useRoomTypeOptions();
   const form = useForm({
     ...SUBMIT_ONLY_VALIDATION,
     resolver: zodResolver(roomCreateFormSchema),
@@ -28,6 +30,7 @@ export function useRoomCreateForm() {
   });
   const { formState } = form;
   const fields = toFieldPropsMap(form, ROOM_INFO_FIELDS);
+  const roomTypeId = useWatch({ control: form.control, name: "roomTypeId" });
   const isSubmitting = formState.isSubmitting || formState.isSubmitSuccessful;
 
   const submit = form.handleSubmit(
@@ -47,7 +50,10 @@ export function useRoomCreateForm() {
             showSubmitError(getApiError(error), {
               fields: ROOM_INFO_FIELDS,
               setError: form.setError,
-              fieldOfCode: { [API_ERROR_CODES.roomDuplicated]: "name" },
+              fieldOfCode: {
+                [API_ERROR_CODES.roomDuplicated]: "name",
+                [API_ERROR_CODES.roomTypeNotFound]: "roomTypeId",
+              },
               onAlert: ({ message }) => errorToast.show(message),
             });
             resolve();
@@ -65,5 +71,14 @@ export function useRoomCreateForm() {
     void submit(event);
   }
 
-  return { fields, isSubmitting, handleSubmit };
+  return {
+    fields: {
+      ...fields,
+      roomTypeId: { ...fields.roomTypeId, value: roomTypeId },
+    },
+    roomTypeOptions,
+    roomTypeHint,
+    isSubmitting,
+    handleSubmit,
+  };
 }

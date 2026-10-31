@@ -9,8 +9,16 @@ type RoomUpdateFormProps = {
 };
 
 export function RoomUpdateForm({ roomId, initialRoom }: RoomUpdateFormProps) {
-  const { fields, alert, status, reloadButtonRef, handleSubmit, reload } =
-    useRoomUpdateForm(roomId, initialRoom);
+  const {
+    fields,
+    roomTypeOptions,
+    roomTypeHint,
+    alert,
+    status,
+    reloadButtonRef,
+    handleSubmit,
+    reload,
+  } = useRoomUpdateForm(roomId, initialRoom);
 
   if (status === "notFound") {
     return <RoomNotFound />;
@@ -19,6 +27,8 @@ export function RoomUpdateForm({ roomId, initialRoom }: RoomUpdateFormProps) {
     <RoomUpdateFormView
       roomId={roomId}
       fields={fields}
+      roomTypeOptions={roomTypeOptions}
+      roomTypeHint={roomTypeHint}
       alert={alert}
       status={status}
       reloadButtonRef={reloadButtonRef}

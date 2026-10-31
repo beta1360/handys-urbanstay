@@ -31,12 +31,16 @@ const ROOM_ID = 1;
 const ROOM = {
   id: ROOM_ID,
   name: "101",
-  type: "스탠다드",
-  capacity: 2,
+  roomType: {
+    id: 1,
+    name: "스탠다드",
+    capacity: 2,
+    roomRate: 100000,
+    checkInTime: "15:00",
+    checkOutTime: "11:00",
+  },
   floor: null,
   description: null,
-  checkInTime: "15:00",
-  checkOutTime: "11:00",
   status: "VACANT",
   currentStay: null,
   version: 0,
@@ -76,12 +80,9 @@ const LIST_PARAMS = { keyword: "10", status: "VACANT", page: 1, size: 10 } as co
 
 const CREATE_BODY = {
   name: ROOM.name,
-  type: ROOM.type,
-  capacity: ROOM.capacity,
+  roomTypeId: ROOM.roomType.id,
   floor: 1,
   description: null,
-  checkInTime: ROOM.checkInTime,
-  checkOutTime: ROOM.checkOutTime,
 };
 
 const UPDATE_BODY = { ...CREATE_BODY, version: ROOM.version };
@@ -323,9 +324,9 @@ describe("updateRoom", () => {
     expect(generated.updateRoom).toHaveBeenCalledWith(ROOM_ID, UPDATE_BODY);
   });
 
-  it("체크인 시각이 HH:mm 형식이 아니면 요청을 보내지 않고 요청 검증 오류를 던진다", async () => {
+  it("유형 id가 정수가 아니면 요청을 보내지 않고 요청 검증 오류를 던진다", async () => {
     await expect(
-      updateRoom(ROOM_ID, { ...UPDATE_BODY, checkInTime: "15:00:00" }),
+      updateRoom(ROOM_ID, { ...UPDATE_BODY, roomTypeId: 1.5 }),
     ).rejects.toBeInstanceOf(RequestValidationError);
     expect(generated.updateRoom).not.toHaveBeenCalled();
   });

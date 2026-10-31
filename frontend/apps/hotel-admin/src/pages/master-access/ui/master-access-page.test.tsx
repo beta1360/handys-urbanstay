@@ -9,9 +9,9 @@ import {
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
+import { ACCESS_MESSAGES } from "@/shared/config";
 import { OperatorList } from "@/widgets/operator-list";
-import { OPERATOR_ACCESS_MESSAGES } from "../config/messages";
-import { OperatorAccessPage } from "./operator-access-page";
+import { MasterAccessPage } from "./master-access-page";
 
 const { fetchOperators } = vi.hoisted(() => ({ fetchOperators: vi.fn() }));
 
@@ -28,7 +28,7 @@ const OPERATOR = {
   version: 0,
 };
 
-function renderOperatorAccessPage(isMaster: boolean) {
+function renderMasterAccessPage(isMaster: boolean) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -41,7 +41,7 @@ function renderOperatorAccessPage(isMaster: boolean) {
     getParentRoute: () => layoutRoute,
     path: "operators",
     beforeLoad: () => ({ isMaster }),
-    component: OperatorAccessPage,
+    component: MasterAccessPage,
   });
   const router = createRouter({
     routeTree: rootRoute.addChildren([
@@ -74,15 +74,15 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-describe("OperatorAccessPage", () => {
+describe("MasterAccessPage", () => {
   it("마스터가 아니면 요청 없이 권한이 없다는 문구와 객실 목록 버튼만 보여준다", async () => {
-    renderOperatorAccessPage(false);
+    renderMasterAccessPage(false);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      OPERATOR_ACCESS_MESSAGES.forbidden,
+      ACCESS_MESSAGES.forbidden,
     );
     expect(
-      screen.getByRole("link", { name: OPERATOR_ACCESS_MESSAGES.backToRooms }),
+      screen.getByRole("link", { name: ACCESS_MESSAGES.backToRooms }),
     ).toHaveAttribute("href", "/rooms");
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(fetchOperators).not.toHaveBeenCalled();
@@ -96,7 +96,7 @@ describe("OperatorAccessPage", () => {
       totalElements: 1,
       totalPages: 1,
     });
-    renderOperatorAccessPage(true);
+    renderMasterAccessPage(true);
 
     expect(await screen.findByRole("table")).toBeInTheDocument();
     expect(fetchOperators).toHaveBeenCalledOnce();

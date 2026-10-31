@@ -2,6 +2,7 @@ import { Table } from "@repo/ui/table";
 import type { TableColumn } from "@repo/ui/table";
 import { TextLink } from "@repo/admin-kit/link";
 import { ROOM_FIELD_LABELS, ROOM_STATUS_LABELS, RoomFloor } from "@/entities/room";
+import { ROOM_TYPE_FIELD_LABELS } from "@/entities/room-type";
 import type { Room } from "@/shared/api";
 import { ROOM_TABLE_MESSAGES } from "../config/messages";
 
@@ -16,9 +17,9 @@ const ROOM_COLUMNS: readonly TableColumn<Room>[] = [
     ),
   },
   {
-    key: "type",
-    header: ROOM_FIELD_LABELS.type,
-    cell: (room) => room.type,
+    key: "roomType",
+    header: ROOM_FIELD_LABELS.roomType,
+    cell: (room) => room.roomType.name,
   },
   {
     key: "floor",
@@ -27,8 +28,8 @@ const ROOM_COLUMNS: readonly TableColumn<Room>[] = [
   },
   {
     key: "capacity",
-    header: ROOM_FIELD_LABELS.capacity,
-    cell: (room) => room.capacity,
+    header: ROOM_TYPE_FIELD_LABELS.capacity,
+    cell: (room) => room.roomType.capacity,
   },
   {
     key: "status",

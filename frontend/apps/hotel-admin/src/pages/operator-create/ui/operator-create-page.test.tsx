@@ -124,7 +124,7 @@ function getFields() {
 }
 
 function getSubmitButton() {
-  return screen.getByRole("button", { name: COMMON_MESSAGES.create });
+  return screen.getByRole("button", { name: COMMON_MESSAGES.register });
 }
 
 async function fillForm(

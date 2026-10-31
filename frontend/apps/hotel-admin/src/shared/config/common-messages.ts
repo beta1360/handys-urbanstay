@@ -11,7 +11,8 @@ export const COMMON_MESSAGES = {
   nextPage: "다음",
   pageStatus: (page: number, totalPages: number) =>
     `${page} / ${totalPages} 페이지`,
-  create: "등록",
+  register: "등록",
+  create: "생성",
   save: "저장",
   edit: "수정",
   reload: "최신 내용 불러오기",

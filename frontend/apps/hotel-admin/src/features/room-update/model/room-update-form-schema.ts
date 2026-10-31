@@ -12,11 +12,8 @@ type RoomUpdateFormValues = z.input<typeof roomUpdateFormSchema>;
 export function toRoomUpdateFormValues(room: Room): RoomUpdateFormValues {
   return {
     name: room.name,
-    type: room.type,
-    capacity: String(room.capacity),
+    roomTypeId: String(room.roomType.id),
     floor: room.floor === null ? "" : String(room.floor),
-    checkInTime: room.checkInTime,
-    checkOutTime: room.checkOutTime,
     description: room.description ?? "",
     version: room.version,
   };

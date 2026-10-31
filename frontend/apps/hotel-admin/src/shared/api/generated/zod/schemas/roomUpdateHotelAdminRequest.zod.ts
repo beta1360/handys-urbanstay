@@ -9,28 +9,19 @@ import * as zod from 'zod';
 
 export const roomUpdateHotelAdminRequestNameMax = 50;
 
-export const roomUpdateHotelAdminRequestTypeMax = 50;
-
-export const roomUpdateHotelAdminRequestCapacityMax = 20;
-
 export const roomUpdateHotelAdminRequestFloorMin = -10;
 export const roomUpdateHotelAdminRequestFloorMax = 200;
 
 export const roomUpdateHotelAdminRequestDescriptionMin = 0;
 export const roomUpdateHotelAdminRequestDescriptionMax = 1000;
 
-export const roomUpdateHotelAdminRequestCheckInTimeRegExp = new RegExp('^([01][0-9]|2[0-3]):[0-5][0-9]$');
-export const roomUpdateHotelAdminRequestCheckOutTimeRegExp = new RegExp('^([01][0-9]|2[0-3]):[0-5][0-9]$');
 
 
 export const RoomUpdateHotelAdminRequest = zod.object({
   "name": zod.string().min(1).max(roomUpdateHotelAdminRequestNameMax).describe('객실 이름(호수). 예: 101, 스위트 A. 앞뒤 공백을 지운 뒤 1~50자. 같은 호텔의 다른 객실과 이름이 같아지면(대소문자 구분) 수정할 수 없고, 다른 호텔의 객실과는 같아도 됩니다.'),
-  "type": zod.string().min(1).max(roomUpdateHotelAdminRequestTypeMax).describe('객실 유형. 예: 스탠다드, 디럭스. 앞뒤 공백을 지운 뒤 1~50자.'),
-  "capacity": zod.int().min(1).max(roomUpdateHotelAdminRequestCapacityMax).describe('최대 인원. 1~20 정수.'),
+  "roomTypeId": zod.int().describe('객실 유형 ID. 같은 호텔의 객실 유형 목록에서 고릅니다. 없는 유형이나 다른 호텔의 유형이면 404 ROOM_TYPE_NOT_FOUND입니다.'),
   "floor": zod.int().min(roomUpdateHotelAdminRequestFloorMin).max(roomUpdateHotelAdminRequestFloorMax).nullish().describe('층(선택). -10~200 정수이고 지하는 음수입니다. 없거나 null이면 층을 비웁니다(null로 저장).'),
   "description": zod.string().min(roomUpdateHotelAdminRequestDescriptionMin).max(roomUpdateHotelAdminRequestDescriptionMax).nullish().describe('소개(선택). 앞뒤 공백을 지운 뒤 1000자 이하. 없거나 비어 있거나 공백만 있으면 null로 저장합니다.'),
-  "checkInTime": zod.stringFormat('time-local', roomUpdateHotelAdminRequestCheckInTimeRegExp).describe('체크인 시각. "HH:mm" 형식(00:00~23:59, 분 단위)의 문자열. 초를 붙이거나 한 자리 시로 보내면 400입니다. 체크아웃 시각과 앞뒤를 비교하지 않습니다.'),
-  "checkOutTime": zod.stringFormat('time-local', roomUpdateHotelAdminRequestCheckOutTimeRegExp).describe('체크아웃 시각. "HH:mm" 형식(00:00~23:59, 분 단위)의 문자열. 초를 붙이거나 한 자리 시로 보내면 400입니다. 보통 다음 날이라 체크인 시각보다 이르거나 같아도 됩니다.'),
   "version": zod.int().describe('조회할 때 받은 version. 현재 version과 다르면 409 ROOM_MODIFIED입니다.')
 });
 

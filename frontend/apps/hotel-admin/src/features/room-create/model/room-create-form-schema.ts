@@ -10,10 +10,7 @@ type RoomCreateFormValues = z.input<typeof roomCreateFormSchema>;
 
 export const EMPTY_ROOM_CREATE_VALUES: RoomCreateFormValues = {
   name: "",
-  type: "",
-  capacity: "",
+  roomTypeId: "",
   floor: "",
-  checkInTime: "",
-  checkOutTime: "",
   description: "",
 };

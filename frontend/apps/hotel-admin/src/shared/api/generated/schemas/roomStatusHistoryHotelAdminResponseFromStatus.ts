@@ -7,7 +7,7 @@
  */
 
 /**
- * 이전 상태. VACANT, RESERVED, OCCUPIED, MAINTENANCE 중 하나이고, 객실 등록 때 남긴 이력이면 null
+ * 이전 상태. VACANT, RESERVED, OCCUPIED, MAINTENANCE 중 하나이고, 객실 생성 때 남긴 이력이면 null
  * @nullable
  */
 export type RoomStatusHistoryHotelAdminResponseFromStatus = typeof RoomStatusHistoryHotelAdminResponseFromStatus[keyof typeof RoomStatusHistoryHotelAdminResponseFromStatus] | null;

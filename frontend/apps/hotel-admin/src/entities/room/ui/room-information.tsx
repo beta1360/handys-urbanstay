@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Card } from "@repo/ui/card";
 import {
   DescriptionList,
@@ -13,21 +14,23 @@ import { RoomFloor } from "./room-floor";
 
 type RoomInformationProps = {
   room: Room;
+  roomTypeTerms?: ReactNode;
 };
 
-export function RoomInformation({ room }: RoomInformationProps) {
+export function RoomInformation({
+  room,
+  roomTypeTerms,
+}: RoomInformationProps) {
   return (
     <Card>
       <DescriptionList>
         <DescriptionListItem term={ROOM_FIELD_LABELS.name}>
           {room.name}
         </DescriptionListItem>
-        <DescriptionListItem term={ROOM_FIELD_LABELS.type}>
-          {room.type}
+        <DescriptionListItem term={ROOM_FIELD_LABELS.roomType}>
+          {room.roomType.name}
         </DescriptionListItem>
-        <DescriptionListItem term={ROOM_FIELD_LABELS.capacity}>
-          {room.capacity}
-        </DescriptionListItem>
+        {roomTypeTerms}
         <DescriptionListItem term={ROOM_FIELD_LABELS.floor}>
           <RoomFloor floor={room.floor} />
         </DescriptionListItem>
@@ -37,12 +40,6 @@ export function RoomInformation({ room }: RoomInformationProps) {
               {ROOM_INFORMATION_MESSAGES.emptyDescription}
             </span>
           )}
-        </DescriptionListItem>
-        <DescriptionListItem term={ROOM_FIELD_LABELS.checkInTime}>
-          {room.checkInTime}
-        </DescriptionListItem>
-        <DescriptionListItem term={ROOM_FIELD_LABELS.checkOutTime}>
-          {room.checkOutTime}
         </DescriptionListItem>
         <DescriptionListItem term={ROOM_FIELD_LABELS.status}>
           {ROOM_STATUS_LABELS[room.status]}
