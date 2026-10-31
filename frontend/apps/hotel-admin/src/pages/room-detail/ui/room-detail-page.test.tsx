@@ -20,7 +20,7 @@ import {
   ROOM_STATUS_LABELS,
   stringifyRoomPathParams,
 } from "@/entities/room";
-import { STAY_LINK_MESSAGES } from "@/entities/stay";
+import { STAY_FIELD_LABELS, STAY_LINK_MESSAGES } from "@/entities/stay";
 import { ROOM_STATUS_CHANGE_MESSAGES } from "@/features/room-status-change";
 import { API_ERROR_CODES, updateRoomStatus } from "@/shared/api";
 import type {
@@ -30,7 +30,10 @@ import type {
   RoomStatusHistoryParams,
 } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
-import { ROOM_STATUS_HISTORY_MESSAGES } from "@/widgets/room-detail";
+import {
+  ROOM_CURRENT_STAY_MESSAGES,
+  ROOM_STATUS_HISTORY_MESSAGES,
+} from "@/widgets/room-detail";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { RoomDetailPage } from "./room-detail-page";
 
@@ -67,6 +70,7 @@ const ROOM: Room = {
   checkInTime: "15:00",
   checkOutTime: "11:00",
   status: "RESERVED",
+  currentStay: null,
   version: 3,
 };
 
@@ -160,6 +164,14 @@ function renderRoomDetailPage(initialEntries = [roomPath(ROOM.id)]) {
           }),
         ]),
         createRoute({ getParentRoute: () => layoutRoute, path: "stays/" }),
+        createRoute({
+          getParentRoute: () => layoutRoute,
+          path: "stays/$stayId",
+        }),
+        createRoute({
+          getParentRoute: () => layoutRoute,
+          path: "guests/$guestId",
+        }),
       ]),
     ]),
     history: createMemoryHistory({
@@ -281,6 +293,61 @@ describe("RoomDetailPage 정보", () => {
 
     expect(await screen.findByText(ROOM.name)).toBeInTheDocument();
     expect(fetchRoom).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("RoomDetailPage 지금 이용", () => {
+  function findCurrentStayRegion() {
+    return screen.findByRole("region", {
+      name: ROOM_CURRENT_STAY_MESSAGES.title,
+    });
+  }
+
+  it("지금 이용이 있으면 이용객(이용객 상세 링크)·전화번호·체크인·체크아웃 날짜와 이용 상세 링크를 보여준다", async () => {
+    fetchRoom.mockResolvedValue({
+      ...ROOM,
+      currentStay: {
+        id: 5,
+        checkInDate: "2026-10-30",
+        checkOutDate: "2026-11-01",
+        guest: { id: 9, name: "김이용", phone: "010-1234-5678" },
+      },
+    });
+    renderRoomDetailPage();
+
+    const region = await findCurrentStayRegion();
+    expect(
+      within(region)
+        .getAllByRole("term")
+        .map((term) => term.textContent),
+    ).toEqual([
+      STAY_FIELD_LABELS.guest,
+      STAY_FIELD_LABELS.guestPhone,
+      STAY_FIELD_LABELS.checkInDate,
+      STAY_FIELD_LABELS.checkOutDate,
+    ]);
+    expect(
+      within(region)
+        .getAllByRole("definition")
+        .map((definition) => definition.textContent),
+    ).toEqual(["김이용", "010-1234-5678", "2026-10-30", "2026-11-01"]);
+    expect(
+      within(region).getByRole("link", { name: "김이용" }),
+    ).toHaveAttribute("href", "/guests/9");
+    expect(
+      within(region).getByRole("link", {
+        name: ROOM_CURRENT_STAY_MESSAGES.stayDetail,
+      }),
+    ).toHaveAttribute("href", "/stays/5");
+  });
+
+  it("지금 이용이 없으면 이용 중인 이용객이 없다는 문구만 보여준다", async () => {
+    renderRoomDetailPage();
+
+    const region = await findCurrentStayRegion();
+    expect(region).toHaveTextContent(ROOM_CURRENT_STAY_MESSAGES.empty);
+    expect(within(region).queryByRole("link")).not.toBeInTheDocument();
+    expect(within(region).queryByRole("term")).not.toBeInTheDocument();
   });
 });
 

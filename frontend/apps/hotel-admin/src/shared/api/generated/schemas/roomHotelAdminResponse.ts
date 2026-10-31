@@ -5,6 +5,7 @@
  * 숙박 운영(호텔·객실·이용) API
  * OpenAPI spec version: v1
  */
+import type { RoomCurrentStayHotelAdminResponse } from './roomCurrentStayHotelAdminResponse.ts';
 import type { RoomHotelAdminResponseStatus } from './roomHotelAdminResponseStatus.ts';
 
 export interface RoomHotelAdminResponse {
@@ -38,6 +39,8 @@ export interface RoomHotelAdminResponse {
   checkOutTime: string;
   /** 객실 상태. VACANT(공실), RESERVED(예약됨), OCCUPIED(이용중), MAINTENANCE(정비중). 새 객실은 VACANT이고 상태 변경 API로만 바뀝니다. */
   status: RoomHotelAdminResponseStatus;
+  /** 지금 이용. 오늘(한국 시간)이 체크인 날짜와 같거나 뒤이고 체크아웃 날짜보다 앞인, 취소하지 않은 이용과 그 이용객입니다. 체크아웃 날에는 그 이용이 지금 이용이 아닙니다. 없으면 null이고, 새로 등록한 객실은 항상 null입니다. 객실 상태와 따로 정해지며 상태를 바꾸지 않습니다. */
+  currentStay: RoomCurrentStayHotelAdminResponse | null;
   /** 버전. 객실 정보가 바뀌어 저장될 때마다 커집니다. 상태가 바뀌어도 그대로입니다. 수정 요청에 그대로 보냅니다. */
   version: number;
 }

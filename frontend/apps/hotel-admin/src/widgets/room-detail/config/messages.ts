@@ -8,3 +8,9 @@ export const ROOM_STATUS_HISTORY_MESSAGES = {
   empty: "상태 이력이 없습니다.",
   loadFailed: "상태 이력을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
 } as const;
+
+export const ROOM_CURRENT_STAY_MESSAGES = {
+  title: "지금 이용",
+  empty: "지금 이용 중인 이용객이 없습니다.",
+  stayDetail: "이용 상세",
+} as const;

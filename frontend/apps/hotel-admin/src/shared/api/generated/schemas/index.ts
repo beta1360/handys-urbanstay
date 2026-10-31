@@ -43,6 +43,8 @@ export * from './pageResponseRoomHotelAdminResponse.ts';
 export * from './pageResponseRoomStatusHistoryHotelAdminResponse.ts';
 export * from './pageResponseStayHotelAdminResponse.ts';
 export * from './roomCreateHotelAdminRequest.ts';
+export * from './roomCurrentStayGuestHotelAdminResponse.ts';
+export * from './roomCurrentStayHotelAdminResponse.ts';
 export * from './roomHotelAdminResponse.ts';
 export * from './roomHotelAdminResponseStatus.ts';
 export * from './roomStatusHistoryChangedByHotelAdminResponse.ts';

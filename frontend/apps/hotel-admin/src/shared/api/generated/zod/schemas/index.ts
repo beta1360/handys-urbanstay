@@ -41,6 +41,8 @@ export * from './pageResponseRoomHotelAdminResponse.zod.ts';
 export * from './pageResponseRoomStatusHistoryHotelAdminResponse.zod.ts';
 export * from './pageResponseStayHotelAdminResponse.zod.ts';
 export * from './roomCreateHotelAdminRequest.zod.ts';
+export * from './roomCurrentStayGuestHotelAdminResponse.zod.ts';
+export * from './roomCurrentStayHotelAdminResponse.zod.ts';
 export * from './roomHotelAdminResponse.zod.ts';
 export * from './roomStatusHistoryChangedByHotelAdminResponse.zod.ts';
 export * from './roomStatusHistoryHotelAdminResponse.zod.ts';

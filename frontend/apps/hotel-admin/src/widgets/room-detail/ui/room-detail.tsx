@@ -6,6 +6,7 @@ import {
   useRoom,
 } from "@/entities/room";
 import { RoomStatusChange } from "@/features/room-status-change";
+import { RoomCurrentStay } from "./room-current-stay";
 import { RoomDetailActions } from "./room-detail-actions";
 import { RoomStatusHistory } from "./room-status-history";
 
@@ -38,6 +39,7 @@ export function RoomDetail({ roomId }: RoomDetailProps) {
         <>
           <RoomDetailActions editRoomId={state.room.id} />
           <RoomInformation room={state.room} />
+          <RoomCurrentStay currentStay={state.room.currentStay} />
           <RoomStatusChange room={state.room} />
           <RoomStatusHistory key={state.room.id} roomId={state.room.id} />
         </>

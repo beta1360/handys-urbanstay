@@ -64,6 +64,7 @@ const ROOM: Room = {
   checkInTime: "15:00",
   checkOutTime: "11:00",
   status: "VACANT",
+  currentStay: null,
   version: 0,
 };
 
