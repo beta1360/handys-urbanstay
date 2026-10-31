@@ -25,13 +25,18 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AccountAdminCreateAppAdminRequest,
+  AccountAdminUpdateAppAdminRequest,
   AccountHotelMasterPasswordResetAppAdminRequest,
   AccountHotelMasterUpdateAppAdminRequest,
   AccountLoginAppAdminRequest,
+  ApiResponseAccountAdminDetailAppAdminResponse,
   ApiResponseAccountAppAdminResponse,
   ApiResponseAccountHotelMasterAppAdminResponse,
+  ApiResponsePageResponseAccountAdminAppAdminResponse,
   EmptyApiResponse,
-  ErrorApiResponse
+  ErrorApiResponse,
+  GetAdminsParams
 } from '../schemas';
 
 import { http } from '../../http.ts';
@@ -289,6 +294,168 @@ export const useResetHotelMasterPassword = <TError = ErrorType<ErrorApiResponse>
       return useMutation(getResetHotelMasterPasswordMutationOptions(options), queryClient);
     }
     /**
+ * 전체 어드민 계정 하나를 조회합니다. 비밀번호는 주지 않습니다. 이름 수정 요청에 보낼 version이 함께 옵니다. 없는 계정이면 404 APP_ADMIN_NOT_FOUND로 응답합니다.
+ * @summary 전체 어드민 계정 상세 조회
+ */
+export const getAdmin = (
+    adminId: number,
+ options?: SecondParameter<typeof http>,signal?: AbortSignal
+) => {
+
+
+      return http<ApiResponseAccountAdminDetailAppAdminResponse>(
+      {url: `/api/v1/app-admin/admins/${adminId}`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetAdminQueryKey = (adminId: number,) => {
+    return [
+    `/api/v1/app-admin/admins/${adminId}`
+    ] as const;
+    }
+
+
+export const getGetAdminQueryOptions = <TData = Awaited<ReturnType<typeof getAdmin>>, TError = ErrorType<ErrorApiResponse>>(adminId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdmin>>, TError, TData>>, request?: SecondParameter<typeof http>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminQueryKey(adminId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdmin>>> = ({ signal }) => getAdmin(adminId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: adminId !== null && adminId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdmin>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminQueryResult = NonNullable<Awaited<ReturnType<typeof getAdmin>>>
+export type GetAdminQueryError = ErrorType<ErrorApiResponse>
+
+
+export function useGetAdmin<TData = Awaited<ReturnType<typeof getAdmin>>, TError = ErrorType<ErrorApiResponse>>(
+ adminId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdmin>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdmin>>,
+          TError,
+          Awaited<ReturnType<typeof getAdmin>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdmin<TData = Awaited<ReturnType<typeof getAdmin>>, TError = ErrorType<ErrorApiResponse>>(
+ adminId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdmin>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdmin>>,
+          TError,
+          Awaited<ReturnType<typeof getAdmin>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdmin<TData = Awaited<ReturnType<typeof getAdmin>>, TError = ErrorType<ErrorApiResponse>>(
+ adminId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdmin>>, TError, TData>>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 전체 어드민 계정 상세 조회
+ */
+
+export function useGetAdmin<TData = Awaited<ReturnType<typeof getAdmin>>, TError = ErrorType<ErrorApiResponse>>(
+ adminId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdmin>>, TError, TData>>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminQueryOptions(adminId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 전체 어드민 계정의 이름을 요청 값으로 바꿉니다. 아이디와 비밀번호는 바꿀 수 없습니다. 이름은 앞뒤 공백을 지운 뒤 검사하고 저장합니다. 조회할 때 받은 version을 함께 보냅니다. 그사이 다른 사용자가 먼저 수정해 version이 다르면 409 APP_ADMIN_MODIFIED로 응답하므로, 다시 조회한 뒤 수정합니다. 동시에 같은 version으로 수정하면 하나만 반영되고 나머지는 409 APP_ADMIN_MODIFIED입니다. 이름을 바꿔도 그 어드민이 로그인해 둔 세션은 유지되고, 내 정보 조회는 바뀐 이름을 돌려줍니다. 성공하면 수정한 계정을 최신 version과 함께 돌려주며, 바뀐 값이 없으면 version도 그대로입니다. 없는 계정이면 404 APP_ADMIN_NOT_FOUND로 응답합니다.
+ * @summary 전체 어드민 계정 이름 수정
+ */
+export const updateAdmin = (
+    adminId: number,
+    accountAdminUpdateAppAdminRequest: BodyType<AccountAdminUpdateAppAdminRequest>,
+ options?: SecondParameter<typeof http>,signal?: AbortSignal
+) => {
+
+
+      return http<ApiResponseAccountAdminDetailAppAdminResponse>(
+      {url: `/api/v1/app-admin/admins/${adminId}`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: accountAdminUpdateAppAdminRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getUpdateAdminMutationKey = () => ['updateAdmin'] as const;
+
+export const getUpdateAdminMutationOptions = <TError = ErrorType<ErrorApiResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdmin>>, TError,UpdateAdminMutationVariables, TContext>, request?: SecondParameter<typeof http>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdmin>>, TError,UpdateAdminMutationVariables, TContext> => {
+
+const mutationKey = getUpdateAdminMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdmin>>, UpdateAdminMutationVariables> = (props) => {
+          const {adminId,data} = props ?? {};
+
+          return  updateAdmin(adminId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdmin>>>
+    export type UpdateAdminMutationBody = BodyType<AccountAdminUpdateAppAdminRequest>
+    export type UpdateAdminMutationError = ErrorType<ErrorApiResponse>
+    export type UpdateAdminMutationVariables = {adminId: number;data: BodyType<AccountAdminUpdateAppAdminRequest>}
+
+    /**
+ * @summary 전체 어드민 계정 이름 수정
+ */
+export const useUpdateAdmin = <TError = ErrorType<ErrorApiResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdmin>>, TError,UpdateAdminMutationVariables, TContext>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdmin>>,
+        TError,
+        UpdateAdminMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateAdminMutationOptions(options), queryClient);
+    }
+    /**
  * 세션을 끝내고 세션 쿠키와 XSRF-TOKEN 쿠키를 지웁니다. data는 항상 null입니다. 다음 로그인 전에는 어드민 API 응답(예: 내 정보 조회의 401)에서 새 XSRF-TOKEN 쿠키를 받습니다.
  * @summary 로그아웃
  */
@@ -421,6 +588,168 @@ export const useLogin = <TError = ErrorType<ErrorApiResponse>,
         TContext
       > => {
       return useMutation(getLoginMutationOptions(options), queryClient);
+    }
+    /**
+ * 전체 어드민 계정 목록을 최근 추가 순(id 내림차순)으로 페이지로 나눠 조회합니다. 비밀번호와 version은 주지 않고, 검색은 없습니다. page는 0~99(기본 0), size는 1~100(기본 10)입니다. 범위를 벗어나면 400 INVALID_INPUT으로 응답하고 fieldErrors에 파라미터 이름을 담습니다.
+ * @summary 전체 어드민 계정 목록 조회
+ */
+export const getAdmins = (
+    params?: GetAdminsParams,
+ options?: SecondParameter<typeof http>,signal?: AbortSignal
+) => {
+
+
+      return http<ApiResponsePageResponseAccountAdminAppAdminResponse>(
+      {url: `/api/v1/app-admin/admins`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetAdminsQueryKey = (params?: GetAdminsParams,) => {
+    return [
+    `/api/v1/app-admin/admins`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAdminsQueryOptions = <TData = Awaited<ReturnType<typeof getAdmins>>, TError = ErrorType<ErrorApiResponse>>(params?: GetAdminsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdmins>>, TError, TData>>, request?: SecondParameter<typeof http>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdmins>>> = ({ signal }) => getAdmins(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdmins>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdmins>>>
+export type GetAdminsQueryError = ErrorType<ErrorApiResponse>
+
+
+export function useGetAdmins<TData = Awaited<ReturnType<typeof getAdmins>>, TError = ErrorType<ErrorApiResponse>>(
+ params: undefined |  GetAdminsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdmins>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdmins>>,
+          TError,
+          Awaited<ReturnType<typeof getAdmins>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdmins<TData = Awaited<ReturnType<typeof getAdmins>>, TError = ErrorType<ErrorApiResponse>>(
+ params?: GetAdminsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdmins>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdmins>>,
+          TError,
+          Awaited<ReturnType<typeof getAdmins>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdmins<TData = Awaited<ReturnType<typeof getAdmins>>, TError = ErrorType<ErrorApiResponse>>(
+ params?: GetAdminsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdmins>>, TError, TData>>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 전체 어드민 계정 목록 조회
+ */
+
+export function useGetAdmins<TData = Awaited<ReturnType<typeof getAdmins>>, TError = ErrorType<ErrorApiResponse>>(
+ params?: GetAdminsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdmins>>, TError, TData>>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 다른 전체 어드민 계정을 추가합니다. 아이디와 이름은 앞뒤 공백을 지운 뒤 검사하고 저장하며, 최대 길이도 지운 값으로 셉니다. 공백만 있는 값은 빈 값으로 봅니다. 비밀번호는 입력한 그대로 검사하고 저장합니다. 추가한 계정은 version이 0이고 바로 전체 어드민 앱에 로그인할 수 있습니다. 아이디를 다른 전체 어드민 계정이 이미 쓰고 있으면(대소문자와 앞뒤 공백은 구분하지 않음) 409 LOGIN_ID_DUPLICATED로 응답합니다. 호텔 계정과는 같은 아이디여도 됩니다. 같은 아이디로 동시에 여러 번 추가해도 하나만 추가되고 나머지는 409 LOGIN_ID_DUPLICATED입니다. 응답은 추가한 계정입니다.
+ * @summary 전체 어드민 계정 추가
+ */
+export const createAdmin = (
+    accountAdminCreateAppAdminRequest: BodyType<AccountAdminCreateAppAdminRequest>,
+ options?: SecondParameter<typeof http>,signal?: AbortSignal
+) => {
+
+
+      return http<ApiResponseAccountAdminDetailAppAdminResponse>(
+      {url: `/api/v1/app-admin/admins`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: accountAdminCreateAppAdminRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getCreateAdminMutationKey = () => ['createAdmin'] as const;
+
+export const getCreateAdminMutationOptions = <TError = ErrorType<ErrorApiResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdmin>>, TError,CreateAdminMutationVariables, TContext>, request?: SecondParameter<typeof http>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAdmin>>, TError,CreateAdminMutationVariables, TContext> => {
+
+const mutationKey = getCreateAdminMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAdmin>>, CreateAdminMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createAdmin(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAdminMutationResult = NonNullable<Awaited<ReturnType<typeof createAdmin>>>
+    export type CreateAdminMutationBody = BodyType<AccountAdminCreateAppAdminRequest>
+    export type CreateAdminMutationError = ErrorType<ErrorApiResponse>
+    export type CreateAdminMutationVariables = {data: BodyType<AccountAdminCreateAppAdminRequest>}
+
+    /**
+ * @summary 전체 어드민 계정 추가
+ */
+export const useCreateAdmin = <TError = ErrorType<ErrorApiResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdmin>>, TError,CreateAdminMutationVariables, TContext>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createAdmin>>,
+        TError,
+        CreateAdminMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateAdminMutationOptions(options), queryClient);
     }
     /**
  * 로그인한 전체 어드민의 정보를 조회합니다. 로그인 상태 확인에 씁니다. 로그인하지 않았으면 401 UNAUTHORIZED와 함께 XSRF-TOKEN 쿠키를 발급합니다.

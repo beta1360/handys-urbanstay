@@ -6,6 +6,26 @@ export {
   meQueryKey,
 } from "./account";
 export type { Account, LoginAccountBody } from "./account";
+export {
+  adminListParamsSchema,
+  adminListQueryKey,
+  adminParamsSchema,
+  adminQueryKey,
+  createAdmin,
+  createAdminBodySchema,
+  fetchAdmin,
+  fetchAdmins,
+  updateAdmin,
+  updateAdminBodySchema,
+} from "./admin";
+export type {
+  Admin,
+  AdminListParams,
+  AdminPage,
+  AdminSummary,
+  CreateAdminBody,
+  UpdateAdminBody,
+} from "./admin";
 export { API_ERROR_CODES, getApiError } from "./api-error";
 export {
   createHotel,

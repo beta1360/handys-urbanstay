@@ -8,11 +8,15 @@
 import * as zod from 'zod';
 
 import {
+  AccountAdminCreateAppAdminRequest,
+  AccountAdminUpdateAppAdminRequest,
   AccountHotelMasterPasswordResetAppAdminRequest,
   AccountHotelMasterUpdateAppAdminRequest,
   AccountLoginAppAdminRequest,
+  ApiResponseAccountAdminDetailAppAdminResponse,
   ApiResponseAccountAppAdminResponse,
   ApiResponseAccountHotelMasterAppAdminResponse,
+  ApiResponsePageResponseAccountAdminAppAdminResponse,
   EmptyApiResponse
 } from '../schemas';
 
@@ -52,6 +56,28 @@ export const ResetHotelMasterPasswordBody = AccountHotelMasterPasswordResetAppAd
 export const ResetHotelMasterPasswordResponse = EmptyApiResponse
 
 /**
+ * 전체 어드민 계정 하나를 조회합니다. 비밀번호는 주지 않습니다. 이름 수정 요청에 보낼 version이 함께 옵니다. 없는 계정이면 404 APP_ADMIN_NOT_FOUND로 응답합니다.
+ * @summary 전체 어드민 계정 상세 조회
+ */
+export const GetAdminParams = zod.object({
+  "adminId": zod.int()
+})
+
+export const GetAdminResponse = ApiResponseAccountAdminDetailAppAdminResponse
+
+/**
+ * 전체 어드민 계정의 이름을 요청 값으로 바꿉니다. 아이디와 비밀번호는 바꿀 수 없습니다. 이름은 앞뒤 공백을 지운 뒤 검사하고 저장합니다. 조회할 때 받은 version을 함께 보냅니다. 그사이 다른 사용자가 먼저 수정해 version이 다르면 409 APP_ADMIN_MODIFIED로 응답하므로, 다시 조회한 뒤 수정합니다. 동시에 같은 version으로 수정하면 하나만 반영되고 나머지는 409 APP_ADMIN_MODIFIED입니다. 이름을 바꿔도 그 어드민이 로그인해 둔 세션은 유지되고, 내 정보 조회는 바뀐 이름을 돌려줍니다. 성공하면 수정한 계정을 최신 version과 함께 돌려주며, 바뀐 값이 없으면 version도 그대로입니다. 없는 계정이면 404 APP_ADMIN_NOT_FOUND로 응답합니다.
+ * @summary 전체 어드민 계정 이름 수정
+ */
+export const UpdateAdminParams = zod.object({
+  "adminId": zod.int()
+})
+
+export const UpdateAdminBody = AccountAdminUpdateAppAdminRequest
+
+export const UpdateAdminResponse = ApiResponseAccountAdminDetailAppAdminResponse
+
+/**
  * 세션을 끝내고 세션 쿠키와 XSRF-TOKEN 쿠키를 지웁니다. data는 항상 null입니다. 다음 로그인 전에는 어드민 API 응답(예: 내 정보 조회의 401)에서 새 XSRF-TOKEN 쿠키를 받습니다.
  * @summary 로그아웃
  */
@@ -64,6 +90,34 @@ export const LogoutResponse = EmptyApiResponse
 export const LoginBody = AccountLoginAppAdminRequest
 
 export const LoginResponse = ApiResponseAccountAppAdminResponse
+
+/**
+ * 전체 어드민 계정 목록을 최근 추가 순(id 내림차순)으로 페이지로 나눠 조회합니다. 비밀번호와 version은 주지 않고, 검색은 없습니다. page는 0~99(기본 0), size는 1~100(기본 10)입니다. 범위를 벗어나면 400 INVALID_INPUT으로 응답하고 fieldErrors에 파라미터 이름을 담습니다.
+ * @summary 전체 어드민 계정 목록 조회
+ */
+export const getAdminsQueryPageDefault = 0;
+export const getAdminsQueryPageMin = 0;
+export const getAdminsQueryPageMax = 99;
+
+export const getAdminsQuerySizeDefault = 10;
+export const getAdminsQuerySizeMax = 100;
+
+
+
+export const GetAdminsQueryParams = zod.object({
+  "page": zod.int().min(getAdminsQueryPageMin).max(getAdminsQueryPageMax).default(getAdminsQueryPageDefault).describe('페이지 번호. 0~99, 기본 0'),
+  "size": zod.int().min(1).max(getAdminsQuerySizeMax).default(getAdminsQuerySizeDefault).describe('페이지 크기. 1~100, 기본 10')
+})
+
+export const GetAdminsResponse = ApiResponsePageResponseAccountAdminAppAdminResponse
+
+/**
+ * 다른 전체 어드민 계정을 추가합니다. 아이디와 이름은 앞뒤 공백을 지운 뒤 검사하고 저장하며, 최대 길이도 지운 값으로 셉니다. 공백만 있는 값은 빈 값으로 봅니다. 비밀번호는 입력한 그대로 검사하고 저장합니다. 추가한 계정은 version이 0이고 바로 전체 어드민 앱에 로그인할 수 있습니다. 아이디를 다른 전체 어드민 계정이 이미 쓰고 있으면(대소문자와 앞뒤 공백은 구분하지 않음) 409 LOGIN_ID_DUPLICATED로 응답합니다. 호텔 계정과는 같은 아이디여도 됩니다. 같은 아이디로 동시에 여러 번 추가해도 하나만 추가되고 나머지는 409 LOGIN_ID_DUPLICATED입니다. 응답은 추가한 계정입니다.
+ * @summary 전체 어드민 계정 추가
+ */
+export const CreateAdminBody = AccountAdminCreateAppAdminRequest
+
+export const CreateAdminResponse = ApiResponseAccountAdminDetailAppAdminResponse
 
 /**
  * 로그인한 전체 어드민의 정보를 조회합니다. 로그인 상태 확인에 씁니다. 로그인하지 않았으면 401 UNAUTHORIZED와 함께 XSRF-TOKEN 쿠키를 발급합니다.
