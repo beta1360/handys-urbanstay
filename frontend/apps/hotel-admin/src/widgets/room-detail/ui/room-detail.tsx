@@ -5,7 +5,9 @@ import {
   RoomNotFound,
   useRoom,
 } from "@/entities/room";
+import { RoomStatusChange } from "@/features/room-status-change";
 import { RoomDetailActions } from "./room-detail-actions";
+import { RoomStatusHistory } from "./room-status-history";
 
 type RoomDetailProps = {
   roomId: number;
@@ -36,6 +38,8 @@ export function RoomDetail({ roomId }: RoomDetailProps) {
         <>
           <RoomDetailActions editRoomId={state.room.id} />
           <RoomInformation room={state.room} />
+          <RoomStatusChange room={state.room} />
+          <RoomStatusHistory key={state.room.id} roomId={state.room.id} />
         </>
       );
   }

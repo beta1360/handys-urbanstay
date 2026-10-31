@@ -1,6 +1,11 @@
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
-import { fetchRoom, roomListQueryKey, roomQueryKey } from "@/shared/api";
+import {
+  fetchRoom,
+  roomListQueryKey,
+  roomQueryKey,
+  roomStatusHistoriesQueryKey,
+} from "@/shared/api";
 import type { Room } from "@/shared/api";
 
 function roomQueryOptions(roomId: number) {
@@ -28,4 +33,19 @@ export function useRefetchRoom(roomId: number) {
 export function cacheSavedRoom(queryClient: QueryClient, room: Room) {
   void queryClient.invalidateQueries({ queryKey: roomListQueryKey() });
   queryClient.setQueryData(roomQueryOptions(room.id).queryKey, room);
+}
+
+export async function refreshRoomStatus(
+  queryClient: QueryClient,
+  roomId: number,
+) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: roomListQueryKey() }),
+    queryClient.invalidateQueries({
+      queryKey: roomQueryOptions(roomId).queryKey,
+    }),
+    queryClient.invalidateQueries({
+      queryKey: roomStatusHistoriesQueryKey(roomId),
+    }),
+  ]);
 }

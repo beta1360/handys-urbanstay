@@ -9,17 +9,21 @@ import {
   createRoom,
   fetchRoom,
   fetchRooms,
+  fetchRoomStatusHistories,
   roomListQueryKey,
   roomQueryKey,
   updateRoom,
+  updateRoomStatus,
 } from "./room";
 
 vi.mock("./generated", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./generated")>()),
   getRooms: vi.fn(),
   getRoom: vi.fn(),
+  getRoomStatusHistories: vi.fn(),
   createRoom: vi.fn(),
   updateRoom: vi.fn(),
+  updateRoomStatus: vi.fn(),
 }));
 
 const ROOM_ID = 1;
@@ -50,6 +54,8 @@ const CREATE_MESSAGE = "객실을 등록했습니다.";
 
 const UPDATE_MESSAGE = "객실 정보를 수정했습니다.";
 
+const STATUS_MESSAGE = "객실 상태를 바꿨습니다.";
+
 const ROOM_PAGE = {
   items: [ROOM],
   page: 0,
@@ -79,6 +85,31 @@ const CREATE_BODY = {
 
 const UPDATE_BODY = { ...CREATE_BODY, version: ROOM.version };
 
+const STATUS_BODY = { from: "VACANT", to: "RESERVED" } as const;
+
+const STATUS_HISTORY_PAGE = {
+  items: [
+    {
+      id: 1,
+      fromStatus: null,
+      toStatus: "VACANT",
+      changedBy: { id: 2, name: "홍길동" },
+      changedAt: "2026-10-30T06:59:32.123456Z",
+    },
+  ],
+  page: 0,
+  size: 10,
+  totalElements: 1,
+  totalPages: 1,
+};
+
+const STATUS_HISTORY_PAGE_RESPONSE = {
+  success: true,
+  data: STATUS_HISTORY_PAGE,
+  message: null,
+  error: null,
+};
+
 const ROOM_CHANGE_OPERATIONS = [
   {
     name: "createRoom",
@@ -95,6 +126,16 @@ const ROOM_CHANGE_OPERATIONS = [
       vi.mocked(generated.updateRoom).mockResolvedValue(response as never),
     run: () => updateRoom(ROOM_ID, UPDATE_BODY),
     toResult: (room: unknown) => ({ data: room, message: UPDATE_MESSAGE }),
+  },
+  {
+    name: "updateRoomStatus",
+    response: { ...ROOM_RESPONSE, message: STATUS_MESSAGE },
+    mockResponse: (response: unknown) =>
+      vi
+        .mocked(generated.updateRoomStatus)
+        .mockResolvedValue(response as never),
+    run: () => updateRoomStatus(ROOM_ID, STATUS_BODY),
+    toResult: (room: unknown) => ({ data: room, message: STATUS_MESSAGE }),
   },
 ];
 
@@ -156,6 +197,56 @@ describe("fetchRooms", () => {
   });
 });
 
+describe("fetchRoomStatusHistories", () => {
+  it("객실 ID·페이지와 signal을 넘겨 상태 이력 페이지를 돌려준다", async () => {
+    vi.mocked(generated.getRoomStatusHistories).mockResolvedValue(
+      STATUS_HISTORY_PAGE_RESPONSE as never,
+    );
+    const { signal } = new AbortController();
+
+    await expect(
+      fetchRoomStatusHistories(ROOM_ID, { page: 1 }, { signal }),
+    ).resolves.toEqual(STATUS_HISTORY_PAGE);
+    expect(generated.getRoomStatusHistories).toHaveBeenCalledWith(
+      ROOM_ID,
+      { page: 1, size: 10 },
+      undefined,
+      signal,
+    );
+  });
+
+  it("page가 범위를 넘으면 요청을 보내지 않고 요청 검증 오류를 던진다", async () => {
+    await expect(
+      fetchRoomStatusHistories(ROOM_ID, { page: 100 }),
+    ).rejects.toBeInstanceOf(RequestValidationError);
+    expect(generated.getRoomStatusHistories).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["success가 false", { success: false }],
+    [
+      "바꾼 시각이 ISO 8601 형식이 아님",
+      {
+        data: {
+          ...STATUS_HISTORY_PAGE,
+          items: [
+            { ...STATUS_HISTORY_PAGE.items[0], changedAt: "2026-10-30 15:59" },
+          ],
+        },
+      },
+    ],
+  ])("성공 응답의 %s면 응답 검증 오류를 던진다", async (_, override) => {
+    vi.mocked(generated.getRoomStatusHistories).mockResolvedValue({
+      ...STATUS_HISTORY_PAGE_RESPONSE,
+      ...override,
+    } as never);
+
+    await expect(
+      fetchRoomStatusHistories(ROOM_ID, { page: 0 }),
+    ).rejects.toBeInstanceOf(ResponseValidationError);
+  });
+});
+
 describe("roomListQueryKey", () => {
   it("파라미터 없이 만들면 모든 목록 쿼리를 가리키고 상세 쿼리는 가리키지 않는다", async () => {
     const queryClient = new QueryClient();
@@ -195,6 +286,33 @@ describe("updateRoom", () => {
       updateRoom(ROOM_ID, { ...UPDATE_BODY, checkInTime: "15:00:00" }),
     ).rejects.toBeInstanceOf(RequestValidationError);
     expect(generated.updateRoom).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateRoomStatus", () => {
+  it("객실 ID와 화면에서 본 상태·바꿀 상태를 보내고 바뀐 객실과 성공 문구를 돌려준다", async () => {
+    const changedRoom = { ...ROOM, status: STATUS_BODY.to };
+    vi.mocked(generated.updateRoomStatus).mockResolvedValue({
+      ...ROOM_RESPONSE,
+      data: changedRoom,
+      message: STATUS_MESSAGE,
+    });
+
+    await expect(updateRoomStatus(ROOM_ID, STATUS_BODY)).resolves.toEqual({
+      data: changedRoom,
+      message: STATUS_MESSAGE,
+    });
+    expect(generated.updateRoomStatus).toHaveBeenCalledWith(
+      ROOM_ID,
+      STATUS_BODY,
+    );
+  });
+
+  it("바꿀 상태가 정해진 값이 아니면 요청을 보내지 않고 요청 검증 오류를 던진다", async () => {
+    await expect(
+      updateRoomStatus(ROOM_ID, { ...STATUS_BODY, to: "vacant" } as never),
+    ).rejects.toBeInstanceOf(RequestValidationError);
+    expect(generated.updateRoomStatus).not.toHaveBeenCalled();
   });
 });
 

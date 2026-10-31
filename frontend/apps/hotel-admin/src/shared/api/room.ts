@@ -7,13 +7,21 @@ import {
   GetRoomResponse,
   GetRoomsQueryParams,
   GetRoomsResponse,
+  GetRoomStatusHistoriesParams,
+  GetRoomStatusHistoriesQueryParams,
+  GetRoomStatusHistoriesResponse,
   UpdateRoomParams,
   UpdateRoomResponse,
+  UpdateRoomStatusParams,
+  UpdateRoomStatusResponse,
 } from "./generated/zod";
 import {
   PageResponseRoomHotelAdminResponse,
+  PageResponseRoomStatusHistoryHotelAdminResponse,
   RoomCreateHotelAdminRequest,
   RoomHotelAdminResponse,
+  RoomStatusHistoryHotelAdminResponse,
+  RoomStatusUpdateHotelAdminRequest,
   RoomUpdateHotelAdminRequest,
 } from "./generated/zod/schemas";
 
@@ -25,9 +33,15 @@ export const roomListParamsSchema = GetRoomsQueryParams;
 
 export const roomParamsSchema = GetRoomParams;
 
+export const roomStatusHistoryParamsSchema = GetRoomStatusHistoriesQueryParams;
+
 export type CreateRoomBody = z.input<typeof RoomCreateHotelAdminRequest>;
 
 export type UpdateRoomBody = z.input<typeof RoomUpdateHotelAdminRequest>;
+
+export type UpdateRoomStatusBody = z.input<
+  typeof RoomStatusUpdateHotelAdminRequest
+>;
 
 export type Room = z.output<typeof RoomHotelAdminResponse>;
 
@@ -36,6 +50,18 @@ export type RoomStatus = Room["status"];
 export type RoomPage = z.output<typeof PageResponseRoomHotelAdminResponse>;
 
 export type RoomListParams = z.input<typeof GetRoomsQueryParams>;
+
+export type RoomStatusHistory = z.output<
+  typeof RoomStatusHistoryHotelAdminResponse
+>;
+
+export type RoomStatusHistoryPage = z.output<
+  typeof PageResponseRoomStatusHistoryHotelAdminResponse
+>;
+
+export type RoomStatusHistoryParams = z.input<
+  typeof GetRoomStatusHistoriesQueryParams
+>;
 
 const ROOM_SUCCESS_SHAPE = {
   success: z.literal(true),
@@ -48,6 +74,12 @@ const GetRoomsSuccessResponse = GetRoomsResponse.extend({
 });
 
 const GetRoomSuccessResponse = GetRoomResponse.extend(ROOM_SUCCESS_SHAPE);
+
+const GetRoomStatusHistoriesSuccessResponse =
+  GetRoomStatusHistoriesResponse.extend({
+    success: z.literal(true),
+    data: PageResponseRoomStatusHistoryHotelAdminResponse,
+  });
 
 const ROOM_CHANGE_SUCCESS_SHAPE = {
   ...ROOM_SUCCESS_SHAPE,
@@ -62,6 +94,10 @@ const UpdateRoomSuccessResponse = UpdateRoomResponse.extend(
   ROOM_CHANGE_SUCCESS_SHAPE,
 );
 
+const UpdateRoomStatusSuccessResponse = UpdateRoomStatusResponse.extend(
+  ROOM_CHANGE_SUCCESS_SHAPE,
+);
+
 type RequestOptions = {
   signal?: AbortSignal;
 };
@@ -72,6 +108,13 @@ export function roomListQueryKey(params?: RoomListParams) {
 
 export function roomQueryKey(roomId: number) {
   return generated.getGetRoomQueryKey(roomId);
+}
+
+export function roomStatusHistoriesQueryKey(
+  roomId: number,
+  params?: RoomStatusHistoryParams,
+) {
+  return generated.getGetRoomStatusHistoriesQueryKey(roomId, params);
 }
 
 export async function fetchRooms(
@@ -94,6 +137,34 @@ export async function fetchRoom(
     signal,
   );
   return parseResponseBody("getRoom", GetRoomSuccessResponse, response).data;
+}
+
+export async function fetchRoomStatusHistories(
+  roomId: number,
+  params: RoomStatusHistoryParams,
+  { signal }: RequestOptions = {},
+) {
+  const validPath = parseRequest(
+    "getRoomStatusHistories",
+    GetRoomStatusHistoriesParams,
+    { roomId },
+  );
+  const validParams = parseRequest(
+    "getRoomStatusHistories",
+    GetRoomStatusHistoriesQueryParams,
+    params,
+  );
+  const response = await generated.getRoomStatusHistories(
+    validPath.roomId,
+    validParams,
+    undefined,
+    signal,
+  );
+  return parseResponseBody(
+    "getRoomStatusHistories",
+    GetRoomStatusHistoriesSuccessResponse,
+    response,
+  ).data;
 }
 
 export async function createRoom(body: CreateRoomBody) {
@@ -122,6 +193,30 @@ export async function updateRoom(roomId: number, body: UpdateRoomBody) {
   const { data, message } = parseResponseBody(
     "updateRoom",
     UpdateRoomSuccessResponse,
+    response,
+  );
+  return { data, message };
+}
+
+export async function updateRoomStatus(
+  roomId: number,
+  body: UpdateRoomStatusBody,
+) {
+  const validParams = parseRequest("updateRoomStatus", UpdateRoomStatusParams, {
+    roomId,
+  });
+  const validBody = parseRequest(
+    "updateRoomStatus",
+    RoomStatusUpdateHotelAdminRequest,
+    body,
+  );
+  const response = await generated.updateRoomStatus(
+    validParams.roomId,
+    validBody,
+  );
+  const { data, message } = parseResponseBody(
+    "updateRoomStatus",
+    UpdateRoomStatusSuccessResponse,
     response,
   );
   return { data, message };

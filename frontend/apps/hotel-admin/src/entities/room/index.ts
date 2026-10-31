@@ -1,5 +1,10 @@
 export { useRoomListQuery } from "./api/room-list-query";
-export { cacheSavedRoom, useRefetchRoom } from "./api/room-query";
+export {
+  cacheSavedRoom,
+  refreshRoomStatus,
+  useRefetchRoom,
+} from "./api/room-query";
+export { useRoomStatusHistoryQuery } from "./api/room-status-history-query";
 export {
   ROOM_FIELD_LABELS,
   ROOM_INFO_MESSAGES,
@@ -16,10 +21,15 @@ export {
   getLastPage,
   isBeyondLastPage,
   isRequestablePage,
+  isRequestableStatusHistoryPage,
   ROOM_LIST_FIRST_PAGE,
   toApiPage,
 } from "./lib/room-page";
-export { normalizeRoomStatus, ROOM_STATUSES } from "./lib/room-status";
+export {
+  normalizeRoomStatus,
+  ROOM_STATUS_TRANSITIONS,
+  ROOM_STATUSES,
+} from "./lib/room-status";
 export {
   createRoomInfoFormShape,
   ROOM_INFO_FIELDS,

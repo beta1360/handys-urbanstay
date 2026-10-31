@@ -31,12 +31,16 @@ export {
   createRoomBodySchema,
   fetchRoom,
   fetchRooms,
+  fetchRoomStatusHistories,
   roomListParamsSchema,
   roomListQueryKey,
   roomParamsSchema,
   roomQueryKey,
+  roomStatusHistoriesQueryKey,
+  roomStatusHistoryParamsSchema,
   updateRoom,
   updateRoomBodySchema,
+  updateRoomStatus,
 } from "./room";
 export type {
   CreateRoomBody,
@@ -44,5 +48,9 @@ export type {
   RoomListParams,
   RoomPage,
   RoomStatus,
+  RoomStatusHistory,
+  RoomStatusHistoryPage,
+  RoomStatusHistoryParams,
   UpdateRoomBody,
+  UpdateRoomStatusBody,
 } from "./room";

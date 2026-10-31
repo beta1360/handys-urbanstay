@@ -6,10 +6,11 @@ import {
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { showToast } from "@repo/admin-kit/toast";
 import {
   parseRoomPathParams,
   ROOM_FIELD_LABELS,
@@ -19,21 +20,41 @@ import {
   ROOM_STATUS_LABELS,
   stringifyRoomPathParams,
 } from "@/entities/room";
-import { API_ERROR_CODES } from "@/shared/api";
-import type { Room } from "@/shared/api";
+import { ROOM_STATUS_CHANGE_MESSAGES } from "@/features/room-status-change";
+import { API_ERROR_CODES, updateRoomStatus } from "@/shared/api";
+import type {
+  Room,
+  RoomStatus,
+  RoomStatusHistoryPage,
+  RoomStatusHistoryParams,
+} from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
+import { ROOM_STATUS_HISTORY_MESSAGES } from "@/widgets/room-detail";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { RoomDetailPage } from "./room-detail-page";
 
-const { fetchRoom } = vi.hoisted(() => ({ fetchRoom: vi.fn() }));
+const { fetchRoom, fetchRoomStatusHistories } = vi.hoisted(() => ({
+  fetchRoom: vi.fn(),
+  fetchRoomStatusHistories: vi.fn(),
+}));
 
 vi.mock("@/shared/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/api")>();
   return {
     ...actual,
+    updateRoomStatus: vi.fn(),
     fetchRoom: (roomId: number) => fetchRoom(roomId),
+    fetchRoomStatusHistories: (
+      roomId: number,
+      params: RoomStatusHistoryParams,
+    ) => fetchRoomStatusHistories(roomId, params),
   };
 });
+
+vi.mock("@repo/admin-kit/toast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@repo/admin-kit/toast")>()),
+  showToast: vi.fn(),
+}));
 
 const ROOM: Room = {
   id: 1,
@@ -48,19 +69,52 @@ const ROOM: Room = {
   version: 3,
 };
 
+const STATUS_HISTORY_PAGE: RoomStatusHistoryPage = {
+  items: [
+    {
+      id: 2,
+      fromStatus: "VACANT",
+      toStatus: "RESERVED",
+      changedBy: { id: 3, name: "김운영" },
+      changedAt: "2026-10-30T15:05:00Z",
+    },
+    {
+      id: 1,
+      fromStatus: null,
+      toStatus: "VACANT",
+      changedBy: { id: 2, name: "홍길동" },
+      changedAt: "2026-10-30T06:59:32.123456Z",
+    },
+  ],
+  page: 0,
+  size: 10,
+  totalElements: 2,
+  totalPages: 1,
+};
+
 const EDIT_PAGE_TEXT = "객실 수정 화면";
+
+const STATUS_MESSAGE = "객실 상태를 바꿨습니다.";
+
+type StatusChangeResult = Awaited<ReturnType<typeof updateRoomStatus>>;
+
+const STATUS_CONFLICT_MESSAGE = "다른 사용자가 먼저 상태를 바꿨습니다.";
 
 function roomPath(roomId: number | string) {
   return `/rooms/${roomId}`;
 }
 
-function createApiError(status: number, code: string) {
+function createApiError(
+  status: number,
+  code: string,
+  message = "요청을 처리하지 못했습니다.",
+) {
   const config = { headers: new AxiosHeaders() };
   const data = {
     success: false,
     data: null,
     message: null,
-    error: { code, message: "요청을 처리하지 못했습니다.", fieldErrors: [] },
+    error: { code, message, fieldErrors: [] },
   };
   return new AxiosError(
     "Request failed",
@@ -128,6 +182,12 @@ function getDescriptionTexts() {
     .map((definition) => definition.textContent);
 }
 
+function getStatusButtons() {
+  return within(
+    screen.getByRole("group", { name: ROOM_STATUS_CHANGE_MESSAGES.title }),
+  ).getAllByRole("button");
+}
+
 function getBackLink() {
   return screen.getByRole("link", { name: COMMON_MESSAGES.backToList });
 }
@@ -144,6 +204,7 @@ async function expectNotFound() {
 
 beforeEach(() => {
   fetchRoom.mockResolvedValue(ROOM);
+  fetchRoomStatusHistories.mockResolvedValue(STATUS_HISTORY_PAGE);
 });
 
 afterEach(() => {
@@ -288,6 +349,157 @@ describe("RoomDetailPage 찾을 수 없음", () => {
 
     await vi.waitFor(() => {
       expect(router.state.location.href).toBe("/rooms");
+    });
+  });
+});
+
+describe("RoomDetailPage 상태 바꾸기", () => {
+  it.each<[RoomStatus, RoomStatus[]]>([
+    ["VACANT", ["RESERVED", "MAINTENANCE"]],
+    ["RESERVED", ["OCCUPIED", "VACANT"]],
+    ["OCCUPIED", ["MAINTENANCE"]],
+    ["MAINTENANCE", ["VACANT"]],
+  ])(
+    "지금 상태가 %s면 갈 수 있는 상태만 버튼으로 보여준다",
+    async (status, nextStatuses) => {
+      fetchRoom.mockResolvedValue({ ...ROOM, status });
+      renderRoomDetailPage();
+
+      expect(
+        await screen.findByRole("group", {
+          name: ROOM_STATUS_CHANGE_MESSAGES.title,
+        }),
+      ).toBeInTheDocument();
+      expect(getStatusButtons().map((button) => button.textContent)).toEqual(
+        nextStatuses.map((nextStatus) => ROOM_STATUS_LABELS[nextStatus]),
+      );
+    },
+  );
+
+  it("누르면 화면에서 본 상태와 바꿀 상태를 보내고 요청 중에는 버튼을 막는다. 성공하면 서버 문구를 토스트로 보여주고 객실을 다시 불러온다", async () => {
+    const changedRoom: Room = { ...ROOM, status: "OCCUPIED" };
+    let resolveChange: (result: StatusChangeResult) => void = () => {};
+    vi.mocked(updateRoomStatus).mockReturnValue(
+      new Promise((resolve) => {
+        resolveChange = resolve;
+      }),
+    );
+    fetchRoom.mockResolvedValueOnce(ROOM).mockResolvedValueOnce(changedRoom);
+    const { user } = renderRoomDetailPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: ROOM_STATUS_LABELS.OCCUPIED }),
+    );
+
+    expect(updateRoomStatus).toHaveBeenCalledExactlyOnceWith(ROOM.id, {
+      from: "RESERVED",
+      to: "OCCUPIED",
+    });
+    getStatusButtons().forEach((button) => expect(button).toBeDisabled());
+
+    resolveChange({ data: changedRoom, message: STATUS_MESSAGE });
+
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalledExactlyOnceWith({
+        type: "success",
+        message: STATUS_MESSAGE,
+      });
+    });
+    expect(fetchRoom).toHaveBeenCalledTimes(2);
+    expect(fetchRoomStatusHistories).toHaveBeenCalledTimes(2);
+    expect(getDescriptionTexts().at(-1)).toBe(ROOM_STATUS_LABELS.OCCUPIED);
+    expect(getStatusButtons().map((button) => button.textContent)).toEqual([
+      ROOM_STATUS_LABELS.MAINTENANCE,
+    ]);
+    expect(getStatusButtons()[0]).toBeEnabled();
+  });
+
+  it.each([
+    API_ERROR_CODES.roomStatusChanged,
+    API_ERROR_CODES.roomStatusTransitionNotAllowed,
+  ])(
+    "409 %s면 서버 문구를 오류 토스트로 보여주고 객실을 다시 불러온다",
+    async (code) => {
+      const latestRoom: Room = { ...ROOM, status: "OCCUPIED" };
+      vi.mocked(updateRoomStatus).mockRejectedValue(
+        createApiError(409, code, STATUS_CONFLICT_MESSAGE),
+      );
+      fetchRoom.mockResolvedValueOnce(ROOM).mockResolvedValueOnce(latestRoom);
+      const { user } = renderRoomDetailPage();
+
+      await user.click(
+        await screen.findByRole("button", { name: ROOM_STATUS_LABELS.VACANT }),
+      );
+
+      await vi.waitFor(() => {
+        expect(showToast).toHaveBeenCalledExactlyOnceWith({
+          type: "error",
+          message: STATUS_CONFLICT_MESSAGE,
+        });
+      });
+      expect(fetchRoom).toHaveBeenCalledTimes(2);
+      expect(fetchRoomStatusHistories).toHaveBeenCalledTimes(2);
+      expect(getDescriptionTexts().at(-1)).toBe(ROOM_STATUS_LABELS.OCCUPIED);
+      expect(getStatusButtons()[0]).toBeEnabled();
+    },
+  );
+});
+
+describe("RoomDetailPage 상태 이력", () => {
+  function getHistoryRows() {
+    return screen
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) =>
+        within(row)
+          .getAllByRole("cell")
+          .map((cell) => cell.textContent),
+      );
+  }
+
+  it("바꾼 시각(한국 시간), 이전 상태 → 바뀐 상태, 바꾼 사람을 최신순으로 보여주고 등록 이력의 이전 상태는 없음으로 보여준다", async () => {
+    renderRoomDetailPage();
+
+    expect(
+      await screen.findByRole("columnheader", {
+        name: ROOM_STATUS_HISTORY_MESSAGES.changedAt,
+      }),
+    ).toBeInTheDocument();
+    const { noFromStatus, statusArrow } = ROOM_STATUS_HISTORY_MESSAGES;
+    expect(getHistoryRows()).toEqual([
+      [
+        "2026-10-31 00:05",
+        `${ROOM_STATUS_LABELS.VACANT}${statusArrow}${ROOM_STATUS_LABELS.RESERVED}`,
+        "김운영",
+      ],
+      [
+        "2026-10-30 15:59",
+        `${noFromStatus}${statusArrow}${ROOM_STATUS_LABELS.VACANT}`,
+        "홍길동",
+      ],
+    ]);
+    expect(fetchRoomStatusHistories).toHaveBeenCalledExactlyOnceWith(ROOM.id, {
+      page: 0,
+    });
+  });
+
+  it("다음 버튼을 누르면 다음 페이지의 이력을 불러온다", async () => {
+    fetchRoomStatusHistories.mockResolvedValue({
+      ...STATUS_HISTORY_PAGE,
+      totalElements: 12,
+      totalPages: 2,
+    });
+    const { user } = renderRoomDetailPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: COMMON_MESSAGES.nextPage }),
+    );
+
+    expect(
+      await screen.findByText(COMMON_MESSAGES.pageStatus(2, 2)),
+    ).toBeInTheDocument();
+    expect(fetchRoomStatusHistories).toHaveBeenLastCalledWith(ROOM.id, {
+      page: 1,
     });
   });
 });
