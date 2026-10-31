@@ -115,6 +115,16 @@ class StayService(
 			throw if (e.violates(Stay.ROOM_PERIOD_EXCLUSION_CONSTRAINT)) BusinessException(StayErrorCode.STAY_PERIOD_OVERLAPPED) else e
 		}
 
+	@Transactional(readOnly = true)
+	fun getCurrentStays(roomIds: Collection<Long>): Map<Long, Stay> {
+		if (roomIds.isEmpty()) {
+			return emptyMap()
+		}
+		val today = LocalDate.now(clock)
+		return stayRepository.findByRoomIdInAndCheckInDateLessThanEqualAndCheckOutDateAfterAndCanceledAtIsNull(roomIds, today, today)
+			.associateBy { checkNotNull(it.room.id) }
+	}
+
 	companion object {
 		private val LATEST_CHECK_IN_FIRST = Sort.by(Sort.Order.desc(Stay::checkInDate.name), Sort.Order.desc(Stay::id.name))
 		private val EARLIEST_CHECK_IN_FIRST = Sort.by(Sort.Order.asc(Stay::checkInDate.name), Sort.Order.asc(Stay::id.name))

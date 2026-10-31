@@ -37,4 +37,11 @@ interface StayRepository : JpaRepository<Stay, Long>, JpaSpecificationExecutor<S
 		""",
 	)
 	fun cancel(id: Long, canceledBy: HotelAdmin, canceledByName: String, cancelReason: String?, canceledAt: Instant): Int
+
+	@EntityGraph(attributePaths = [GUEST])
+	fun findByRoomIdInAndCheckInDateLessThanEqualAndCheckOutDateAfterAndCanceledAtIsNull(
+		roomIds: Collection<Long>,
+		checkInDate: LocalDate,
+		checkOutDate: LocalDate,
+	): List<Stay>
 }

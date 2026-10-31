@@ -3,6 +3,7 @@ package com.marco.assignment.handys.urbanstay.room.dto.hoteladmin
 import com.marco.assignment.handys.urbanstay.common.config.JacksonConfig
 import com.marco.assignment.handys.urbanstay.room.entity.Room
 import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
+import com.marco.assignment.handys.urbanstay.stay.entity.Stay
 import io.swagger.v3.oas.annotations.media.Schema
 import java.time.LocalTime
 
@@ -25,13 +26,15 @@ data class RoomHotelAdminResponse(
 	val checkOutTime: LocalTime,
 	@Schema(description = "openapi.schema.RoomHotelAdminResponse.status", example = "VACANT")
 	val status: RoomStatus,
+	@Schema(description = "openapi.schema.RoomHotelAdminResponse.currentStay")
+	val currentStay: RoomCurrentStayHotelAdminResponse?,
 	@Schema(description = "openapi.schema.RoomHotelAdminResponse.version", example = "0")
 	val version: Long,
 ) {
 
 	companion object {
 
-		fun from(room: Room): RoomHotelAdminResponse =
+		fun from(room: Room, currentStay: Stay?): RoomHotelAdminResponse =
 			RoomHotelAdminResponse(
 				id = checkNotNull(room.id),
 				name = room.name,
@@ -42,6 +45,7 @@ data class RoomHotelAdminResponse(
 				checkInTime = room.checkInTime,
 				checkOutTime = room.checkOutTime,
 				status = room.status,
+				currentStay = currentStay?.let(RoomCurrentStayHotelAdminResponse::from),
 				version = room.version,
 			)
 	}

@@ -1083,7 +1083,7 @@ class RoomHotelAdminControllerTest {
 		val properties = response["properties"]
 
 		assertThat(required(response))
-			.containsExactlyInAnyOrder("id", "name", "type", "capacity", "floor", "description", "checkInTime", "checkOutTime", "status", "version")
+			.containsExactlyInAnyOrder("id", "name", "type", "capacity", "floor", "description", "checkInTime", "checkOutTime", "status", "currentStay", "version")
 		assertThat(properties.properties().filter { (_, property) -> "null" in types(property) }.map { it.key })
 			.containsExactlyInAnyOrder("floor", "description")
 		listOf("checkInTime", "checkOutTime").forEach { field ->
@@ -1319,6 +1319,7 @@ class RoomHotelAdminControllerTest {
 					"checkInTime" to checkInTime,
 					"checkOutTime" to checkOutTime,
 					"status" to status.name,
+					"currentStay" to null,
 					"version" to version,
 				),
 			),
