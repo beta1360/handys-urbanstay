@@ -2,6 +2,9 @@
 .claude/settings.local.json
 CLAUDE.local.md
 
+# Turborepo local cache (when turbo runs from the repository root)
+.turbo/
+
 # Local environment values; keep placeholder examples shareable
 .env
 .env.*

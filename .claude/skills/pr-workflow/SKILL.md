@@ -25,7 +25,7 @@ git switch -c feature/backend/seed
 - 최대한 작은 단위로, 커밋 하나에 기능 하나.
 - 메시지는 제목 한 줄과 트레일러만 쓴다.
   - 제목: `prefix(part): 한글 제목`. 50자 내외로 짧게. 예: `feature(backend): 로컬 더미 데이터 자동 입력`
-  - 트레일러: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` 하나만
+  - 트레일러: Claude 트레일러 하나만(루트 `CLAUDE.md`). 지금은 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`이고, 쓰는 모델이 바뀌면 그 이름으로 쓴다(아래 예시도 같다).
 - 커밋 전에 사용자에게 묻는다(`CLAUDE.md` '브랜치 및 PR 규칙'). 사용자가 따로 맡기지 않았다면 매번 묻는다.
 
 ```bash
@@ -44,7 +44,7 @@ git commit -m "feature(backend): 로컬 더미 데이터 자동 입력" \
 ## 4. PR 제목과 본문
 
 - 제목: `prefix(part) - domain: title`. 예: `feature(backend) - seed: 로컬 더미 데이터 자동 입력`
-- 본문은 아래 순서다. 템플릿은 `CLAUDE.md`, 실제 예는 `gh pr view 109`(frontend)·`gh pr view 106`(backend).
+- 본문은 루트 `CLAUDE.md` 템플릿(개발 목적·해결한 것·논의하고 싶은 내용·의사결정을 내린 것)을 넓힌 아래 순서다. 템플릿의 H1 제목 줄은 `gh pr create --title`로 넣으므로 본문에는 쓰지 않는다. 실제 예는 `gh pr view 104`(frontend)·`gh pr view 106`(backend).
 
 ```markdown
 ## 개발 목적

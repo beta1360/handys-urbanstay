@@ -13,7 +13,7 @@ description: 백엔드(Spring Boot + Docker Compose PostgreSQL)와 세 프론트
 |---|---|
 | JDK | 25 (Gradle은 wrapper) |
 | Docker Desktop | 실행 중이어야 한다 |
-| Node.js | 24 |
+| Node.js | 24에서 확인(저장소에 고정한 버전은 없다) |
 | pnpm | 10.7.1 |
 
 ## 2. 백엔드 (`http://localhost:8080`)
