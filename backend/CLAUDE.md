@@ -495,3 +495,33 @@ urbanstay/
   - 테스트 컨테이너를 새로 만들려면 `docker rm -f $(docker ps -aq --filter label=org.testcontainers.hash --filter ancestor=postgres:18)`를 실행한다.
 - Gradle configuration cache가 켜져 있다(`gradle.properties`).
 - Swagger UI는 `http://localhost:8080/swagger-ui.html`, 문서는 `http://localhost:8080/v3/api-docs/app`, `http://localhost:8080/v3/api-docs/app-admin`, `http://localhost:8080/v3/api-docs/hotel-admin`이다.
+
+## 로컬 더미 데이터
+
+- 백엔드가 뜰 때(`seed/config/SeedConfig`의 `ApplicationRunner`) `urbanstay.seed.enabled`가 `true`이고 호텔이 하나도 없으면 화면마다 확인할 만큼의 더미 데이터를 한 트랜잭션으로 넣는다(`SeedService.seedIfEmpty`). 호텔이 하나라도 있으면 아무것도 하지 않고, 중간에 실패하면 아무것도 남지 않는다.
+  - `application.properties`는 `true`다. 테스트는 `src/test/resources/config/application.properties`가 `false`로 덮어쓴다(`classpath:/config/`가 나중에 읽혀 우선한다). 테스트 DB에 더미 데이터가 섞이지 않게 하기 위해서다.
+  - 호텔이 이미 있는 개발 DB에는 넣지 않는다. 처음부터 넣으려면 `docker compose down -v`로 데이터를 지운 뒤 `./gradlew bootRun`을 실행한다.
+- 서비스 규칙을 그대로 거친다: 호텔과 마스터(`HotelService.create`), 운영자(`HotelOperatorService.create`), 유형(`RoomTypeService.create`), 객실과 `(없음 → 공실)` 이력(`RoomService.create`, 등록한 계정은 마스터), 상태 변경과 이력(`RoomService.changeStatus`, 운영자A·운영자B·마스터가 번갈아), 회원(`MemberService.signup`, 비밀번호 해시), 회원과 연결된 이용객(`GuestService.getOrCreate`), 끝나지 않은 이용의 취소(`StayService.cancel`).
+- 서비스로 만들 수 없는 것만 저장소로 넣는다(다른 도메인의 Repository를 쓰지 않는 규칙의 예외).
+  - 지난 이용: 예약은 오늘 이후 체크인만 받으므로 `StayRepository.saveAndFlush(Stay(...))`로 넣는다. 금액은 엔티티가 그 유형의 1박 요금으로 계산하고, 인원은 유형의 최대 인원 이하이며, 같은 객실의 기간은 겹치지 않게 짰다(배제 제약이 막는다).
+  - 회원 없는 이용객: 예약은 회원만 하므로 `GuestRepository`로 넣는다. 전화번호는 호텔 안에서 회원과도 겹치지 않는다.
+  - 지난 이용의 취소: 취소는 끝나지 않은 이용만 받으므로 `StayRepository.cancel`로 체크인 3일 전 10시(Asia/Seoul)를 취소 시각으로 넣는다.
+- 날짜는 오늘(`Clock`) 기준 상대 날짜다(체크인 −40일 ~ +33일). 어느 날 띄워도 지난달·이번 달·다음 달에 체크인이 있다.
+- 넣는 데이터
+  - 호텔 3곳: 어반스테이 강남(객실 12), 홍대(10), 해운대(8). 호텔마다 마스터 1·운영자 2.
+  - 객실 유형(호텔마다 3개): 스탠다드(2명, 15:00/11:00), 디럭스(3명, 15:00/12:00), 스위트(4명, 14:00/12:00). 1박 요금은 강남 89,000/129,000/219,000원, 홍대 79,000/115,000/189,000원, 해운대 99,000/149,000/259,000원.
+  - 객실: 101~105 스탠다드, 201~205 디럭스, 301~302 스위트 중 호텔 객실 수만큼. 상태는 101·201 이용중(지금 이용), 102 정비중(오늘 체크아웃, 공실 → 예약됨 → 이용중 → 정비중), 103 예약됨(내일 체크인), 302 정비중(공실 → 정비중), 나머지 공실이다.
+  - 회원 10명. 회원마다 이용이 하나 이상 있고, member3 말고는 두 호텔 이상에 이용이 있다.
+  - 이용 40건: 호텔마다 12건과 취소 4건(강남 2(지난 이용 1·앞으로 1), 홍대 1(사유 없음), 해운대 1(지난 이용)). 스위트 2실이 모두 +5일~+8일에 예약돼 그 기간에는 스위트를 예약할 수 없다.
+  - 이용객: 회원과 연결된 이용객과 회원 없는 이용객(호텔마다 4명)이 섞인다.
+- 테스트 계정. 비밀번호는 모두 `Test1234!`(로컬 테스트 값, `SeedService.PASSWORD`)다.
+
+  | 구분 | 아이디 |
+  |---|---|
+  | 전체 어드민 | `urbanstay.initial-admin.*` 설정값(계정 절) |
+  | 강남 마스터 / 운영자 | `master1@urbanstay.test` / `operator1a@urbanstay.test`, `operator1b@urbanstay.test` |
+  | 홍대 마스터 / 운영자 | `master2@urbanstay.test` / `operator2a@urbanstay.test`, `operator2b@urbanstay.test` |
+  | 해운대 마스터 / 운영자 | `master3@urbanstay.test` / `operator3a@urbanstay.test`, `operator3b@urbanstay.test` |
+  | 회원 | `member1@urbanstay.test` ~ `member10@urbanstay.test` |
+
+- 테스트(`SeedServiceTest`): 테스트 트랜잭션 안에서 관련 테이블을 지우고, 켠 설정의 러너를 두 번 실행해 개수(호텔 3·호텔 계정 9·유형 9·객실 30·회원 10·이용 30~40·취소 3~5)가 늘지 않는지 보고 롤백한다. 객실 상태 네 가지, 지금 이용, 지난달~다음 달 체크인, 회원·비회원 이용객, 비밀번호 해시도 확인한다. 같은 객실의 겹침은 저장이 배제 제약을 통과한 것으로 확인한다. 테스트 설정의 러너가 아무것도 넣지 않는지도 확인한다.
