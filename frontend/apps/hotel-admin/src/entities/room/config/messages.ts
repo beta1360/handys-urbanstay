@@ -30,3 +30,12 @@ export const ROOM_LOAD_MESSAGES = {
 export const ROOM_NOT_FOUND_MESSAGES = {
   description: "객실을 찾을 수 없습니다.",
 } as const;
+
+export const ROOM_INFO_MESSAGES = {
+  legend: "객실 정보",
+  optional: "(선택)",
+  capacityHint: (min: number | null, max: number | null) =>
+    `${min}~${max}명`,
+  floorHint: (min: number | null, max: number | null) =>
+    `${min}~${max}. 지하는 음수`,
+} as const;

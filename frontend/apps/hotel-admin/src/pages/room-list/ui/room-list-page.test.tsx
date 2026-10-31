@@ -20,6 +20,7 @@ import type { Room, RoomPage } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { ROOM_LIST_CONTENT_MESSAGES } from "@/widgets/room-list";
+import { ROOM_LIST_MESSAGES } from "../config/messages";
 import {
   ROOM_LIST_DEFAULT_SEARCH,
   roomListSearchSchema,
@@ -108,6 +109,7 @@ function renderRoomListPage(initialPath = roomsPath()) {
     routeTree: rootRoute.addChildren([
       layoutRoute.addChildren([
         roomListRoute,
+        createRoute({ getParentRoute: () => layoutRoute, path: "rooms/new" }),
         createRoute({
           getParentRoute: () => layoutRoute,
           path: "rooms/$roomId",
@@ -195,6 +197,21 @@ describe("RoomListPage 목록", () => {
 
     await vi.waitFor(() => {
       expect(router.state.location.href).toBe(`/rooms/${ROOMS[0].id}`);
+    });
+  });
+
+  it("객실 등록 버튼을 누르면 객실 등록 화면으로 이동한다", async () => {
+    const { router, user } = renderRoomListPage();
+
+    const createLink = await screen.findByRole("link", {
+      name: ROOM_LIST_MESSAGES.create,
+    });
+    expect(createLink).toHaveAttribute("href", "/rooms/new");
+
+    await user.click(createLink);
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe("/rooms/new");
     });
   });
 
