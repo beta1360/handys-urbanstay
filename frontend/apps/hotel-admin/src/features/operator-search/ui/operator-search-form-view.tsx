@@ -12,7 +12,7 @@ import { COMMON_MESSAGES } from "@/shared/config";
 import { OPERATOR_SEARCH_FORM_MESSAGES } from "../config/messages";
 
 const ACTIVE_OPTIONS = [
-  { value: "", label: OPERATOR_SEARCH_FORM_MESSAGES.allActive },
+  { value: "", label: COMMON_MESSAGES.all },
   { value: String(true), label: OPERATOR_ACTIVE_LABELS.active },
   { value: String(false), label: OPERATOR_ACTIVE_LABELS.inactive },
 ];

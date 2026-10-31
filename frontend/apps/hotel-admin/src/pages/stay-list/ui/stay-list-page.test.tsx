@@ -240,13 +240,13 @@ describe("StayListPage 목록", () => {
 
     await screen.findByRole("option", { name: ROOMS[1].name });
     expect(getOptionTexts(getRoomSelect())).toEqual([
-      STAY_SEARCH_FORM_MESSAGES.all,
+      COMMON_MESSAGES.all,
       ROOMS[0].name,
       ROOMS[1].name,
     ]);
     expect(fetchRooms).toHaveBeenCalledExactlyOnceWith({ page: 0, size: 100 });
     expect(getOptionTexts(getCanceledSelect())).toEqual([
-      STAY_SEARCH_FORM_MESSAGES.all,
+      COMMON_MESSAGES.all,
       STAY_CANCELED_LABELS.false,
       STAY_CANCELED_LABELS.true,
     ]);

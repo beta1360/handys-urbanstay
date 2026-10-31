@@ -172,7 +172,7 @@ describe("OperatorListPage 검색과 사용 여부 거르기", () => {
         .getAllByRole("option")
         .map((option) => option.textContent),
     ).toEqual([
-      OPERATOR_SEARCH_FORM_MESSAGES.allActive,
+      COMMON_MESSAGES.all,
       OPERATOR_ACTIVE_LABELS.active,
       OPERATOR_ACTIVE_LABELS.inactive,
     ]);

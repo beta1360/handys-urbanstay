@@ -5,9 +5,8 @@ import type { SelectFieldOption } from "@repo/ui/select-field";
 import type { FormFieldProps } from "@repo/admin-kit/form";
 import { STAY_CANCELED_LABELS, STAY_FIELD_LABELS } from "@/entities/stay";
 import { COMMON_MESSAGES } from "@/shared/config";
-import { STAY_SEARCH_FORM_MESSAGES } from "../config/messages";
 
-const ALL_OPTION = { value: "", label: STAY_SEARCH_FORM_MESSAGES.all };
+const ALL_OPTION = { value: "", label: COMMON_MESSAGES.all };
 
 const CANCELED_OPTIONS = [
   ALL_OPTION,

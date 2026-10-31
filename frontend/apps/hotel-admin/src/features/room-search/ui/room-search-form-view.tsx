@@ -13,7 +13,7 @@ import { COMMON_MESSAGES } from "@/shared/config";
 import { ROOM_SEARCH_FORM_MESSAGES } from "../config/messages";
 
 const STATUS_OPTIONS = [
-  { value: "", label: ROOM_SEARCH_FORM_MESSAGES.allStatuses },
+  { value: "", label: COMMON_MESSAGES.all },
   ...ROOM_STATUSES.map((status) => ({
     value: status,
     label: ROOM_STATUS_LABELS[status],
