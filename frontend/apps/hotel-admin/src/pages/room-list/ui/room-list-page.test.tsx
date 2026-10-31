@@ -15,7 +15,10 @@ import {
   ROOM_INFORMATION_MESSAGES,
   ROOM_STATUS_LABELS,
 } from "@/entities/room";
-import { ROOM_TYPE_FIELD_LABELS } from "@/entities/room-type";
+import {
+  ROOM_TYPE_FIELD_LABELS,
+  ROOM_TYPE_OPTION_MESSAGES,
+} from "@/entities/room-type";
 import { ROOM_SEARCH_FORM_MESSAGES } from "@/features/room-search";
 import type { Room, RoomPage, RoomType } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
@@ -94,6 +97,8 @@ const ROOM_TYPES: RoomType[] = [
   { ...ROOMS[1].roomType, version: 0 },
   { ...ROOMS[0].roomType, version: 0 },
 ];
+
+const UNLISTED_ROOM_TYPE_ID = "99";
 
 function createRoomPage(overrides: Partial<RoomPage> = {}): RoomPage {
   return {
@@ -447,10 +452,15 @@ describe("RoomListPage 유형 거르기", () => {
   });
 
   it("URL의 유형으로 처음 조회하고 유형 선택에 보여준다", async () => {
-    renderRoomListPage(roomsPath({ roomTypeId: String(ROOM_TYPES[1].id) }));
+    const { router } = renderRoomListPage(
+      roomsPath({ roomTypeId: String(ROOM_TYPES[1].id) }),
+    );
 
     await screen.findByRole("option", { name: ROOM_TYPES[1].name });
     expect(getRoomTypeSelect()).toHaveValue(String(ROOM_TYPES[1].id));
+    expect(router.state.location.href).toBe(
+      roomsPath({ roomTypeId: String(ROOM_TYPES[1].id) }),
+    );
     expect(fetchRooms).toHaveBeenCalledExactlyOnceWith({
       roomTypeId: ROOM_TYPES[1].id,
       page: 0,
@@ -466,6 +476,40 @@ describe("RoomListPage 유형 거르기", () => {
     await screen.findByRole("table");
     expect(router.state.location.href).toBe(roomsPath());
     expect(fetchRooms).toHaveBeenCalledExactlyOnceWith({ page: 0 });
+  });
+
+  it("URL의 유형이 불러온 유형 목록에 없으면 방문 기록을 바꿔 URL에서 지우고 유형 없이 다시 조회한다", async () => {
+    const { router } = renderRoomListPage(
+      roomsPath({ status: "VACANT", roomTypeId: UNLISTED_ROOM_TYPE_ID }),
+    );
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe(roomsPath({ status: "VACANT" }));
+    });
+    expect(router.history.length).toBe(1);
+    expect(fetchRooms).toHaveBeenLastCalledWith({ status: "VACANT", page: 0 });
+    expect(getRoomTypeSelect()).toHaveValue("");
+  });
+
+  it("유형 목록을 불러오지 못하면 URL의 유형을 두고 유형 칸 아래에 불러오기 실패 문구를 보여준다", async () => {
+    fetchRoomTypes.mockRejectedValue(new Error("network"));
+    const { router } = renderRoomListPage(
+      roomsPath({ roomTypeId: UNLISTED_ROOM_TYPE_ID }),
+    );
+
+    expect(
+      await screen.findByText(ROOM_TYPE_OPTION_MESSAGES.loadFailed),
+    ).toBeInTheDocument();
+    expect(getRoomTypeSelect()).toHaveAccessibleDescription(
+      ROOM_TYPE_OPTION_MESSAGES.loadFailed,
+    );
+    expect(router.state.location.href).toBe(
+      roomsPath({ roomTypeId: UNLISTED_ROOM_TYPE_ID }),
+    );
+    expect(fetchRooms).toHaveBeenCalledExactlyOnceWith({
+      roomTypeId: Number(UNLISTED_ROOM_TYPE_ID),
+      page: 0,
+    });
   });
 });
 

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { FormEvent } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -34,9 +35,10 @@ export function useRoomSearchForm({
   roomTypeId,
 }: RoomSearchCriteria) {
   const navigate = useNavigate();
-  const { roomTypeOptions, roomTypeHint } = useRoomTypeOptions({
-    emptyLabel: COMMON_MESSAGES.all,
-  });
+  const { roomTypeOptions, roomTypeHint, isUnlistedRoomType } =
+    useRoomTypeOptions({ emptyLabel: COMMON_MESSAGES.all });
+  const isRoomTypeIdUnlisted =
+    roomTypeId !== undefined && isUnlistedRoomType(roomTypeId);
   const form = useForm({
     ...SUBMIT_ONLY_VALIDATION,
     resolver: zodResolver(roomSearchFormSchema),
@@ -51,6 +53,16 @@ export function useRoomSearchForm({
     control: form.control,
     name: "roomTypeId",
   });
+
+  useEffect(() => {
+    if (isRoomTypeIdUnlisted) {
+      void navigate({
+        to: "/rooms",
+        search: (previous) => ({ ...previous, roomTypeId: undefined }),
+        replace: true,
+      });
+    }
+  }, [isRoomTypeIdUnlisted, navigate]);
 
   const submit = form.handleSubmit((criteria) => {
     form.setValue("keyword", criteria.keyword ?? "");

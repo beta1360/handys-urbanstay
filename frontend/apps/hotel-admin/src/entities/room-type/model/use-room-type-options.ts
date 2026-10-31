@@ -36,5 +36,8 @@ export function useRoomTypeOptions({
         ? ROOM_TYPE_OPTION_MESSAGES.loadFailed
         : undefined,
     isRoomTypeEmpty: data !== undefined && data.length === 0,
+    isUnlistedRoomType: (roomTypeId: number) =>
+      data !== undefined &&
+      !data.some((roomType) => roomType.id === roomTypeId),
   };
 }
