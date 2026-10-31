@@ -41,7 +41,7 @@ class SeedService(
 
 	@Transactional
 	fun seedIfEmpty() {
-		if (!hotelService.getHotelsByName(0, 1).isEmpty) {
+		if (!hotelService.getHotels(null, 0, 1).isEmpty) {
 			return
 		}
 		val today = LocalDate.now(clock)
