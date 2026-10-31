@@ -201,7 +201,7 @@ app-admin과 같은 흐름이고, 경로만 다르다.
 
 - 게스트 앱(web)
   - 대부분의 API 호출은 서버 사이드에서 한다.
-  - 사용자 인터랙션에 따른 브라우저 호출은 Next rewrites로 `/api/v1/app/*`를 백엔드로 넘긴다.
+  - 사용자 인터랙션에 따른 브라우저 호출(예약, 로그인·로그아웃, 내 이용의 다음 페이지)과 로그인 상태 확인(`/auth/me`)은 브라우저에서 하고, Next rewrites로 `/api/v1/app/*`를 백엔드로 넘긴다.
 - 어드민 앱(app-admin, hotel-admin)
   - 브라우저에서 상대 경로로 호출하고, Vite 개발 서버의 proxy가 자기 앱의 API 경로만 백엔드로 넘긴다.
   - 쿠키는 포트로 나뉘지 않는다. 세션·CSRF 쿠키가 섞이지 않도록 앱마다 다른 호스트로 접속한다. app-admin은 `http://app-admin.localhost:5173`, hotel-admin은 `http://hotel-admin.localhost:5174`.
