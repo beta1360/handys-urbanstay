@@ -22,12 +22,21 @@ import {
 } from "@/entities/room";
 import { ROOM_STATUS_CHANGE_MESSAGES } from "@/features/room-status-change";
 import { API_ERROR_CODES, updateRoomStatus } from "@/shared/api";
-import type { Room, RoomStatus } from "@/shared/api";
+import type {
+  Room,
+  RoomStatus,
+  RoomStatusHistoryPage,
+  RoomStatusHistoryParams,
+} from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
+import { ROOM_STATUS_HISTORY_MESSAGES } from "@/widgets/room-detail";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { RoomDetailPage } from "./room-detail-page";
 
-const { fetchRoom } = vi.hoisted(() => ({ fetchRoom: vi.fn() }));
+const { fetchRoom, fetchRoomStatusHistories } = vi.hoisted(() => ({
+  fetchRoom: vi.fn(),
+  fetchRoomStatusHistories: vi.fn(),
+}));
 
 vi.mock("@/shared/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/api")>();
@@ -35,6 +44,10 @@ vi.mock("@/shared/api", async (importOriginal) => {
     ...actual,
     updateRoomStatus: vi.fn(),
     fetchRoom: (roomId: number) => fetchRoom(roomId),
+    fetchRoomStatusHistories: (
+      roomId: number,
+      params: RoomStatusHistoryParams,
+    ) => fetchRoomStatusHistories(roomId, params),
   };
 });
 
@@ -54,6 +67,29 @@ const ROOM: Room = {
   checkOutTime: "11:00",
   status: "RESERVED",
   version: 3,
+};
+
+const STATUS_HISTORY_PAGE: RoomStatusHistoryPage = {
+  items: [
+    {
+      id: 2,
+      fromStatus: "VACANT",
+      toStatus: "RESERVED",
+      changedBy: { id: 3, name: "김운영" },
+      changedAt: "2026-10-30T15:05:00Z",
+    },
+    {
+      id: 1,
+      fromStatus: null,
+      toStatus: "VACANT",
+      changedBy: { id: 2, name: "홍길동" },
+      changedAt: "2026-10-30T06:59:32.123456Z",
+    },
+  ],
+  page: 0,
+  size: 10,
+  totalElements: 2,
+  totalPages: 1,
 };
 
 const EDIT_PAGE_TEXT = "객실 수정 화면";
@@ -168,6 +204,7 @@ async function expectNotFound() {
 
 beforeEach(() => {
   fetchRoom.mockResolvedValue(ROOM);
+  fetchRoomStatusHistories.mockResolvedValue(STATUS_HISTORY_PAGE);
 });
 
 afterEach(() => {
@@ -369,6 +406,7 @@ describe("RoomDetailPage 상태 바꾸기", () => {
       });
     });
     expect(fetchRoom).toHaveBeenCalledTimes(2);
+    expect(fetchRoomStatusHistories).toHaveBeenCalledTimes(2);
     expect(getDescriptionTexts().at(-1)).toBe(ROOM_STATUS_LABELS.OCCUPIED);
     expect(getStatusButtons().map((button) => button.textContent)).toEqual([
       ROOM_STATUS_LABELS.MAINTENANCE,
@@ -400,8 +438,68 @@ describe("RoomDetailPage 상태 바꾸기", () => {
         });
       });
       expect(fetchRoom).toHaveBeenCalledTimes(2);
+      expect(fetchRoomStatusHistories).toHaveBeenCalledTimes(2);
       expect(getDescriptionTexts().at(-1)).toBe(ROOM_STATUS_LABELS.OCCUPIED);
       expect(getStatusButtons()[0]).toBeEnabled();
     },
   );
+});
+
+describe("RoomDetailPage 상태 이력", () => {
+  function getHistoryRows() {
+    return screen
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) =>
+        within(row)
+          .getAllByRole("cell")
+          .map((cell) => cell.textContent),
+      );
+  }
+
+  it("바꾼 시각(한국 시간), 이전 상태 → 바뀐 상태, 바꾼 사람을 최신순으로 보여주고 등록 이력의 이전 상태는 없음으로 보여준다", async () => {
+    renderRoomDetailPage();
+
+    expect(
+      await screen.findByRole("columnheader", {
+        name: ROOM_STATUS_HISTORY_MESSAGES.changedAt,
+      }),
+    ).toBeInTheDocument();
+    const { noFromStatus, statusArrow } = ROOM_STATUS_HISTORY_MESSAGES;
+    expect(getHistoryRows()).toEqual([
+      [
+        "2026-10-31 00:05",
+        `${ROOM_STATUS_LABELS.VACANT}${statusArrow}${ROOM_STATUS_LABELS.RESERVED}`,
+        "김운영",
+      ],
+      [
+        "2026-10-30 15:59",
+        `${noFromStatus}${statusArrow}${ROOM_STATUS_LABELS.VACANT}`,
+        "홍길동",
+      ],
+    ]);
+    expect(fetchRoomStatusHistories).toHaveBeenCalledExactlyOnceWith(ROOM.id, {
+      page: 0,
+    });
+  });
+
+  it("다음 버튼을 누르면 다음 페이지의 이력을 불러온다", async () => {
+    fetchRoomStatusHistories.mockResolvedValue({
+      ...STATUS_HISTORY_PAGE,
+      totalElements: 12,
+      totalPages: 2,
+    });
+    const { user } = renderRoomDetailPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: COMMON_MESSAGES.nextPage }),
+    );
+
+    expect(
+      await screen.findByText(COMMON_MESSAGES.pageStatus(2, 2)),
+    ).toBeInTheDocument();
+    expect(fetchRoomStatusHistories).toHaveBeenLastCalledWith(ROOM.id, {
+      page: 1,
+    });
+  });
 });

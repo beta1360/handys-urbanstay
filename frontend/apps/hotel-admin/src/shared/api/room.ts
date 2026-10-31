@@ -7,6 +7,9 @@ import {
   GetRoomResponse,
   GetRoomsQueryParams,
   GetRoomsResponse,
+  GetRoomStatusHistoriesParams,
+  GetRoomStatusHistoriesQueryParams,
+  GetRoomStatusHistoriesResponse,
   UpdateRoomParams,
   UpdateRoomResponse,
   UpdateRoomStatusParams,
@@ -14,8 +17,10 @@ import {
 } from "./generated/zod";
 import {
   PageResponseRoomHotelAdminResponse,
+  PageResponseRoomStatusHistoryHotelAdminResponse,
   RoomCreateHotelAdminRequest,
   RoomHotelAdminResponse,
+  RoomStatusHistoryHotelAdminResponse,
   RoomStatusUpdateHotelAdminRequest,
   RoomUpdateHotelAdminRequest,
 } from "./generated/zod/schemas";
@@ -27,6 +32,8 @@ export const updateRoomBodySchema = RoomUpdateHotelAdminRequest;
 export const roomListParamsSchema = GetRoomsQueryParams;
 
 export const roomParamsSchema = GetRoomParams;
+
+export const roomStatusHistoryParamsSchema = GetRoomStatusHistoriesQueryParams;
 
 export type CreateRoomBody = z.input<typeof RoomCreateHotelAdminRequest>;
 
@@ -44,6 +51,18 @@ export type RoomPage = z.output<typeof PageResponseRoomHotelAdminResponse>;
 
 export type RoomListParams = z.input<typeof GetRoomsQueryParams>;
 
+export type RoomStatusHistory = z.output<
+  typeof RoomStatusHistoryHotelAdminResponse
+>;
+
+export type RoomStatusHistoryPage = z.output<
+  typeof PageResponseRoomStatusHistoryHotelAdminResponse
+>;
+
+export type RoomStatusHistoryParams = z.input<
+  typeof GetRoomStatusHistoriesQueryParams
+>;
+
 const ROOM_SUCCESS_SHAPE = {
   success: z.literal(true),
   data: RoomHotelAdminResponse,
@@ -55,6 +74,12 @@ const GetRoomsSuccessResponse = GetRoomsResponse.extend({
 });
 
 const GetRoomSuccessResponse = GetRoomResponse.extend(ROOM_SUCCESS_SHAPE);
+
+const GetRoomStatusHistoriesSuccessResponse =
+  GetRoomStatusHistoriesResponse.extend({
+    success: z.literal(true),
+    data: PageResponseRoomStatusHistoryHotelAdminResponse,
+  });
 
 const ROOM_CHANGE_SUCCESS_SHAPE = {
   ...ROOM_SUCCESS_SHAPE,
@@ -85,6 +110,13 @@ export function roomQueryKey(roomId: number) {
   return generated.getGetRoomQueryKey(roomId);
 }
 
+export function roomStatusHistoriesQueryKey(
+  roomId: number,
+  params?: RoomStatusHistoryParams,
+) {
+  return generated.getGetRoomStatusHistoriesQueryKey(roomId, params);
+}
+
 export async function fetchRooms(
   params: RoomListParams,
   { signal }: RequestOptions = {},
@@ -105,6 +137,34 @@ export async function fetchRoom(
     signal,
   );
   return parseResponseBody("getRoom", GetRoomSuccessResponse, response).data;
+}
+
+export async function fetchRoomStatusHistories(
+  roomId: number,
+  params: RoomStatusHistoryParams,
+  { signal }: RequestOptions = {},
+) {
+  const validPath = parseRequest(
+    "getRoomStatusHistories",
+    GetRoomStatusHistoriesParams,
+    { roomId },
+  );
+  const validParams = parseRequest(
+    "getRoomStatusHistories",
+    GetRoomStatusHistoriesQueryParams,
+    params,
+  );
+  const response = await generated.getRoomStatusHistories(
+    validPath.roomId,
+    validParams,
+    undefined,
+    signal,
+  );
+  return parseResponseBody(
+    "getRoomStatusHistories",
+    GetRoomStatusHistoriesSuccessResponse,
+    response,
+  ).data;
 }
 
 export async function createRoom(body: CreateRoomBody) {

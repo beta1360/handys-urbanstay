@@ -1,4 +1,7 @@
-import { roomListParamsSchema } from "@/shared/api";
+import {
+  roomListParamsSchema,
+  roomStatusHistoryParamsSchema,
+} from "@/shared/api";
 import type { RoomPage } from "@/shared/api";
 
 export const ROOM_LIST_FIRST_PAGE = 1;
@@ -9,6 +12,11 @@ export function toApiPage(page: number) {
 
 export function isRequestablePage(page: number) {
   return roomListParamsSchema.shape.page.safeParse(toApiPage(page)).success;
+}
+
+export function isRequestableStatusHistoryPage(page: number) {
+  return roomStatusHistoryParamsSchema.shape.page.safeParse(toApiPage(page))
+    .success;
 }
 
 export function getLastPage(totalPages: number) {

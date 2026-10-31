@@ -4,6 +4,7 @@ export {
   refreshRoomStatus,
   useRefetchRoom,
 } from "./api/room-query";
+export { useRoomStatusHistoryQuery } from "./api/room-status-history-query";
 export {
   ROOM_FIELD_LABELS,
   ROOM_INFO_MESSAGES,
@@ -20,6 +21,7 @@ export {
   getLastPage,
   isBeyondLastPage,
   isRequestablePage,
+  isRequestableStatusHistoryPage,
   ROOM_LIST_FIRST_PAGE,
   toApiPage,
 } from "./lib/room-page";

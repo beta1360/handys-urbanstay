@@ -1,6 +1,11 @@
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
-import { fetchRoom, roomListQueryKey, roomQueryKey } from "@/shared/api";
+import {
+  fetchRoom,
+  roomListQueryKey,
+  roomQueryKey,
+  roomStatusHistoriesQueryKey,
+} from "@/shared/api";
 import type { Room } from "@/shared/api";
 
 function roomQueryOptions(roomId: number) {
@@ -38,6 +43,9 @@ export async function refreshRoomStatus(
     queryClient.invalidateQueries({ queryKey: roomListQueryKey() }),
     queryClient.invalidateQueries({
       queryKey: roomQueryOptions(roomId).queryKey,
+    }),
+    queryClient.invalidateQueries({
+      queryKey: roomStatusHistoriesQueryKey(roomId),
     }),
   ]);
 }
