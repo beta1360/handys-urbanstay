@@ -454,7 +454,7 @@ urbanstay/
 
 - 파일 위치는 `src/main/resources/db/migration`이다.
 - 파일 하나에 논리적인 스키마 변경 하나를 담는다. 보통 그 도메인 PR의 변경 하나다.
-- 버전은 순차 정수를 쓴다. 예: `V1__create_hotel.sql`, `V2__create_room.sql`
+- 버전은 순차 정수를 쓴다. 예: `V1__create_app_admin.sql`, `V2__create_hotel.sql`
 - 이미 적용된 파일은 수정하지 않는다. 변경은 새 버전 파일로 추가한다.
 - 기존 테이블에 not null 컬럼을 더할 때는 default로 기존 행을 채운 뒤 default를 지운다. 새 행의 값은 엔티티가 정한다(`V4__add_hotel_admin_version.sql`, `V7__add_room_status.sql`).
 - 한 파일에 여러 도메인의 테이블을 섞지 않는다.
