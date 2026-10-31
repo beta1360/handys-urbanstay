@@ -8,6 +8,7 @@ import { SUBMIT_ONLY_VALIDATION, toFieldPropsMap } from "@repo/admin-kit/form";
 import { useRoomListQuery } from "@/entities/room";
 import {
   isStayCheckInRangeValid,
+  isUnlistedStayRoom,
   normalizeStayCanceled,
   normalizeStayCheckInDate,
   normalizeStayFilterId,
@@ -61,6 +62,8 @@ export function useStaySearchForm(criteria: StaySearchCriteria) {
     criteria;
   const navigate = useNavigate();
   const rooms = useRoomListQuery(STAY_ROOM_OPTIONS_PARAMS);
+  const isRoomIdUnlisted =
+    roomId !== undefined && isUnlistedStayRoom(rooms.data, roomId);
   const { error: listError } = useStayListQuery(
     toStayListParams(criteria, page),
   );
@@ -88,6 +91,16 @@ export function useStaySearchForm(criteria: StaySearchCriteria) {
       }
     });
   }, [listError, setError]);
+
+  useEffect(() => {
+    if (isRoomIdUnlisted) {
+      void navigate({
+        to: "/stays",
+        search: (previous) => ({ ...previous, roomId: undefined }),
+        replace: true,
+      });
+    }
+  }, [isRoomIdUnlisted, navigate]);
 
   const submit = form.handleSubmit((filter) => {
     form.setValue("keyword", filter.keyword ?? "");
