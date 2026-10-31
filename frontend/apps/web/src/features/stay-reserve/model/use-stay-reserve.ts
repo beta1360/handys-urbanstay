@@ -14,7 +14,8 @@ import {
   toFieldPropsMap,
 } from "@/shared/lib/form";
 import type { FormFieldProps } from "@/shared/lib/form";
-import { loginHref, useCurrentHref } from "@/shared/lib/login-redirect";
+import { useCurrentHref } from "@/shared/lib/current-href";
+import { loginHref } from "@/shared/lib/login-redirect";
 import { useReserveStay } from "../api/use-reserve-stay";
 import {
   EMPTY_STAY_RESERVE_VALUES,

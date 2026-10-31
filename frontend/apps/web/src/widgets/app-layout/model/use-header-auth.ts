@@ -1,9 +1,6 @@
 import { useMember } from "@/entities/member";
-import {
-  loginHref,
-  signupHref,
-  useCurrentHref,
-} from "@/shared/lib/login-redirect";
+import { useCurrentHref } from "@/shared/lib/current-href";
+import { loginHref, signupHref } from "@/shared/lib/login-redirect";
 
 export type HeaderAuthState =
   | { status: "checking" }

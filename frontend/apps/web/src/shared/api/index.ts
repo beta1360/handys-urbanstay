@@ -20,8 +20,13 @@ export {
   roomTypesQueryKey,
 } from "./room-type";
 export type { RoomType, RoomTypeListParams } from "./room-type";
-export { createStay, createStayBodySchema } from "./stay";
-export type { CreateStayBody, ReservedStay } from "./stay";
+export { createStay, createStayBodySchema, fetchMyStays } from "./stay";
+export type {
+  CreateStayBody,
+  MyStay,
+  MyStayListParams,
+  ReservedStay,
+} from "./stay";
 export {
   RequestValidationError,
   ResponseValidationError,

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { API_ERROR_CODES, getApiError } from "./api-error";
 import * as generated from "./generated";
-import { createStay } from "./stay";
+import { createStay, fetchMyStays } from "./stay";
 import {
   RequestValidationError,
   ResponseValidationError,
@@ -10,6 +10,7 @@ import {
 vi.mock("./generated", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./generated")>()),
   createStay: vi.fn(),
+  getMyStays: vi.fn(),
 }));
 
 const HEADERS = new Headers();
@@ -106,5 +107,60 @@ describe("createStay", () => {
     await expect(createStay(BODY)).rejects.toBeInstanceOf(
       ResponseValidationError,
     );
+  });
+});
+
+describe("fetchMyStays", () => {
+  const PAGE_PARAMS = { page: 0, size: 100 };
+  const COOKIE = "JSESSIONID=abc";
+  const MY_STAY = {
+    id: 11,
+    hotel: { id: 3, name: "어반스테이 강남" },
+    roomType: { id: 2, name: "스탠다드" },
+    checkInDate: "2026-11-04",
+    checkOutDate: "2026-11-06",
+    guestCount: 2,
+    roomRate: 90000,
+    nights: 2,
+    baseAmount: 180000,
+    discountAmount: 0,
+    totalAmount: 180000,
+    canceledAt: null,
+  };
+
+  function myStaysResponse(items: unknown[]) {
+    return {
+      status: 200,
+      headers: HEADERS,
+      data: {
+        success: true,
+        data: { items, page: 0, size: 100, totalElements: 1, totalPages: 1 },
+        message: null,
+        error: null,
+      },
+    } as never;
+  }
+
+  it("들어온 요청의 쿠키를 넘겨 내 이용 목록을 조회한다", async () => {
+    vi.mocked(generated.getMyStays).mockResolvedValue(
+      myStaysResponse([MY_STAY]),
+    );
+
+    const page = await fetchMyStays(PAGE_PARAMS, { cookie: COOKIE });
+
+    expect(page.items).toEqual([MY_STAY]);
+    expect(generated.getMyStays).toHaveBeenCalledWith(PAGE_PARAMS, {
+      headers: { cookie: COOKIE },
+    });
+  });
+
+  it("취소 시각 형식이 틀리면 응답 검증 오류를 던진다", async () => {
+    vi.mocked(generated.getMyStays).mockResolvedValue(
+      myStaysResponse([{ ...MY_STAY, canceledAt: "어제" }]),
+    );
+
+    await expect(
+      fetchMyStays(PAGE_PARAMS, { cookie: COOKIE }),
+    ).rejects.toBeInstanceOf(ResponseValidationError);
   });
 });

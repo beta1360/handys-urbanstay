@@ -9,7 +9,7 @@ import {
   fetchMe,
   logoutMember,
 } from "@/shared/api";
-import { COMMON_MESSAGES } from "@/shared/config";
+import { COMMON_MESSAGES, ROUTES } from "@/shared/config";
 import { loginHref, signupHref } from "@/shared/lib/login-redirect";
 import { APP_HEADER_MESSAGES } from "../config/messages";
 import { HeaderAuth } from "./header-auth";
@@ -76,7 +76,7 @@ describe("HeaderAuth", () => {
     ).toHaveAttribute("href", signupHref(CURRENT_HREF));
   });
 
-  it("로그인했으면 이름을 보여주고 로그아웃하면 비회원 링크로 바꾸고 화면을 다시 그린다", async () => {
+  it("로그인했으면 이름과 내 이용 링크를 보여주고 로그아웃하면 비회원 링크로 바꾸고 화면을 다시 그린다", async () => {
     vi.mocked(fetchMe).mockResolvedValue({
       id: 1,
       email: "guest@example.com",
@@ -89,6 +89,9 @@ describe("HeaderAuth", () => {
     expect(
       await screen.findByText(APP_HEADER_MESSAGES.memberName(MEMBER_NAME)),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: COMMON_MESSAGES.myStays }),
+    ).toHaveAttribute("href", ROUTES.myStays);
     await user.click(screen.getByRole("button"));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());

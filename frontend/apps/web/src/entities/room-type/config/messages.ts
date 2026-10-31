@@ -1,5 +1,7 @@
+import { COMMON_MESSAGES } from "@/shared/config";
+
 export const ROOM_TYPE_LABELS = {
-  roomType: "객실 유형",
+  roomType: COMMON_MESSAGES.roomType,
 } as const;
 
 export const ROOM_TYPE_MESSAGES = {

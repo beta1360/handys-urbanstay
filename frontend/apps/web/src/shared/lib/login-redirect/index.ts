@@ -4,4 +4,3 @@ export {
   sanitizeLoginRedirect,
   signupHref,
 } from "./login-redirect";
-export { useCurrentHref } from "./use-current-href";

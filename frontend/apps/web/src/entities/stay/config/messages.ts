@@ -7,6 +7,14 @@ export const STAY_LABELS = {
   totalAmount: "최종 금액",
 } as const;
 
+export const MY_STAY_MESSAGES = {
+  upcomingTitle: "지금·앞으로의 이용",
+  pastTitle: "지난 이용",
+  sectionEmpty: "이용이 없습니다.",
+  empty: "아직 이용이 없습니다.",
+  canceled: "취소됨",
+} as const;
+
 export const STAY_MESSAGES = {
   periodWithNights: (
     checkInDate: string,

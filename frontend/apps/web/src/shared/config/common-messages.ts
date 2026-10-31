@@ -5,6 +5,8 @@ export const COMMON_MESSAGES = {
   backToHotels: "호텔 목록",
   login: "로그인",
   signup: "회원가입",
+  myStays: "내 이용",
+  roomType: "객실 유형",
   people: (count: number) => `${count}명`,
   won: (amount: string) => `${amount}원`,
 } as const;
