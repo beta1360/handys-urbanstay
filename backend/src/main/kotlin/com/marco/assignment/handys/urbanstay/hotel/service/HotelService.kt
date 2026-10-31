@@ -46,6 +46,9 @@ class HotelService(
 	}
 
 	@Transactional(readOnly = true)
+	fun getHotelsByName(page: Int, size: Int): Page<Hotel> = hotelRepository.findAll(PageRequest.of(page, size, NAME_ORDER))
+
+	@Transactional(readOnly = true)
 	fun getHotel(hotelId: Long): Hotel = findHotel(hotelId)
 
 	@Transactional
@@ -86,5 +89,6 @@ class HotelService(
 
 	companion object {
 		private val NEWEST_FIRST = Sort.by(Sort.Direction.DESC, Hotel::id.name)
+		private val NAME_ORDER = Sort.by(Sort.Order.asc(Hotel::name.name), Sort.Order.asc(Hotel::id.name))
 	}
 }
