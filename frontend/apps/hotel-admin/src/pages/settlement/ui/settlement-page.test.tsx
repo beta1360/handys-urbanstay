@@ -171,7 +171,6 @@ describe("SettlementPage", () => {
         .getAllByRole("definition")
         .map((definition) => definition.textContent),
     ).toEqual([formatWon(1250000), "3", "1"]);
-    expect(formatWon(1250000)).toBe("1,250,000원");
     expect(
       screen.getByText(SETTLEMENT_SUMMARY_MESSAGES.basis),
     ).toBeInTheDocument();

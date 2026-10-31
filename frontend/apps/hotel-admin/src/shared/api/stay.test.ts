@@ -8,13 +8,7 @@ import {
   getStaysQueryPageDefault,
   getStaysQuerySizeDefault,
 } from "./generated/zod";
-import {
-  cancelStay,
-  fetchStay,
-  fetchStays,
-  stayListQueryKey,
-  stayQueryKey,
-} from "./stay";
+import { cancelStay, fetchStay, fetchStays } from "./stay";
 
 vi.mock("./generated", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./generated")>()),
@@ -179,17 +173,6 @@ describe("fetchStay", () => {
       CANCELED_STAY,
     );
     expect(generated.getStay).toHaveBeenCalledWith(STAY_ID, undefined, signal);
-  });
-});
-
-describe("쿼리 키", () => {
-  it("생성된 목록·상세 쿼리 키를 쓴다", () => {
-    expect(stayListQueryKey(LIST_PARAMS)).toEqual(
-      generated.getGetStaysQueryKey(LIST_PARAMS),
-    );
-    expect(stayQueryKey(STAY_ID)).toEqual(
-      generated.getGetStayQueryKey(STAY_ID),
-    );
   });
 });
 

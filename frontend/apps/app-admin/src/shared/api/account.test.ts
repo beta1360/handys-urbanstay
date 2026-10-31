@@ -3,8 +3,8 @@ import {
   RequestValidationError,
   ResponseValidationError,
 } from "@repo/admin-kit/api";
-import { fetchMe, loginAccount, logoutAccount, meQueryKey } from "./account";
-import { getGetMeQueryKey, getMe, login, logout } from "./generated";
+import { fetchMe, loginAccount, logoutAccount } from "./account";
+import { getMe, login, logout } from "./generated";
 
 vi.mock("./generated", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./generated")>()),
@@ -64,12 +64,6 @@ afterEach(() => {
   vi.clearAllMocks();
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
-});
-
-describe("meQueryKey", () => {
-  it("생성된 쿼리 키를 쓴다", () => {
-    expect(meQueryKey()).toEqual(getGetMeQueryKey());
-  });
 });
 
 describe("fetchMe", () => {

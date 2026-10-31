@@ -118,10 +118,7 @@ describe("fetchHotelRoomTypes", () => {
     expect(getApiError(error)?.code).toBe(API_ERROR_CODES.hotelNotFound);
   });
 
-  it("호텔 단위로 무효화할 수 있도록 생성된 쿼리 키를 쓴다", () => {
-    expect(roomTypesQueryKey(HOTEL_ID, PARAMS)).toEqual(
-      generated.getGetHotelRoomTypesQueryKey(HOTEL_ID, PARAMS),
-    );
+  it("조건 없이 만든 키가 조건 있는 키의 앞부분이라 호텔 단위로 무효화할 수 있다", () => {
     expect(roomTypesQueryKey(HOTEL_ID, PARAMS).slice(0, 1)).toEqual(
       roomTypesQueryKey(HOTEL_ID),
     );

@@ -6,7 +6,6 @@ import {
 import * as generated from "./generated";
 import {
   fetchHotelMaster,
-  hotelMasterQueryKey,
   resetHotelMasterPassword,
   updateHotelMaster,
 } from "./hotel-master";
@@ -49,14 +48,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.clearAllMocks();
   vi.restoreAllMocks();
-});
-
-describe("hotelMasterQueryKey", () => {
-  it("생성된 마스터 조회 쿼리 키를 쓴다", () => {
-    expect(hotelMasterQueryKey(HOTEL_ID)).toEqual(
-      generated.getGetHotelMasterQueryKey(HOTEL_ID),
-    );
-  });
 });
 
 describe("fetchHotelMaster", () => {

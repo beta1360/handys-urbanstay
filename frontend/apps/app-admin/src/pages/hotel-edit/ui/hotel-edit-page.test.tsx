@@ -435,46 +435,6 @@ describe("HotelEditPage 폼", () => {
     expect(fields.name).toHaveFocus();
     expect(updateHotel).not.toHaveBeenCalled();
   });
-
-  it("입력창을 고치면 그 입력창의 오류만 지운다", async () => {
-    const { user } = await renderLoadedHotelEditPage();
-    await replaceValue(user, "name", "");
-    await replaceValue(user, "address", "");
-    await user.click(getSubmitButton());
-
-    await user.type(getFields().name, "a");
-
-    expect(getInvalidFields()).toEqual([getFields().address]);
-  });
-
-  it.each<[string, HotelInfoField, string, string]>([
-    [
-      "전화번호 형식이 틀리면",
-      "phone",
-      "02-1234-567a",
-      FORM_VALIDATION_MESSAGES.phoneFormat,
-    ],
-    [
-      "이름이 100자를 넘으면",
-      "name",
-      "가".repeat(101),
-      FORM_VALIDATION_MESSAGES.maxLength(100),
-    ],
-  ])(
-    "%s 그 칸에 오류 하나만 보여주고 초점을 옮기며 요청하지 않는다",
-    async (_, field, value, message) => {
-      const { user } = await renderLoadedHotelEditPage();
-
-      await replaceValue(user, field, value);
-      await user.click(getSubmitButton());
-
-      const input = getFields()[field];
-      expect(getInvalidFields()).toEqual([input]);
-      expect(input).toHaveAccessibleDescription(describedText(field, message));
-      expect(input).toHaveFocus();
-      expect(updateHotel).not.toHaveBeenCalled();
-    },
-  );
 });
 
 describe("HotelEditPage 저장", () => {

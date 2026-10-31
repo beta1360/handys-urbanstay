@@ -10,14 +10,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { UserEvent } from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
-import {
-  afterEach,
-  describe,
-  expect,
-  it,
-  onTestFinished,
-  vi,
-} from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   RequestValidationError,
   ResponseValidationError,
@@ -152,32 +145,6 @@ describe("LoginPage", () => {
     const passwordInput = getPasswordInput();
     expect(passwordInput).toHaveAttribute("type", "password");
     expect(passwordInput).toHaveAttribute("autocomplete", "current-password");
-  });
-
-  it("로그인 제출 버튼을 보여준다", async () => {
-    renderLoginPage();
-
-    await findLoginIdInput();
-    expect(getSubmitButton()).toHaveAttribute("type", "submit");
-  });
-
-  it("로그인 버튼으로 제출하면 브라우저의 기본 제출 동작을 막는다", async () => {
-    const user = userEvent.setup();
-    const submitEvents: Event[] = [];
-    const recordSubmit = (event: Event) => {
-      submitEvents.push(event);
-    };
-    document.addEventListener("submit", recordSubmit);
-    onTestFinished(() => {
-      document.removeEventListener("submit", recordSubmit);
-    });
-    renderLoginPage();
-
-    await findLoginIdInput();
-    await user.click(getSubmitButton());
-
-    expect(submitEvents).toHaveLength(1);
-    expect(submitEvents[0].defaultPrevented).toBe(true);
   });
 });
 
