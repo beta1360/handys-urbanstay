@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from "./../routes/login";
 import { Route as AuthenticatedIndexRouteImport } from "./../routes/_authenticated/index";
 import { Route as AuthenticatedAdminsIndexRouteImport } from "./../routes/_authenticated/admins/index";
 import { Route as AuthenticatedAdminsAdminIdRouteRouteImport } from "./../routes/_authenticated/admins/$adminId/route";
+import { Route as AuthenticatedAdminsNewRouteImport } from "./../routes/_authenticated/admins/new";
 import { Route as AuthenticatedHotelsIndexRouteImport } from "./../routes/_authenticated/hotels/index";
 import { Route as AuthenticatedHotelsHotelIdRouteRouteImport } from "./../routes/_authenticated/hotels/$hotelId/route";
 import { Route as AuthenticatedHotelsNewRouteImport } from "./../routes/_authenticated/hotels/new";
@@ -50,6 +51,11 @@ const AuthenticatedAdminsAdminIdRouteRoute =
     path: "/admins/$adminId",
     getParentRoute: () => AuthenticatedRoute,
   } as any);
+const AuthenticatedAdminsNewRoute = AuthenticatedAdminsNewRouteImport.update({
+  id: "/admins/new",
+  path: "/admins/new",
+  getParentRoute: () => AuthenticatedRoute,
+} as any);
 const AuthenticatedHotelsIndexRoute =
   AuthenticatedHotelsIndexRouteImport.update({
     id: "/hotels/",
@@ -109,6 +115,7 @@ export interface FileRoutesByFullPath {
   "/login": typeof LoginRoute;
   "/admins/$adminId": typeof AuthenticatedAdminsAdminIdRouteRouteWithChildren;
   "/hotels/$hotelId": typeof AuthenticatedHotelsHotelIdRouteRouteWithChildren;
+  "/admins/new": typeof AuthenticatedAdminsNewRoute;
   "/hotels/new": typeof AuthenticatedHotelsNewRoute;
   "/members/$memberId": typeof AuthenticatedMembersMemberIdRoute;
   "/admins/": typeof AuthenticatedAdminsIndexRoute;
@@ -122,6 +129,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   "/login": typeof LoginRoute;
   "/": typeof AuthenticatedIndexRoute;
+  "/admins/new": typeof AuthenticatedAdminsNewRoute;
   "/hotels/new": typeof AuthenticatedHotelsNewRoute;
   "/members/$memberId": typeof AuthenticatedMembersMemberIdRoute;
   "/admins": typeof AuthenticatedAdminsIndexRoute;
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   "/_authenticated/": typeof AuthenticatedIndexRoute;
   "/_authenticated/admins/$adminId": typeof AuthenticatedAdminsAdminIdRouteRouteWithChildren;
   "/_authenticated/hotels/$hotelId": typeof AuthenticatedHotelsHotelIdRouteRouteWithChildren;
+  "/_authenticated/admins/new": typeof AuthenticatedAdminsNewRoute;
   "/_authenticated/hotels/new": typeof AuthenticatedHotelsNewRoute;
   "/_authenticated/members/$memberId": typeof AuthenticatedMembersMemberIdRoute;
   "/_authenticated/admins/": typeof AuthenticatedAdminsIndexRoute;
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
     | "/login"
     | "/admins/$adminId"
     | "/hotels/$hotelId"
+    | "/admins/new"
     | "/hotels/new"
     | "/members/$memberId"
     | "/admins/"
@@ -169,6 +179,7 @@ export interface FileRouteTypes {
   to:
     | "/login"
     | "/"
+    | "/admins/new"
     | "/hotels/new"
     | "/members/$memberId"
     | "/admins"
@@ -185,6 +196,7 @@ export interface FileRouteTypes {
     | "/_authenticated/"
     | "/_authenticated/admins/$adminId"
     | "/_authenticated/hotels/$hotelId"
+    | "/_authenticated/admins/new"
     | "/_authenticated/hotels/new"
     | "/_authenticated/members/$memberId"
     | "/_authenticated/admins/"
@@ -236,6 +248,13 @@ declare module "@tanstack/react-router" {
       path: "/admins/$adminId";
       fullPath: "/admins/$adminId";
       preLoaderRoute: typeof AuthenticatedAdminsAdminIdRouteRouteImport;
+      parentRoute: typeof AuthenticatedRoute;
+    };
+    "/_authenticated/admins/new": {
+      id: "/_authenticated/admins/new";
+      path: "/admins/new";
+      fullPath: "/admins/new";
+      preLoaderRoute: typeof AuthenticatedAdminsNewRouteImport;
       parentRoute: typeof AuthenticatedRoute;
     };
     "/_authenticated/hotels/": {
@@ -341,6 +360,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute;
   AuthenticatedAdminsAdminIdRouteRoute: typeof AuthenticatedAdminsAdminIdRouteRouteWithChildren;
   AuthenticatedHotelsHotelIdRouteRoute: typeof AuthenticatedHotelsHotelIdRouteRouteWithChildren;
+  AuthenticatedAdminsNewRoute: typeof AuthenticatedAdminsNewRoute;
   AuthenticatedHotelsNewRoute: typeof AuthenticatedHotelsNewRoute;
   AuthenticatedMembersMemberIdRoute: typeof AuthenticatedMembersMemberIdRoute;
   AuthenticatedAdminsIndexRoute: typeof AuthenticatedAdminsIndexRoute;
@@ -354,6 +374,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
     AuthenticatedAdminsAdminIdRouteRouteWithChildren,
   AuthenticatedHotelsHotelIdRouteRoute:
     AuthenticatedHotelsHotelIdRouteRouteWithChildren,
+  AuthenticatedAdminsNewRoute: AuthenticatedAdminsNewRoute,
   AuthenticatedHotelsNewRoute: AuthenticatedHotelsNewRoute,
   AuthenticatedMembersMemberIdRoute: AuthenticatedMembersMemberIdRoute,
   AuthenticatedAdminsIndexRoute: AuthenticatedAdminsIndexRoute,

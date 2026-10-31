@@ -12,3 +12,7 @@ export const ADMIN_LOAD_MESSAGES = {
 export const ADMIN_NOT_FOUND_MESSAGES = {
   description: "어드민 계정을 찾을 수 없습니다.",
 } as const;
+
+export const ADMIN_INFO_MESSAGES = {
+  legend: "어드민 계정",
+} as const;

@@ -15,6 +15,7 @@ import type { AdminPage, AdminSummary } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { ADMIN_LIST_CONTENT_MESSAGES } from "@/widgets/admin-list";
+import { ADMIN_LIST_MESSAGES } from "../config/messages";
 import {
   ADMIN_LIST_DEFAULT_SEARCH,
   adminListSearchSchema,
@@ -155,6 +156,21 @@ describe("AdminListPage 목록", () => {
       `/admins/${ADMINS[0].id}`,
     );
     expect(fetchAdmins).toHaveBeenCalledExactlyOnceWith({ page: 0 });
+  });
+
+  it("어드민 계정 추가 버튼을 누르면 추가 화면으로 이동한다", async () => {
+    const { router, user } = renderAdminListPage();
+
+    const createLink = await screen.findByRole("link", {
+      name: ADMIN_LIST_MESSAGES.create,
+    });
+    expect(createLink).toHaveAttribute("href", "/admins/new");
+
+    await user.click(createLink);
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe("/admins/new");
+    });
   });
 
   it("처음 불러오는 동안 불러오는 중 문구를 보여준다", async () => {
