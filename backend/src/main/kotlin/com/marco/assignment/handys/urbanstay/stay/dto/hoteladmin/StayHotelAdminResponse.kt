@@ -17,6 +17,8 @@ data class StayHotelAdminResponse(
 	val checkOutDate: LocalDate,
 	@Schema(description = "openapi.schema.StayHotelAdminResponse.guestCount", example = "2")
 	val guestCount: Int,
+	@Schema(description = "openapi.schema.StayHotelAdminResponse.cancellation")
+	val cancellation: StayCancellationHotelAdminResponse?,
 ) {
 
 	companion object {
@@ -29,6 +31,7 @@ data class StayHotelAdminResponse(
 				checkInDate = stay.checkInDate,
 				checkOutDate = stay.checkOutDate,
 				guestCount = stay.guestCount,
+				cancellation = StayCancellationHotelAdminResponse.from(stay),
 			)
 	}
 }
