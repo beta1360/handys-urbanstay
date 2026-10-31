@@ -1,5 +1,5 @@
 export { useRoomListQuery } from "./api/room-list-query";
-export { cacheSavedRoom } from "./api/room-query";
+export { cacheSavedRoom, useRefetchRoom } from "./api/room-query";
 export {
   ROOM_FIELD_LABELS,
   ROOM_INFO_MESSAGES,

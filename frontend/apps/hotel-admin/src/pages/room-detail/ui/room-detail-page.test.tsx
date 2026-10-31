@@ -22,6 +22,7 @@ import {
 import { API_ERROR_CODES } from "@/shared/api";
 import type { Room } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
+import { ROOM_DETAIL_ACTION_MESSAGES } from "@/widgets/room-detail";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { RoomDetailPage } from "./room-detail-page";
 
@@ -47,6 +48,8 @@ const ROOM: Room = {
   status: "RESERVED",
   version: 3,
 };
+
+const EDIT_PAGE_TEXT = "객실 수정 화면";
 
 function roomPath(roomId: number | string) {
   return `/rooms/${roomId}`;
@@ -95,6 +98,11 @@ function renderRoomDetailPage(initialEntries = [roomPath(ROOM.id)]) {
             getParentRoute: () => roomRoute,
             path: "/",
             component: RoomDetailPage,
+          }),
+          createRoute({
+            getParentRoute: () => roomRoute,
+            path: "edit",
+            component: () => <p>{EDIT_PAGE_TEXT}</p>,
           }),
         ]),
       ]),
@@ -211,6 +219,41 @@ describe("RoomDetailPage 정보", () => {
 
     expect(await screen.findByText(ROOM.name)).toBeInTheDocument();
     expect(fetchRoom).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("RoomDetailPage 수정 버튼", () => {
+  it("객실 정보를 보여줄 때 목록으로 링크 줄의 오른쪽 끝에 수정 버튼을 두고, 누르면 수정 화면으로 이동한다", async () => {
+    const { router, user } = renderRoomDetailPage();
+
+    const editLink = await screen.findByRole("link", {
+      name: ROOM_DETAIL_ACTION_MESSAGES.edit,
+    });
+    expect(editLink).toHaveAttribute("href", `${roomPath(ROOM.id)}/edit`);
+    expect(editLink.parentElement).toBe(getBackLink().parentElement);
+    expect(editLink.parentElement?.lastElementChild).toBe(editLink);
+
+    await user.click(editLink);
+
+    expect(await screen.findByText(EDIT_PAGE_TEXT)).toBeInTheDocument();
+    expect(router.state.location.href).toBe(`${roomPath(ROOM.id)}/edit`);
+  });
+
+  it.each([
+    ["불러오는 중", "status", () => new Promise<never>(() => {})],
+    [
+      "불러오지 못했을 때",
+      "alert",
+      () => Promise.reject(createApiError(500, "INTERNAL_SERVER_ERROR")),
+    ],
+  ])("%s에는 수정 버튼을 보여주지 않는다", async (_, role, fetchResult) => {
+    fetchRoom.mockImplementation(fetchResult);
+    renderRoomDetailPage();
+
+    expect(await screen.findByRole(role)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: ROOM_DETAIL_ACTION_MESSAGES.edit }),
+    ).not.toBeInTheDocument();
   });
 });
 

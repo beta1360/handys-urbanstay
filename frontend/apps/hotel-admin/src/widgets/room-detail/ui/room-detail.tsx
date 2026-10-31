@@ -34,7 +34,7 @@ export function RoomDetail({ roomId }: RoomDetailProps) {
     case "ready":
       return (
         <>
-          <RoomDetailActions />
+          <RoomDetailActions editRoomId={state.room.id} />
           <RoomInformation room={state.room} />
         </>
       );
