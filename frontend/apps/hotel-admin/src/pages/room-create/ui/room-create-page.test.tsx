@@ -26,7 +26,6 @@ import {
   ROOM_INFO_MESSAGES,
 } from "@/entities/room";
 import type { RoomInfoField } from "@/entities/room";
-import { ROOM_CREATE_FORM_MESSAGES } from "@/features/room-create";
 import {
   API_ERROR_CODES,
   createRoom,
@@ -181,7 +180,7 @@ function getFields(): Record<RoomInfoField, HTMLElement> {
 }
 
 function getSubmitButton() {
-  return screen.getByRole("button", { name: ROOM_CREATE_FORM_MESSAGES.submit });
+  return screen.getByRole("button", { name: COMMON_MESSAGES.create });
 }
 
 function getInvalidFields() {

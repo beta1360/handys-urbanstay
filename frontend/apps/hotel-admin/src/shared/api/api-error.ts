@@ -9,6 +9,9 @@ export const API_ERROR_CODES = {
   roomNotFound: "ROOM_NOT_FOUND",
   roomDuplicated: "ROOM_DUPLICATED",
   roomModified: "ROOM_MODIFIED",
+  guestNotFound: "GUEST_NOT_FOUND",
+  guestPhoneDuplicated: "GUEST_PHONE_DUPLICATED",
+  guestModified: "GUEST_MODIFIED",
 } as const;
 
 export const getApiError = createApiErrorReader(ErrorApiResponse);

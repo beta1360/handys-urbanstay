@@ -5,7 +5,6 @@ import { ButtonLink } from "@repo/admin-kit/link";
 import { RoomInfoFields } from "@/entities/room";
 import type { RoomInfoField } from "@/entities/room";
 import { COMMON_MESSAGES } from "@/shared/config";
-import { ROOM_CREATE_FORM_MESSAGES } from "../config/messages";
 
 type RoomCreateFormViewProps = {
   fields: Record<RoomInfoField, FormFieldProps>;
@@ -27,7 +26,7 @@ export function RoomCreateFormView({
       <RoomInfoFields fields={fields} />
       <div className="flex gap-2">
         <Button type="submit" variant="primary" loading={isSubmitting}>
-          {ROOM_CREATE_FORM_MESSAGES.submit}
+          {COMMON_MESSAGES.create}
         </Button>
         <ButtonLink
           to="/rooms"

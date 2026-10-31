@@ -140,7 +140,7 @@ function getStatusSelect() {
 }
 
 function getSearchButton() {
-  return screen.getByRole("button", { name: ROOM_SEARCH_FORM_MESSAGES.search });
+  return screen.getByRole("button", { name: COMMON_MESSAGES.search });
 }
 
 function getRowTexts(row: HTMLElement) {
@@ -231,7 +231,7 @@ describe("RoomListPage 목록", () => {
     );
 
     expect(
-      await screen.findByText(ROOM_LIST_CONTENT_MESSAGES.pageStatus(3, 5)),
+      await screen.findByText(COMMON_MESSAGES.pageStatus(3, 5)),
     ).toBeInTheDocument();
     expect(await findKeywordInput()).toHaveValue(KEYWORD);
     expect(getStatusSelect()).toHaveValue("RESERVED");
@@ -337,7 +337,7 @@ describe("RoomListPage 검색과 상태 거르기", () => {
     await screen.findByRole("table");
     await user.click(
       screen.getByRole("button", {
-        name: ROOM_LIST_CONTENT_MESSAGES.nextPage,
+        name: COMMON_MESSAGES.nextPage,
       }),
     );
 
@@ -360,12 +360,12 @@ describe("RoomListPage 빈 상태", () => {
     [
       "상태로만 걸러도 검색 결과가 없다는",
       { status: "OCCUPIED" },
-      ROOM_LIST_CONTENT_MESSAGES.emptySearchResult,
+      COMMON_MESSAGES.emptySearchResult,
     ],
     [
       "검색어가 있으면 검색 결과가 없다는",
       { keyword: KEYWORD },
-      ROOM_LIST_CONTENT_MESSAGES.emptySearchResult,
+      COMMON_MESSAGES.emptySearchResult,
     ],
   ])("항목이 없을 때 %s 문구를 보여준다", async (_, search, message) => {
     fetchRooms.mockResolvedValue(EMPTY_ROOM_PAGE);
@@ -407,7 +407,7 @@ describe("RoomListPage URL 정리", () => {
     );
 
     expect(
-      await screen.findByText(ROOM_LIST_CONTENT_MESSAGES.pageStatus(2, 2)),
+      await screen.findByText(COMMON_MESSAGES.pageStatus(2, 2)),
     ).toBeInTheDocument();
     expect(router.state.location.href).toBe(
       roomsPath({ keyword: KEYWORD, status: "VACANT", page: "2" }),

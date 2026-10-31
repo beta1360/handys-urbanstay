@@ -1,4 +1,5 @@
 import { Card } from "@repo/ui/card";
+import { COMMON_MESSAGES } from "@/shared/config";
 import { ROOM_LIST_CONTENT_MESSAGES } from "../config/messages";
 
 type RoomListEmptyProps = {
@@ -10,7 +11,7 @@ export function RoomListEmpty({ isFiltered }: RoomListEmptyProps) {
     <Card>
       <p className="text-center text-sm text-neutral-500">
         {isFiltered
-          ? ROOM_LIST_CONTENT_MESSAGES.emptySearchResult
+          ? COMMON_MESSAGES.emptySearchResult
           : ROOM_LIST_CONTENT_MESSAGES.empty}
       </p>
     </Card>

@@ -9,6 +9,7 @@ import {
   ROOM_STATUS_LABELS,
   ROOM_STATUSES,
 } from "@/entities/room";
+import { COMMON_MESSAGES } from "@/shared/config";
 import { ROOM_SEARCH_FORM_MESSAGES } from "../config/messages";
 
 const STATUS_OPTIONS = [
@@ -44,7 +45,7 @@ export function RoomSearchFormView({
         {...fields.status}
       />
       <Button type="submit" variant="secondary">
-        {ROOM_SEARCH_FORM_MESSAGES.search}
+        {COMMON_MESSAGES.search}
       </Button>
     </form>
   );

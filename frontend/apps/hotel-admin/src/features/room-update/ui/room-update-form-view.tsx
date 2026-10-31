@@ -5,7 +5,6 @@ import { ButtonLink } from "@repo/admin-kit/link";
 import { RoomInfoFields } from "@/entities/room";
 import type { RoomInfoField } from "@/entities/room";
 import { COMMON_MESSAGES } from "@/shared/config";
-import { ROOM_UPDATE_FORM_MESSAGES } from "../config/messages";
 import type { RoomUpdateStatus } from "../model/use-room-update-form";
 
 type RoomUpdateFormViewProps = {
@@ -42,7 +41,7 @@ export function RoomUpdateFormView({
             loading={status === "reloading"}
             onClick={onReload}
           >
-            {ROOM_UPDATE_FORM_MESSAGES.reload}
+            {COMMON_MESSAGES.reload}
           </Button>
         </div>
       ) : null}
@@ -53,7 +52,7 @@ export function RoomUpdateFormView({
           loading={status === "submitting"}
           disabled={status === "reloading"}
         >
-          {ROOM_UPDATE_FORM_MESSAGES.submit}
+          {COMMON_MESSAGES.save}
         </Button>
         <ButtonLink
           to="/rooms/$roomId"

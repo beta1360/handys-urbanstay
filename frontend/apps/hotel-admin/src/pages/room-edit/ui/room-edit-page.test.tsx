@@ -26,7 +26,6 @@ import {
   stringifyRoomPathParams,
 } from "@/entities/room";
 import type { RoomInfoField } from "@/entities/room";
-import { ROOM_UPDATE_FORM_MESSAGES } from "@/features/room-update";
 import { API_ERROR_CODES, roomQueryKey, updateRoom } from "@/shared/api";
 import type { Room } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
@@ -201,11 +200,11 @@ function expectFormValues(values: Record<RoomInfoField, string>) {
 }
 
 function getSubmitButton() {
-  return screen.getByRole("button", { name: ROOM_UPDATE_FORM_MESSAGES.submit });
+  return screen.getByRole("button", { name: COMMON_MESSAGES.save });
 }
 
 function getReloadButton() {
-  return screen.getByRole("button", { name: ROOM_UPDATE_FORM_MESSAGES.reload });
+  return screen.getByRole("button", { name: COMMON_MESSAGES.reload });
 }
 
 async function expectNotFound() {
