@@ -18,6 +18,7 @@ export const getStaysParamsSizeMax = 100;
 export const GetStaysParams = zod.object({
   "roomId": zod.int().optional(),
   "guestId": zod.int().optional(),
+  "canceled": zod.boolean().optional(),
   "page": zod.int().min(getStaysParamsPageMin).max(getStaysParamsPageMax).default(getStaysParamsPageDefault),
   "size": zod.int().min(1).max(getStaysParamsSizeMax).default(getStaysParamsSizeDefault)
 })
