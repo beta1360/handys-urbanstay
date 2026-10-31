@@ -19,6 +19,7 @@ import { Route as AuthenticatedRoomsIndexRouteImport } from "./../routes/_authen
 import { Route as AuthenticatedRoomsRoomIdRouteRouteImport } from "./../routes/_authenticated/rooms/$roomId/route";
 import { Route as AuthenticatedRoomsNewRouteImport } from "./../routes/_authenticated/rooms/new";
 import { Route as AuthenticatedGuestsGuestIdIndexRouteImport } from "./../routes/_authenticated/guests/$guestId/index";
+import { Route as AuthenticatedGuestsGuestIdEditRouteImport } from "./../routes/_authenticated/guests/$guestId/edit";
 import { Route as AuthenticatedRoomsRoomIdIndexRouteImport } from "./../routes/_authenticated/rooms/$roomId/index";
 import { Route as AuthenticatedRoomsRoomIdEditRouteImport } from "./../routes/_authenticated/rooms/$roomId/edit";
 
@@ -75,6 +76,12 @@ const AuthenticatedGuestsGuestIdIndexRoute =
     path: "/",
     getParentRoute: () => AuthenticatedGuestsGuestIdRouteRoute,
   } as any);
+const AuthenticatedGuestsGuestIdEditRoute =
+  AuthenticatedGuestsGuestIdEditRouteImport.update({
+    id: "/edit",
+    path: "/edit",
+    getParentRoute: () => AuthenticatedGuestsGuestIdRouteRoute,
+  } as any);
 const AuthenticatedRoomsRoomIdIndexRoute =
   AuthenticatedRoomsRoomIdIndexRouteImport.update({
     id: "/",
@@ -97,6 +104,7 @@ export interface FileRoutesByFullPath {
   "/rooms/new": typeof AuthenticatedRoomsNewRoute;
   "/guests/": typeof AuthenticatedGuestsIndexRoute;
   "/rooms/": typeof AuthenticatedRoomsIndexRoute;
+  "/guests/$guestId/edit": typeof AuthenticatedGuestsGuestIdEditRoute;
   "/rooms/$roomId/edit": typeof AuthenticatedRoomsRoomIdEditRoute;
   "/guests/$guestId/": typeof AuthenticatedGuestsGuestIdIndexRoute;
   "/rooms/$roomId/": typeof AuthenticatedRoomsRoomIdIndexRoute;
@@ -108,6 +116,7 @@ export interface FileRoutesByTo {
   "/rooms/new": typeof AuthenticatedRoomsNewRoute;
   "/guests": typeof AuthenticatedGuestsIndexRoute;
   "/rooms": typeof AuthenticatedRoomsIndexRoute;
+  "/guests/$guestId/edit": typeof AuthenticatedGuestsGuestIdEditRoute;
   "/rooms/$roomId/edit": typeof AuthenticatedRoomsRoomIdEditRoute;
   "/guests/$guestId": typeof AuthenticatedGuestsGuestIdIndexRoute;
   "/rooms/$roomId": typeof AuthenticatedRoomsRoomIdIndexRoute;
@@ -123,6 +132,7 @@ export interface FileRoutesById {
   "/_authenticated/rooms/new": typeof AuthenticatedRoomsNewRoute;
   "/_authenticated/guests/": typeof AuthenticatedGuestsIndexRoute;
   "/_authenticated/rooms/": typeof AuthenticatedRoomsIndexRoute;
+  "/_authenticated/guests/$guestId/edit": typeof AuthenticatedGuestsGuestIdEditRoute;
   "/_authenticated/rooms/$roomId/edit": typeof AuthenticatedRoomsRoomIdEditRoute;
   "/_authenticated/guests/$guestId/": typeof AuthenticatedGuestsGuestIdIndexRoute;
   "/_authenticated/rooms/$roomId/": typeof AuthenticatedRoomsRoomIdIndexRoute;
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | "/rooms/new"
     | "/guests/"
     | "/rooms/"
+    | "/guests/$guestId/edit"
     | "/rooms/$roomId/edit"
     | "/guests/$guestId/"
     | "/rooms/$roomId/";
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | "/rooms/new"
     | "/guests"
     | "/rooms"
+    | "/guests/$guestId/edit"
     | "/rooms/$roomId/edit"
     | "/guests/$guestId"
     | "/rooms/$roomId";
@@ -163,6 +175,7 @@ export interface FileRouteTypes {
     | "/_authenticated/rooms/new"
     | "/_authenticated/guests/"
     | "/_authenticated/rooms/"
+    | "/_authenticated/guests/$guestId/edit"
     | "/_authenticated/rooms/$roomId/edit"
     | "/_authenticated/guests/$guestId/"
     | "/_authenticated/rooms/$roomId/";
@@ -245,6 +258,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthenticatedGuestsGuestIdIndexRouteImport;
       parentRoute: typeof AuthenticatedGuestsGuestIdRouteRoute;
     };
+    "/_authenticated/guests/$guestId/edit": {
+      id: "/_authenticated/guests/$guestId/edit";
+      path: "/edit";
+      fullPath: "/guests/$guestId/edit";
+      preLoaderRoute: typeof AuthenticatedGuestsGuestIdEditRouteImport;
+      parentRoute: typeof AuthenticatedGuestsGuestIdRouteRoute;
+    };
     "/_authenticated/rooms/$roomId/": {
       id: "/_authenticated/rooms/$roomId/";
       path: "/";
@@ -263,11 +283,13 @@ declare module "@tanstack/react-router" {
 }
 
 interface AuthenticatedGuestsGuestIdRouteRouteChildren {
+  AuthenticatedGuestsGuestIdEditRoute: typeof AuthenticatedGuestsGuestIdEditRoute;
   AuthenticatedGuestsGuestIdIndexRoute: typeof AuthenticatedGuestsGuestIdIndexRoute;
 }
 
 const AuthenticatedGuestsGuestIdRouteRouteChildren: AuthenticatedGuestsGuestIdRouteRouteChildren =
   {
+    AuthenticatedGuestsGuestIdEditRoute: AuthenticatedGuestsGuestIdEditRoute,
     AuthenticatedGuestsGuestIdIndexRoute: AuthenticatedGuestsGuestIdIndexRoute,
   };
 

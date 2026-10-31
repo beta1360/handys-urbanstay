@@ -1,5 +1,5 @@
 export { useGuestListQuery } from "./api/guest-list-query";
-export { cacheSavedGuest } from "./api/guest-query";
+export { cacheSavedGuest, useRefetchGuest } from "./api/guest-query";
 export {
   GUEST_FIELD_LABELS,
   GUEST_INFO_MESSAGES,

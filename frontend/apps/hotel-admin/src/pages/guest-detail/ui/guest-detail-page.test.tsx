@@ -21,6 +21,7 @@ import { API_ERROR_CODES } from "@/shared/api";
 import type { Guest } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
+import { GUEST_DETAIL_ACTION_MESSAGES } from "@/widgets/guest-detail";
 import { GuestDetailPage } from "./guest-detail-page";
 
 const { fetchGuest } = vi.hoisted(() => ({ fetchGuest: vi.fn() }));
@@ -85,6 +86,7 @@ function renderGuestDetailPage(guestId = String(GUEST.id)) {
             path: "/",
             component: GuestDetailPage,
           }),
+          createRoute({ getParentRoute: () => guestRoute, path: "edit" }),
         ]),
       ]),
     ]),
@@ -124,7 +126,7 @@ afterEach(() => {
 });
 
 describe("GuestDetailPage", () => {
-  it("이용객의 이름·전화번호·이메일을 항목 목록으로 보여주고 위쪽에 목록으로 링크를 둔다", async () => {
+  it("이용객의 이름·전화번호·이메일을 항목 목록으로 보여주고 위쪽에 목록으로 링크와 수정 버튼을 둔다", async () => {
     renderGuestDetailPage();
 
     const terms = await screen.findAllByRole("term");
@@ -142,6 +144,9 @@ describe("GuestDetailPage", () => {
     const [backLink] = queryBackToListLinks();
     expect(backLink).toHaveAttribute("href", "/guests");
     expect(backLink).not.toHaveAttribute("aria-current");
+    expect(
+      screen.getByRole("link", { name: GUEST_DETAIL_ACTION_MESSAGES.edit }),
+    ).toHaveAttribute("href", `/guests/${GUEST.id}/edit`);
     expect(fetchGuest).toHaveBeenCalledExactlyOnceWith(GUEST.id);
   });
 
@@ -153,6 +158,9 @@ describe("GuestDetailPage", () => {
       COMMON_MESSAGES.loading,
     );
     expect(queryBackToListLinks()).toHaveLength(1);
+    expect(
+      screen.queryByRole("link", { name: GUEST_DETAIL_ACTION_MESSAGES.edit }),
+    ).not.toBeInTheDocument();
   });
 
   it("이용객이 없다는 404 응답이면 찾을 수 없다는 문구와 목록으로 버튼만 보여준다", async () => {
