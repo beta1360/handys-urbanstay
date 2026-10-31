@@ -6,7 +6,7 @@ import {
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -149,6 +149,38 @@ describe("AdminLayout", () => {
       });
       expect(roomMenu).toHaveAttribute("href", "/rooms");
       expect(roomMenu).toHaveAttribute("aria-current", "page");
+    },
+  );
+
+  it.each([
+    [
+      "MASTER",
+      [
+        ADMIN_LAYOUT_MESSAGES.roomMenuLabel,
+        ADMIN_LAYOUT_MESSAGES.guestMenuLabel,
+        ADMIN_LAYOUT_MESSAGES.operatorMenuLabel,
+      ],
+    ],
+    [
+      "OPERATOR",
+      [
+        ADMIN_LAYOUT_MESSAGES.roomMenuLabel,
+        ADMIN_LAYOUT_MESSAGES.guestMenuLabel,
+      ],
+    ],
+  ] as const)(
+    "역할이 %s면 사이드바 메뉴를 %j 순서로 보여준다",
+    async (role, menuLabels) => {
+      renderAdminLayout("/", { ...ACCOUNT, role });
+
+      const sidebar = await screen.findByRole("navigation", {
+        name: ADMIN_LAYOUT_MESSAGES.sidebarLabel,
+      });
+      expect(
+        within(sidebar)
+          .getAllByRole("link")
+          .map((link) => link.textContent),
+      ).toEqual(menuLabels);
     },
   );
 
