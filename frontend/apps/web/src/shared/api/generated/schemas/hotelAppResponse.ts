@@ -13,4 +13,6 @@ export interface HotelAppResponse {
   name: string;
   /** 주소(한 줄) */
   address: string;
+  /** 그 호텔의 객실 수(객실 상태와 관계없이 모두 셉니다). 0이면 객실이 없는 호텔이라 고를 수 없습니다. */
+  roomCount: number;
 }

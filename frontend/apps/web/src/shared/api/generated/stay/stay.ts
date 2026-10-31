@@ -228,7 +228,7 @@ export const getGetMyStaysUrl = (params?: GetMyStaysParams,) => {
 }
 
 /**
- * 로그인한 회원의 이용(예약)을 모든 호텔에서 페이지로 나눠 조회합니다. 회원 세션 쿠키로 호출하고, 로그인하지 않았으면 401 UNAUTHORIZED입니다. 회원과 연결된 이용객의 이용이며, 회원 기능 전에 같은 전화번호로 그 호텔에 예약했던 이용도 처음 예약할 때 그 이용객이 회원과 연결되면 함께 나옵니다. 취소한 이용도 함께 보여주고 canceledAt으로 구분합니다. 체크인 날짜 내림차순, 같으면 이용 id 내림차순으로 놓여 지금 이용 중이거나 앞으로의 이용이 지난 이용보다 위에 옵니다. page는 0~99(기본 0), size는 1~100(기본 10)입니다. 범위를 벗어나면 400 INVALID_INPUT으로 응답하고 fieldErrors에 파라미터 이름을 담습니다.
+ * 로그인한 회원의 이용(예약)을 모든 호텔에서 페이지로 나눠 조회합니다. 회원 세션 쿠키로 호출하고, 로그인하지 않았으면 401 UNAUTHORIZED입니다. 회원과 연결된 이용객의 이용이며, 회원 기능 전에 같은 전화번호로 그 호텔에 예약했던 이용도 처음 예약할 때 그 이용객이 회원과 연결되면 함께 나옵니다. 취소한 이용도 함께 보여주고 canceledAt으로 구분합니다. period로 지금·앞으로의 이용과 지난 이용을 나눠 받습니다. 오늘은 한국 시간 날짜입니다. period=UPCOMING은 체크아웃 날짜가 오늘보다 뒤인 이용(지금 이용 중이거나 예약한 이용)을 체크인 날짜 오름차순, 같으면 이용 id 오름차순으로 줍니다. period=PAST는 체크아웃 날짜가 오늘이거나 지난 이용을 체크인 날짜 내림차순, 같으면 이용 id 내림차순으로 줍니다. 무한 스크롤은 UPCOMING을 마지막 페이지까지 받은 뒤 PAST를 page=0부터 이어서 받습니다. period를 보내지 않거나 비어 있거나 공백만 있으면 모든 이용을 체크인 날짜 내림차순, 같으면 이용 id 내림차순으로 줍니다. period가 UPCOMING, PAST(대소문자 구분)가 아니면 400 INVALID_INPUT으로 응답하고 fieldErrors에 period를 담습니다. page는 0~99(기본 0), size는 1~100(기본 10)입니다. 범위를 벗어나면 400 INVALID_INPUT으로 응답하고 fieldErrors에 파라미터 이름을 담습니다.
  * @summary 내 이용 목록 조회
  */
 export const getMyStays = async (params?: GetMyStaysParams, options?: Parameters<typeof http>[1]): Promise<getMyStaysResponse> => {

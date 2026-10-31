@@ -1,4 +1,4 @@
-import { MyStayListEmpty, MyStayListView } from "@/entities/stay";
+import { MyStayFeed, MyStayListEmpty } from "@/entities/stay";
 import { loadMyStays } from "../model/load-my-stays";
 
 export async function MyStays() {
@@ -7,5 +7,5 @@ export async function MyStays() {
   if (state.status === "empty") {
     return <MyStayListEmpty />;
   }
-  return <MyStayListView sections={state.sections} />;
+  return <MyStayFeed initialPages={state.initialPages} />;
 }

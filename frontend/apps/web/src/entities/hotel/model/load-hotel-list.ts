@@ -1,13 +1,21 @@
 import type { Hotel } from "@/shared/api";
 import { getHotelList } from "../api/hotel-list";
 
+export type HotelListItem = Hotel & { bookable: boolean };
+
 export type HotelListState =
   | { status: "empty" }
-  | { status: "ready"; hotels: Hotel[] };
+  | { status: "ready"; hotels: HotelListItem[] };
 
 export async function loadHotelList(): Promise<HotelListState> {
   const { items } = await getHotelList();
   return items.length === 0
     ? { status: "empty" }
-    : { status: "ready", hotels: items };
+    : {
+        status: "ready",
+        hotels: items.map((hotel) => ({
+          ...hotel,
+          bookable: hotel.roomCount > 0,
+        })),
+      };
 }

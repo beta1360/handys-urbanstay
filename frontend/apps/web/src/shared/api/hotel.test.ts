@@ -9,7 +9,12 @@ vi.mock("./generated", async (importOriginal) => ({
   getHotels: vi.fn(),
 }));
 
-const HOTEL = { id: 1, name: "어반스테이 강남", address: "서울 강남구" };
+const HOTEL = {
+  id: 1,
+  name: "어반스테이 강남",
+  address: "서울 강남구",
+  roomCount: 12,
+};
 
 const HOTEL_PAGE = {
   items: [HOTEL],
