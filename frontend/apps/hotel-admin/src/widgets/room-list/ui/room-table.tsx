@@ -41,7 +41,10 @@ const ROOM_COLUMNS: readonly TableColumn<Room>[] = [
     header: ROOM_TABLE_MESSAGES.currentGuest,
     cell: (room) =>
       room.currentStay === null ? null : (
-        <TextLink to="/stays/$stayId" params={{ stayId: room.currentStay.id }}>
+        <TextLink
+          to="/guests/$guestId"
+          params={{ guestId: room.currentStay.guest.id }}
+        >
           {room.currentStay.guest.name}
         </TextLink>
       ),

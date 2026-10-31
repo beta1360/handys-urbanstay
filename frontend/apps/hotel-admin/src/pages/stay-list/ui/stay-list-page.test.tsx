@@ -14,6 +14,7 @@ import { STAY_CANCELED_LABELS, STAY_FIELD_LABELS } from "@/entities/stay";
 import { STAY_SEARCH_FORM_MESSAGES } from "@/features/stay-search";
 import type { Guest, Room, Stay, StayPage } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
+import { formatWon } from "@/shared/lib/money";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { STAY_LIST_CONTENT_MESSAGES } from "@/widgets/stay-list";
 import {
@@ -209,7 +210,7 @@ afterEach(() => {
 });
 
 describe("StayListPage 목록", () => {
-  it("이용 목록을 객실·이용객·체크인·체크아웃·인원·취소 여부·상세 열의 표로 보여주고 취소한 이용은 취소됨으로 표시한다", async () => {
+  it("이용 목록을 객실·이용객·체크인·체크아웃·인원·금액·취소 여부·상세 열의 표로 보여주고 금액은 최종 금액, 취소한 이용은 취소됨으로 표시한다", async () => {
     renderStayListPage();
 
     const table = await screen.findByRole("table");
@@ -223,6 +224,7 @@ describe("StayListPage 목록", () => {
       STAY_FIELD_LABELS.checkInDate,
       STAY_FIELD_LABELS.checkOutDate,
       STAY_FIELD_LABELS.guestCount,
+      STAY_FIELD_LABELS.amount,
       STAY_FIELD_LABELS.canceled,
       STAY_LIST_CONTENT_MESSAGES.detailHeader,
     ]);
@@ -234,6 +236,7 @@ describe("StayListPage 목록", () => {
         "2026-11-20",
         "2026-11-22",
         "3",
+        formatWon(STAYS[0].totalAmount),
         "",
         STAY_LIST_CONTENT_MESSAGES.detailLink,
       ],
@@ -243,6 +246,7 @@ describe("StayListPage 목록", () => {
         "2026-11-02",
         "2026-11-04",
         "2",
+        formatWon(STAYS[1].totalAmount),
         STAY_CANCELED_LABELS.true,
         STAY_LIST_CONTENT_MESSAGES.detailLink,
       ],

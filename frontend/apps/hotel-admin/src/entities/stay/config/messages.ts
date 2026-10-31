@@ -4,8 +4,13 @@ export const STAY_FIELD_LABELS = {
   guestPhone: "이용객 전화번호",
   checkInDate: "체크인 날짜",
   checkOutDate: "체크아웃 날짜",
-  nights: "박 수",
   guestCount: "인원",
+  roomRate: "1박 요금",
+  nights: "박 수",
+  baseAmount: "기본 금액",
+  discountAmount: "할인 금액",
+  totalAmount: "최종 금액",
+  amount: "금액",
   canceled: "취소 여부",
 } as const;
 

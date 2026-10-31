@@ -28,6 +28,7 @@ import {
 } from "@/shared/api";
 import type { Stay } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
+import { formatWon } from "@/shared/lib/money";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { StayDetailPage } from "./stay-detail-page";
 
@@ -174,7 +175,7 @@ afterEach(() => {
 });
 
 describe("StayDetailPage", () => {
-  it("객실·이용객 링크, 전화번호, 기간, 박 수, 인원을 항목 목록으로 보여주고 취소하지 않은 이용에는 취소 정보가 없다", async () => {
+  it("객실·이용객 링크, 전화번호, 기간, 인원, 예약 비용을 항목 목록으로 보여주고 취소하지 않은 이용에는 취소 정보가 없다", async () => {
     renderStayDetailPage();
 
     await screen.findByRole("link", { name: STAY.room.name });
@@ -184,9 +185,14 @@ describe("StayDetailPage", () => {
       [STAY_FIELD_LABELS.guestPhone, STAY.guest.phone],
       [STAY_FIELD_LABELS.checkInDate, STAY.checkInDate],
       [STAY_FIELD_LABELS.checkOutDate, STAY.checkOutDate],
-      [STAY_FIELD_LABELS.nights, "2"],
       [STAY_FIELD_LABELS.guestCount, String(STAY.guestCount)],
+      [STAY_FIELD_LABELS.roomRate, formatWon(STAY.roomRate)],
+      [STAY_FIELD_LABELS.nights, String(STAY.nights)],
+      [STAY_FIELD_LABELS.baseAmount, formatWon(STAY.baseAmount)],
+      [STAY_FIELD_LABELS.discountAmount, formatWon(STAY.discountAmount)],
+      [STAY_FIELD_LABELS.totalAmount, formatWon(STAY.totalAmount)],
     ]);
+    expect(formatWon(STAY.totalAmount)).toBe("200,000원");
     expect(
       screen.getByRole("link", { name: STAY.room.name }),
     ).toHaveAttribute("href", `/rooms/${STAY.room.id}`);

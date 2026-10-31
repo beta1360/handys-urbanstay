@@ -136,7 +136,7 @@ function renderRoomListPage(initialPath = roomsPath(), isMaster = true) {
         }),
         createRoute({
           getParentRoute: () => layoutRoute,
-          path: "stays/$stayId",
+          path: "guests/$guestId",
         }),
       ]),
     ]),
@@ -213,12 +213,12 @@ describe("RoomListPage 목록", () => {
     expect(fetchRooms).toHaveBeenCalledExactlyOnceWith({ page: 0 });
   });
 
-  it("지금 이용객 이름은 그 이용의 상세 화면으로 가는 링크다", async () => {
+  it("지금 이용객 이름은 그 이용객의 상세 화면으로 가는 링크다", async () => {
     renderRoomListPage();
 
     expect(
       await screen.findByRole("link", { name: "김이용" }),
-    ).toHaveAttribute("href", "/stays/5");
+    ).toHaveAttribute("href", "/guests/9");
   });
 
   it("객실 이름은 그 객실의 상세 화면으로 가는 링크다", async () => {
