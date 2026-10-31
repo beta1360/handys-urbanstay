@@ -4,6 +4,7 @@ object ApiPaths {
 	const val APP = "/api/v1/app"
 	const val APP_ADMIN = "/api/v1/app-admin"
 	const val HOTEL_ADMIN = "/api/v1/hotel-admin"
+	const val ADMINS = "/admins"
 	const val AUTH = "/auth"
 	const val HOTEL = "/hotel"
 	const val LOGIN = "/login"

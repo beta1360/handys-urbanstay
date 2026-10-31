@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository
 interface AppAdminRepository : JpaRepository<AppAdmin, Long> {
 
 	fun findByLoginId(loginId: String): AppAdmin?
+
+	fun existsByLoginId(loginId: String): Boolean
 }
