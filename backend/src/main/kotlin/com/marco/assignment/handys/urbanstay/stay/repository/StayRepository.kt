@@ -18,8 +18,6 @@ private const val GUEST = "guest"
 
 interface StayRepository : JpaRepository<Stay, Long>, JpaSpecificationExecutor<Stay> {
 
-	fun existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfterAndCanceledAtIsNull(roomId: Long, checkOutDate: LocalDate, checkInDate: LocalDate): Boolean
-
 	fun findByRoomIdAndCanceledAtIsNullAndCheckOutDateAfter(roomId: Long, date: LocalDate, pageable: Pageable): Page<Stay>
 
 	@EntityGraph(attributePaths = [ROOM, GUEST])

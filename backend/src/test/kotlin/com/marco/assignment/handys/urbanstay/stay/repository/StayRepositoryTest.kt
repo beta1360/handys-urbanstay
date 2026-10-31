@@ -128,6 +128,9 @@ class StayRepositoryTest {
 		assertThat(overlaps(room, CHECK_OUT, CHECK_OUT.plusDays(1))).isFalse()
 		assertThat(overlaps(room, CHECK_IN.minusDays(1), CHECK_IN)).isFalse()
 		assertThat(overlaps(otherRoom, CHECK_IN, CHECK_OUT)).isFalse()
+		stayRepository.saveAndFlush(Stay(room, guest, CHECK_OUT, CHECK_OUT.plusDays(2), 2))
+		assertThat(stayRepository.findOverlappedRoomIds(listOf(checkNotNull(room.id), checkNotNull(otherRoom.id)), CHECK_IN, CHECK_OUT.plusDays(2)))
+			.containsExactly(room.id)
 	}
 
 	@Test
@@ -190,7 +193,7 @@ class StayRepositoryTest {
 	}
 
 	private fun overlaps(room: Room, checkIn: LocalDate, checkOut: LocalDate): Boolean =
-		stayRepository.existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfterAndCanceledAtIsNull(checkNotNull(room.id), checkOut, checkIn)
+		stayRepository.findOverlappedRoomIds(listOf(checkNotNull(room.id)), checkIn, checkOut).isNotEmpty()
 
 	private fun room(name: String): Room = Room(hotel, name, "스탠다드", 20, null, null, LocalTime.of(15, 0), LocalTime.of(11, 0))
 

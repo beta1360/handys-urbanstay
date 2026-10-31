@@ -2,10 +2,13 @@ package com.marco.assignment.handys.urbanstay.room.repository
 
 import com.marco.assignment.handys.urbanstay.room.entity.Room
 import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
+import jakarta.persistence.LockModeType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Sort
 import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import java.time.Instant
@@ -31,6 +34,13 @@ interface RoomRepository : JpaRepository<Room, Long> {
 
 	@Query("select r from Room r where r.hotel.id = :hotelId order by collate(r.type as natural_sort), r.id")
 	fun findByHotelIdInTypeOrder(hotelId: Long): List<Room>
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select r from Room r where r.hotel.id = :hotelId and r.type = :type order by r.id")
+	fun lockByHotelIdAndType(hotelId: Long, type: String): List<Room>
+
+	@EntityGraph(attributePaths = ["hotel"])
+	fun findByIdIn(ids: Collection<Long>, sort: Sort): List<Room>
 
 	@Modifying(flushAutomatically = true, clearAutomatically = true)
 	@Query(

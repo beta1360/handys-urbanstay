@@ -81,6 +81,15 @@ class RoomService(
 		return roomRepository.findByHotelIdInTypeOrder(hotelId)
 	}
 
+	@Transactional
+	fun lockRoomsByType(hotelId: Long, type: String): List<Room> {
+		val locked = roomRepository.lockByHotelIdAndType(hotelId, type)
+		if (locked.isEmpty()) {
+			throw BusinessException(RoomErrorCode.ROOM_TYPE_NOT_FOUND)
+		}
+		return roomRepository.findByIdIn(locked.map { checkNotNull(it.id) }, NAME_ORDER)
+	}
+
 	@Transactional(readOnly = true)
 	fun getRoom(hotelId: Long, roomId: Long): Room = findRoom(hotelId, roomId)
 

@@ -7,6 +7,7 @@ import com.marco.assignment.handys.urbanstay.common.exception.InvalidField
 import com.marco.assignment.handys.urbanstay.common.exception.violates
 import com.marco.assignment.handys.urbanstay.guest.service.GuestService
 import com.marco.assignment.handys.urbanstay.room.entity.Room
+import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import com.marco.assignment.handys.urbanstay.room.service.RoomService
 import com.marco.assignment.handys.urbanstay.stay.entity.Stay
 import com.marco.assignment.handys.urbanstay.stay.exception.StayErrorCode
@@ -34,7 +35,8 @@ class StayService(
 
 	@Transactional
 	fun reserve(
-		roomId: Long,
+		hotelId: Long,
+		roomType: String,
 		checkInDate: LocalDate,
 		checkOutDate: LocalDate,
 		guestCount: Int,
@@ -42,10 +44,11 @@ class StayService(
 		guestPhone: String,
 		guestEmail: String,
 	): Stay {
-		val room = roomService.getRoomWithHotel(roomId)
-		checkValid(room, checkInDate, checkOutDate, guestCount)
-		checkNotOverlapped(roomId, checkInDate, checkOutDate)
-		val guest = guestService.getOrCreate(checkNotNull(room.hotel.id), guestName, guestPhone, guestEmail)
+		checkPeriod(checkInDate, checkOutDate)
+		val rooms = roomService.lockRoomsByType(hotelId, roomType)
+		val room = availableRooms(rooms, checkInDate, checkOutDate, guestCount).firstOrNull()
+			?: throw BusinessException(RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
+		val guest = guestService.getOrCreate(hotelId, guestName, guestPhone, guestEmail)
 		return translateConflicts { stayRepository.saveAndFlush(Stay(room, guest, checkInDate, checkOutDate, guestCount)) }
 	}
 
@@ -93,26 +96,15 @@ class StayService(
 	private fun findStay(hotelId: Long, stayId: Long): Stay =
 		stayRepository.findByIdAndRoomHotelId(stayId, hotelId) ?: throw BusinessException(StayErrorCode.STAY_NOT_FOUND)
 
-	private fun checkValid(room: Room, checkInDate: LocalDate, checkOutDate: LocalDate, guestCount: Int) {
-		throwIfInvalid(
-			invalidPeriod(checkInDate, checkOutDate) +
-				listOfNotNull(InvalidField(Stay::guestCount.name, MAX_VALUE, mapOf("value" to room.capacity)).takeIf { guestCount > room.capacity }),
+	private fun checkPeriod(checkInDate: LocalDate, checkOutDate: LocalDate) {
+		val invalidFields = listOfNotNull(
+			InvalidField(Stay::checkInDate.name, TODAY_OR_LATER).takeIf { checkInDate < LocalDate.now(clock) },
+			invalidCheckOutDate(checkInDate, checkOutDate),
 		)
-	}
-
-	private fun checkPeriod(checkInDate: LocalDate, checkOutDate: LocalDate) = throwIfInvalid(invalidPeriod(checkInDate, checkOutDate))
-
-	private fun throwIfInvalid(invalidFields: List<InvalidField>) {
 		if (invalidFields.isNotEmpty()) {
 			throw BusinessException(CommonErrorCode.INVALID_INPUT, invalidFields)
 		}
 	}
-
-	private fun invalidPeriod(checkInDate: LocalDate, checkOutDate: LocalDate): List<InvalidField> =
-		listOfNotNull(
-			InvalidField(Stay::checkInDate.name, TODAY_OR_LATER).takeIf { checkInDate < LocalDate.now(clock) },
-			invalidCheckOutDate(checkInDate, checkOutDate),
-		)
 
 	private fun invalidCheckOutDate(checkInDate: LocalDate, checkOutDate: LocalDate): InvalidField? =
 		when {
@@ -129,12 +121,6 @@ class StayService(
 		}
 		val overlappedIds = stayRepository.findOverlappedRoomIds(candidates.map { checkNotNull(it.id) }, checkInDate, checkOutDate).toSet()
 		return candidates.filter { it.id !in overlappedIds }
-	}
-
-	private fun checkNotOverlapped(roomId: Long, checkInDate: LocalDate, checkOutDate: LocalDate) {
-		if (stayRepository.existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfterAndCanceledAtIsNull(roomId, checkOutDate, checkInDate)) {
-			throw BusinessException(StayErrorCode.STAY_PERIOD_OVERLAPPED)
-		}
 	}
 
 	private fun translateConflicts(save: () -> Stay): Stay =
@@ -160,6 +146,5 @@ class StayService(
 		private const val TODAY_OR_LATER = "validation.today-or-later"
 		private const val AFTER_CHECK_IN = "validation.after-check-in"
 		private const val MAX_NIGHTS = "validation.max-nights"
-		private const val MAX_VALUE = "validation.max"
 	}
 }

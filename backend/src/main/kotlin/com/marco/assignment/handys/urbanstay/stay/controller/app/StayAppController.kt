@@ -81,14 +81,15 @@ class StayAppController(
 		ApiResponse.success(PageResponse.from(stayService.getReservedPeriods(roomId, page, size).map(StayReservedPeriodAppResponse::from)))
 
 	@Operation(summary = "openapi.app.operation.createStay.summary", description = "openapi.app.operation.createStay.description")
-	@RoomApiErrors(RoomErrorCode.ROOM_NOT_FOUND)
+	@RoomApiErrors(RoomErrorCode.ROOM_TYPE_NOT_FOUND, RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
 	@StayApiErrors(StayErrorCode.STAY_PERIOD_OVERLAPPED)
 	@SuccessMessage("success.stay.reserved")
 	@PostMapping("/stays")
 	@ResponseStatus(HttpStatus.CREATED)
 	fun createStay(@Valid @RequestBody request: StayCreateAppRequest): ApiResponse<StayAppResponse> {
 		val stay = stayService.reserve(
-			roomId = request.roomId,
+			hotelId = request.hotelId,
+			roomType = request.roomType,
 			checkInDate = request.checkInDate,
 			checkOutDate = request.checkOutDate,
 			guestCount = request.guestCount,
