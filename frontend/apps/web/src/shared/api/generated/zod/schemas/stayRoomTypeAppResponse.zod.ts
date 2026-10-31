@@ -7,10 +7,18 @@
  */
 import * as zod from 'zod';
 
+export const stayRoomTypeAppResponseCheckInTimeRegExp = new RegExp('^([01][0-9]|2[0-3]):[0-5][0-9]$');
+export const stayRoomTypeAppResponseCheckOutTimeRegExp = new RegExp('^([01][0-9]|2[0-3]):[0-5][0-9]$');
+
+
 export const StayRoomTypeAppResponse = zod.object({
-  "type": zod.string().describe('객실 유형 이름(객실의 유형 값). 예약 요청의 roomType에 그대로 보냅니다.'),
+  "id": zod.int().describe('객실 유형 ID. 예약 요청의 roomTypeId에 그대로 보냅니다.'),
+  "name": zod.string().describe('객실 유형 이름'),
+  "capacity": zod.int().describe('최대 인원. 이보다 많은 인원은 그 유형에 예약할 수 없습니다.'),
+  "roomRate": zod.int().describe('1박 요금(원)'),
+  "checkInTime": zod.stringFormat('time-local', stayRoomTypeAppResponseCheckInTimeRegExp).describe('체크인 시각("HH:mm")'),
+  "checkOutTime": zod.stringFormat('time-local', stayRoomTypeAppResponseCheckOutTimeRegExp).describe('체크아웃 시각("HH:mm")'),
   "roomCount": zod.int().describe('그 유형의 객실 수. 객실 상태와 예약에 관계없이 모두 셉니다.'),
-  "maxGuests": zod.int().describe('그 유형 객실의 최대 인원 중 가장 큰 값. 이보다 많은 인원은 그 유형에 예약할 수 없습니다.'),
   "availableCount": zod.int().describe('고른 기간과 인원으로 예약할 수 있는 객실 수. 0이면 그 유형은 예약할 수 없습니다(\'예약불가\').')
 });
 

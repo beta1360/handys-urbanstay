@@ -20,9 +20,27 @@ const PARAMS = {
   guestCount: 2,
 };
 
+const ROOM_TYPE_TIMES = { checkInTime: "15:00", checkOutTime: "11:00" };
+
 const ROOM_TYPES = [
-  { type: "디럭스", roomCount: 2, maxGuests: 4, availableCount: 0 },
-  { type: "스탠다드", roomCount: 3, maxGuests: 2, availableCount: 2 },
+  {
+    id: 1,
+    name: "디럭스",
+    capacity: 4,
+    roomRate: 150000,
+    ...ROOM_TYPE_TIMES,
+    roomCount: 2,
+    availableCount: 0,
+  },
+  {
+    id: 2,
+    name: "스탠다드",
+    capacity: 2,
+    roomRate: 90000,
+    ...ROOM_TYPE_TIMES,
+    roomCount: 3,
+    availableCount: 2,
+  },
 ];
 
 const HEADERS = new Headers();
@@ -48,11 +66,9 @@ describe("fetchHotelRoomTypes", () => {
     await expect(
       fetchHotelRoomTypes(HOTEL_ID, PARAMS, { signal }),
     ).resolves.toEqual(ROOM_TYPES);
-    expect(generated.getHotelRoomTypes).toHaveBeenCalledWith(
-      HOTEL_ID,
-      PARAMS,
-      { signal },
-    );
+    expect(generated.getHotelRoomTypes).toHaveBeenCalledWith(HOTEL_ID, PARAMS, {
+      signal,
+    });
   });
 
   it("인원이 1보다 작으면 요청을 보내지 않고 요청 검증 오류를 던진다", async () => {
@@ -68,7 +84,7 @@ describe("fetchHotelRoomTypes", () => {
       headers: HEADERS,
       data: {
         success: true,
-        data: [{ type: "디럭스", roomCount: 2, maxGuests: 4 }],
+        data: [{ id: 1, name: "디럭스", capacity: 4, roomCount: 2 }],
         message: null,
         error: null,
       },

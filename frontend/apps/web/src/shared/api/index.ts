@@ -4,6 +4,16 @@ export { fetchHotels } from "./hotel";
 export type { Hotel, HotelListParams, HotelPage } from "./hotel";
 export { http } from "./http";
 export {
+  fetchMe,
+  loginBodySchema,
+  loginMember,
+  logoutMember,
+  memberQueryKey,
+  signupBodySchema,
+  signupMember,
+} from "./member";
+export type { LoginBody, Member, SignupBody } from "./member";
+export {
   fetchHotelRoomTypes,
   hotelIdParamsSchema,
   roomTypeListParamsSchema,

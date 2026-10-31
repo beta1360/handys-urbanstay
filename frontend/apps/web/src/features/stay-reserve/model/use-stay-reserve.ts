@@ -65,12 +65,15 @@ export function useStayReserve(hotelId: number): StayReserveState {
   const { formState } = form;
   const fields = toFieldPropsMap(form, STAY_RESERVE_FIELDS);
   const isSubmitting = formState.isSubmitting || formState.isSubmitSuccessful;
-  const selectedType = useWatch({ control: form.control, name: "roomType" });
+  const selectedRoomTypeId = useWatch({
+    control: form.control,
+    name: "roomTypeId",
+  });
   const selectedRoomType =
     roomTypes.status === "ready"
       ? roomTypes.roomTypes.find(
-          ({ type, availableCount }) =>
-            type === selectedType && availableCount > 0,
+          ({ id, availableCount }) =>
+            String(id) === selectedRoomTypeId && availableCount > 0,
         )
       : undefined;
   const summary =
@@ -79,7 +82,7 @@ export function useStayReserve(hotelId: number): StayReserveState {
       : undefined;
 
   useEffect(() => {
-    form.resetField("roomType");
+    form.resetField("roomTypeId");
     form.clearErrors();
   }, [criteria, form]);
 
@@ -94,12 +97,12 @@ export function useStayReserve(hotelId: number): StayReserveState {
       event.preventDefault();
       return;
     }
-    const { criteria: period } = summary;
+    const { roomType, criteria: period } = summary;
     void form.handleSubmit(
-      ({ roomType, guest }) =>
+      () =>
         new Promise<void>((resolve) => {
           reserve(
-            { hotelId, roomType, ...period, guest },
+            { hotelId, roomTypeId: roomType.id, ...period },
             {
               onSuccess: ({ data, message }) => {
                 setReservation({ stay: data, message });

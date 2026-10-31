@@ -28,7 +28,7 @@ export function StayReserveCompleted({
       <StayDetailList
         rows={[
           { label: STAY_RESERVE_LABELS.hotel, value: stay.hotel.name },
-          { label: ROOM_TYPE_LABELS.roomType, value: stay.roomType },
+          { label: ROOM_TYPE_LABELS.roomType, value: stay.roomType.name },
           { label: STAY_LABELS.period, value: formatStayPeriod(stay) },
           {
             label: STAY_LABELS.guestCount,

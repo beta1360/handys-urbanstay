@@ -26,9 +26,11 @@ import type {
 
 import type {
   ApiResponseListStayRoomTypeAppResponse,
+  ApiResponsePageResponseStayMyAppResponse,
   ApiResponseStayAppResponse,
   ErrorApiResponse,
   GetHotelRoomTypesParams,
+  GetMyStaysParams,
   StayCreateAppRequest
 } from '../schemas';
 
@@ -64,6 +66,11 @@ export type createStayResponse400 = {
   status: 400
 }
 
+export type createStayResponse401 = {
+  data: ErrorApiResponse
+  status: 401
+}
+
 export type createStayResponse404 = {
   data: ErrorApiResponse
   status: 404
@@ -82,7 +89,7 @@ export type createStayResponse500 = {
 export type createStayResponseSuccess = (createStayResponse201) & {
   headers: Headers;
 };
-export type createStayResponseError = (createStayResponse400 | createStayResponse404 | createStayResponse409 | createStayResponse500) & {
+export type createStayResponseError = (createStayResponse400 | createStayResponse401 | createStayResponse404 | createStayResponse409 | createStayResponse500) & {
   headers: Headers;
 };
 
@@ -97,7 +104,7 @@ export const getCreateStayUrl = () => {
 }
 
 /**
- * 호텔의 객실 유형 하나를 기간과 인원으로 예약합니다. 로그인과 CSRF 토큰 없이 호출합니다. 게스트는 객실(호수)을 고르지 않습니다. 서버가 그 유형에서 예약할 수 있는 객실(최대 인원이 guestCount 이상이고 그 기간에 취소하지 않은 이용과 겹치지 않는 객실) 중 객실 이름순(이름 속 숫자는 숫자 크기로 비교, 같으면 객실 id순)으로 첫 객실을 배정하고, 응답에는 배정한 객실을 담지 않습니다. 객실 상태와 관계없이 배정하고, 예약해도 객실 상태는 바뀌지 않습니다. 같은 유형에 예약이 동시에 와도 한 객실에 기간이 겹치는 이용은 생기지 않습니다. 먼저 온 예약이 끝날 때까지 기다렸다가 남은 객실을 배정하고, 남은 객실이 없으면 409 ROOM_TYPE_UNAVAILABLE입니다. 예약하는 이용객의 이름, 전화번호, 이메일을 guest에 함께 보내며, 이용객과 이용은 함께 저장되거나 함께 저장되지 않습니다. 그 호텔에 하이픈을 뺀 숫자가 같은 전화번호의 이용객(예: 010-1234-5678과 01012345678)이 이미 있으면 그 이용객으로 예약하고, 그 이용객의 이름과 이메일은 바꾸지 않습니다(응답의 guest.name은 이미 있던 이용객의 이름입니다). 없으면 보낸 값으로 새 이용객을 등록합니다. 같은 새 이용객의 예약이 동시에 와도 이용객은 하나만 등록됩니다. 다른 호텔의 이용객과는 전화번호가 같아도 따로 등록합니다. 판단 순서는 요청 형식(필수·형식·길이·인원 1 이상, 400), 기간(400), 객실 유형(404), 예약할 수 있는 객실(409) 순입니다. 기간은 날짜 단위로 체크인 날짜부터 체크아웃 날짜 전날까지 묵는 것으로 보고(체크아웃 날은 비어 있음), 1박 이상 30박 이하이며 체크인 날짜는 오늘(한국 시간)이거나 그 뒤여야 합니다. 기간 규칙을 어기면 400 INVALID_INPUT으로 응답하고 fieldErrors에 틀린 항목(checkInDate, checkOutDate)을 모두 담습니다. 이용객 항목이 틀리면 fieldErrors의 필드는 guest.name, guest.phone, guest.email입니다. 그 호텔에 그 유형의 객실이 없으면(없는 호텔 포함) 404 ROOM_TYPE_NOT_FOUND로 응답합니다. 그 기간과 인원으로 예약할 수 있는 객실이 없으면(인원이 그 유형 모든 객실의 최대 인원보다 많을 때 포함) 409 ROOM_TYPE_UNAVAILABLE로 응답합니다. 취소한 이용과는 겹쳐도 되고, 체크아웃 날에 다른 이용이 체크인하는 것은 겹치지 않습니다(예: 11월 1일~3일과 3일~5일). 409 STAY_PERIOD_OVERLAPPED는 배정한 객실에 기간이 겹치는 이용이 DB 제약에 걸렸을 때의 안전망이며 보통은 나오지 않습니다. 성공하면 201과 함께 예약 내용(호텔, 객실 유형, 기간, 인원, 이용객 이름)을 돌려줍니다.
+ * 로그인한 회원이 호텔의 객실 유형 하나를 기간과 인원으로 예약합니다. 회원 세션 쿠키로 호출하고 CSRF 토큰은 쓰지 않습니다. 로그인하지 않았으면 401 UNAUTHORIZED입니다. 게스트는 객실(호수)을 고르지 않습니다. 서버가 그 유형에서 예약할 수 있는 객실(그 기간에 취소하지 않은 이용과 겹치지 않는 객실, guestCount는 유형의 최대 인원 이하) 중 객실 이름순(이름 속 숫자는 숫자 크기로 비교, 같으면 객실 id순)으로 첫 객실을 배정하고, 응답에는 배정한 객실을 담지 않습니다. 객실 상태와 관계없이 배정하고, 예약해도 객실 상태는 바뀌지 않습니다. 같은 유형에 예약이 동시에 와도 한 객실에 기간이 겹치는 이용은 생기지 않습니다. 먼저 온 예약이 끝날 때까지 기다렸다가 남은 객실을 배정하고, 남은 객실이 없으면 409 ROOM_TYPE_UNAVAILABLE입니다. 이용객 정보는 보내지 않고 로그인한 회원의 정보를 씁니다. 그 호텔에 하이픈을 뺀 숫자가 회원 전화번호와 같은 이용객(예: 010-1234-5678과 01012345678)이 있으면 그 이용객으로 예약하고 회원과 연결하며, 그 이용객의 이름과 이메일은 바꾸지 않습니다(응답의 guest.name은 이미 있던 이용객의 이름입니다). 없으면 회원의 이름, 전화번호, 이메일로 그 호텔의 이용객을 새로 만들고 회원과 연결합니다. 그 이용객이 이미 다른 회원과 연결되어 있으면 409 GUEST_LINKED_TO_OTHER_MEMBER로 응답하고 예약하지 않습니다. 이용객과 이용은 함께 저장되거나 함께 저장되지 않습니다. 같은 새 이용객의 예약이 동시에 와도 이용객은 하나만 만들어집니다. 판단 순서는 로그인(401), 요청 형식(필수·형식·인원 1 이상, 400), 기간(400), 객실 유형(404), 예약할 수 있는 객실(409 ROOM_TYPE_UNAVAILABLE), 이용객 연결(409 GUEST_LINKED_TO_OTHER_MEMBER) 순입니다. 기간은 날짜 단위로 체크인 날짜부터 체크아웃 날짜 전날까지 묵는 것으로 보고(체크아웃 날은 비어 있음), 1박 이상 30박 이하이며 체크인 날짜는 오늘(한국 시간)이거나 그 뒤여야 합니다. 기간 규칙을 어기면 400 INVALID_INPUT으로 응답하고 fieldErrors에 틀린 항목(checkInDate, checkOutDate)을 모두 담습니다. 없는 유형이거나 그 호텔의 유형이 아니면(없는 호텔 포함) 404 ROOM_TYPE_NOT_FOUND로 응답합니다. 그 기간과 인원으로 예약할 수 있는 객실이 없으면(인원이 그 유형의 최대 인원보다 많을 때, 그 유형에 객실이 없을 때 포함) 409 ROOM_TYPE_UNAVAILABLE로 응답합니다. 취소한 이용과는 겹쳐도 되고, 체크아웃 날에 다른 이용이 체크인하는 것은 겹치지 않습니다(예: 11월 1일~3일과 3일~5일). 409 STAY_PERIOD_OVERLAPPED는 배정한 객실에 기간이 겹치는 이용이 DB 제약에 걸렸을 때의 안전망이며 보통은 나오지 않습니다. 예약할 때 그 유형의 1박 요금으로 금액을 계산해 이용에 저장합니다(기본 금액 = 1박 요금 × 박 수, 할인 금액은 지금 0, 최종 금액 = 기본 금액 - 할인 금액). 나중에 유형의 요금이 바뀌어도 저장한 금액은 그대로입니다. 성공하면 201과 함께 예약 내용(호텔, 객실 유형, 기간, 인원, 금액, 이용객 이름)을 돌려줍니다.
  * @summary 예약
  */
 export const createStay = async (stayCreateAppRequest: StayCreateAppRequest, options?: Parameters<typeof http>[1]): Promise<createStayResponse> => {
@@ -176,7 +183,144 @@ export const useCreateStay = <TError = ErrorApiResponse,
       > => {
       return useMutation(getCreateStayMutationOptions(options), queryClient);
     }
-    export type getHotelRoomTypesResponse200 = {
+    export type getMyStaysResponse200 = {
+  data: ApiResponsePageResponseStayMyAppResponse
+  status: 200
+}
+
+export type getMyStaysResponse400 = {
+  data: ErrorApiResponse
+  status: 400
+}
+
+export type getMyStaysResponse401 = {
+  data: ErrorApiResponse
+  status: 401
+}
+
+export type getMyStaysResponse500 = {
+  data: ErrorApiResponse
+  status: 500
+}
+
+export type getMyStaysResponseSuccess = (getMyStaysResponse200) & {
+  headers: Headers;
+};
+export type getMyStaysResponseError = (getMyStaysResponse400 | getMyStaysResponse401 | getMyStaysResponse500) & {
+  headers: Headers;
+};
+
+export type getMyStaysResponse = (getMyStaysResponseSuccess | getMyStaysResponseError)
+
+export const getGetMyStaysUrl = (params?: GetMyStaysParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/app/me/stays?${stringifiedParams}` : `/api/v1/app/me/stays`
+}
+
+/**
+ * 로그인한 회원의 이용(예약)을 모든 호텔에서 페이지로 나눠 조회합니다. 회원 세션 쿠키로 호출하고, 로그인하지 않았으면 401 UNAUTHORIZED입니다. 회원과 연결된 이용객의 이용이며, 회원 기능 전에 같은 전화번호로 그 호텔에 예약했던 이용도 처음 예약할 때 그 이용객이 회원과 연결되면 함께 나옵니다. 취소한 이용도 함께 보여주고 canceledAt으로 구분합니다. 체크인 날짜 내림차순, 같으면 이용 id 내림차순으로 놓여 지금 이용 중이거나 앞으로의 이용이 지난 이용보다 위에 옵니다. page는 0~99(기본 0), size는 1~100(기본 10)입니다. 범위를 벗어나면 400 INVALID_INPUT으로 응답하고 fieldErrors에 파라미터 이름을 담습니다.
+ * @summary 내 이용 목록 조회
+ */
+export const getMyStays = async (params?: GetMyStaysParams, options?: Parameters<typeof http>[1]): Promise<getMyStaysResponse> => {
+
+  return http<getMyStaysResponse>(getGetMyStaysUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyStaysQueryKey = (params?: GetMyStaysParams,) => {
+    return [
+    `/api/v1/app/me/stays`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMyStaysQueryOptions = <TData = Awaited<ReturnType<typeof getMyStays>>, TError = ErrorApiResponse>(params?: GetMyStaysParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyStays>>, TError, TData>>, request?: SecondParameter<typeof http>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyStaysQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyStays>>> = ({ signal }) => getMyStays(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyStays>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetMyStaysQueryResult = NonNullable<Awaited<ReturnType<typeof getMyStays>>>
+export type GetMyStaysQueryError = ErrorApiResponse
+
+
+export function useGetMyStays<TData = Awaited<ReturnType<typeof getMyStays>>, TError = ErrorApiResponse>(
+ params: undefined |  GetMyStaysParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyStays>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMyStays>>,
+          TError,
+          Awaited<ReturnType<typeof getMyStays>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMyStays<TData = Awaited<ReturnType<typeof getMyStays>>, TError = ErrorApiResponse>(
+ params?: GetMyStaysParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyStays>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMyStays>>,
+          TError,
+          Awaited<ReturnType<typeof getMyStays>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMyStays<TData = Awaited<ReturnType<typeof getMyStays>>, TError = ErrorApiResponse>(
+ params?: GetMyStaysParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyStays>>, TError, TData>>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 내 이용 목록 조회
+ */
+
+export function useGetMyStays<TData = Awaited<ReturnType<typeof getMyStays>>, TError = ErrorApiResponse>(
+ params?: GetMyStaysParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyStays>>, TError, TData>>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetMyStaysQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export type getHotelRoomTypesResponse200 = {
   data: ApiResponseListStayRoomTypeAppResponse
   status: 200
 }
@@ -222,7 +366,7 @@ export const getGetHotelRoomTypesUrl = (hotelId: number,
 }
 
 /**
- * 호텔 하나의 객실 유형 목록을 고른 기간과 인원으로 조회합니다. 로그인과 CSRF 토큰 없이 호출합니다. 객실 유형은 객실의 유형(type) 값이고, 같은 호텔에서 유형 글자가 똑같은(대소문자 구분) 객실들이 한 유형입니다. 유형마다 객실 수(roomCount), 그 유형 객실의 최대 인원 중 가장 큰 값(maxGuests), 그 기간과 인원으로 예약할 수 있는 객실 수(availableCount)를 담습니다. 예약할 수 있는 객실은 최대 인원이 guestCount 이상이고 그 기간에 취소하지 않은 이용과 겹치지 않는 객실이며, 객실 상태와는 관계없습니다. availableCount가 0이면 그 유형은 예약할 수 없습니다(화면의 '예약불가'). 기간은 날짜 단위로 체크인 날짜부터 체크아웃 날짜 전날까지 묵는 것으로 보므로, 체크아웃 날에 다른 이용이 체크인하는 것은 겹치지 않습니다(예: 11월 1일~3일과 3일~5일). 유형 이름 오름차순으로 놓입니다. 이름 속 숫자는 숫자 크기로 비교하고(예: 2인실, 10인실 순), 숫자로 시작하는 이름, 영문, 한글 순이며, 대소문자만 다른 이름은 소문자가 먼저입니다(예: deluxe, Deluxe). 한 호텔의 유형 수는 많지 않고 화면이 한 번에 모두 보여주므로 페이지로 나누지 않고 전부 돌려줍니다. 객실이 없는 호텔이면 빈 목록입니다. 세 파라미터는 모두 필수이고, 날짜는 "YYYY-MM-DD" 형식만 받습니다. 빠졌거나 형식이 틀렸거나 인원이 1보다 적으면 먼저 400 INVALID_INPUT으로 응답하고 fieldErrors에 그 파라미터 이름을 담습니다. 그다음 예약과 같은 기간 규칙(체크인 날짜는 오늘(한국 시간)이거나 그 뒤, 체크아웃 날짜는 체크인 날짜보다 뒤이고 최대 30박)을 어기면 400 INVALID_INPUT으로 응답하고 fieldErrors에 틀린 항목(checkInDate, checkOutDate)을 모두 담습니다. 없는 호텔이면 404 HOTEL_NOT_FOUND이고, 400 검사가 먼저입니다.
+ * 호텔 하나의 객실 유형 목록을 고른 기간과 인원으로 조회합니다. 로그인과 CSRF 토큰 없이 호출합니다. 객실 유형은 호텔 마스터가 만든 유형이고, 유형마다 이름, 최대 인원(capacity), 1박 요금(roomRate), 체크인·체크아웃 시각, 그 유형의 객실 수(roomCount), 그 기간과 인원으로 예약할 수 있는 객실 수(availableCount)를 담습니다. 예약할 수 있는 객실은 그 유형의 최대 인원이 guestCount 이상이고 그 기간에 취소하지 않은 이용과 겹치지 않는 객실이며, 객실 상태와는 관계없습니다. availableCount가 0이면 그 유형은 예약할 수 없습니다(화면의 '예약불가'). 객실이 없는 유형도 roomCount 0, availableCount 0으로 나옵니다. 기간은 날짜 단위로 체크인 날짜부터 체크아웃 날짜 전날까지 묵는 것으로 보므로, 체크아웃 날에 다른 이용이 체크인하는 것은 겹치지 않습니다(예: 11월 1일~3일과 3일~5일). 유형 이름 오름차순(같으면 id 오름차순)으로 놓입니다. 이름 속 숫자는 숫자 크기로 비교하고(예: 2인실, 10인실 순), 숫자로 시작하는 이름, 영문, 한글 순이며, 대소문자만 다른 이름은 소문자가 먼저입니다(예: deluxe, Deluxe). 한 호텔의 유형 수는 많지 않고 화면이 한 번에 모두 보여주므로 페이지로 나누지 않고 전부 돌려줍니다. 유형이 없는 호텔이면 빈 목록입니다. 세 파라미터는 모두 필수이고, 날짜는 "YYYY-MM-DD" 형식만 받습니다. 빠졌거나 형식이 틀렸거나 인원이 1보다 적으면 먼저 400 INVALID_INPUT으로 응답하고 fieldErrors에 그 파라미터 이름을 담습니다. 그다음 예약과 같은 기간 규칙(체크인 날짜는 오늘(한국 시간)이거나 그 뒤, 체크아웃 날짜는 체크인 날짜보다 뒤이고 최대 30박)을 어기면 400 INVALID_INPUT으로 응답하고 fieldErrors에 틀린 항목(checkInDate, checkOutDate)을 모두 담습니다. 없는 호텔이면 404 HOTEL_NOT_FOUND이고, 400 검사가 먼저입니다.
  * @summary 호텔의 객실 유형별 예약 가능 객실 조회
  */
 export const getHotelRoomTypes = async (hotelId: number,

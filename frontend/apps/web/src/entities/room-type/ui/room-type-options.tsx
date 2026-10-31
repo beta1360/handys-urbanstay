@@ -20,20 +20,20 @@ export function RoomTypeOptions({
         const unavailable = roomType.availableCount === 0;
         return (
           <label
-            key={roomType.type}
+            key={roomType.id}
             className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white p-4 has-checked:border-gray-900 has-disabled:bg-gray-50 has-disabled:text-gray-400"
           >
             <input
               {...inputProps}
               type="radio"
-              value={roomType.type}
+              value={String(roomType.id)}
               disabled={unavailable}
               className="size-4 accent-gray-900"
             />
             <span className="flex flex-1 flex-col gap-0.5">
-              <span className="font-semibold">{roomType.type}</span>
+              <span className="font-semibold">{roomType.name}</span>
               <span className="text-sm text-gray-500">
-                {ROOM_TYPE_MESSAGES.maxGuests(roomType.maxGuests)}
+                {ROOM_TYPE_MESSAGES.maxGuests(roomType.capacity)}
               </span>
             </span>
             <span className="text-sm font-medium">

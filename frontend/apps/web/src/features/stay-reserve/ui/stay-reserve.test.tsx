@@ -11,7 +11,7 @@ import {
   fetchHotelRoomTypes,
 } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
-import { STAY_RESERVE_LABELS, STAY_RESERVE_MESSAGES } from "../config/messages";
+import { STAY_RESERVE_MESSAGES } from "../config/messages";
 import { StayReserve } from "./stay-reserve";
 
 vi.mock("next/navigation", () => ({
@@ -32,20 +32,29 @@ const CRITERIA = {
   guestCount: 2,
 };
 
-const DELUXE = { type: "디럭스", roomCount: 2, maxGuests: 4, availableCount: 0 };
+const ROOM_TYPE_TIMES = { checkInTime: "15:00", checkOutTime: "11:00" };
+
+const DELUXE = {
+  id: 1,
+  name: "디럭스",
+  capacity: 4,
+  roomRate: 150000,
+  ...ROOM_TYPE_TIMES,
+  roomCount: 2,
+  availableCount: 0,
+};
 
 const STANDARD = {
-  type: "스탠다드",
+  id: 2,
+  name: "스탠다드",
+  capacity: 2,
+  roomRate: 90000,
+  ...ROOM_TYPE_TIMES,
   roomCount: 3,
-  maxGuests: 2,
   availableCount: 2,
 };
 
-const GUEST = {
-  name: "김이용",
-  phone: "010-1234-5678",
-  email: "guest@example.com",
-};
+const GUEST_NAME = "김이용";
 
 const SEARCH_CHILD = "검색 폼 자리";
 
@@ -68,19 +77,7 @@ async function selectStandardAndSubmit(
   user: ReturnType<typeof userEvent.setup>,
 ) {
   await user.click(
-    await screen.findByRole("radio", { name: new RegExp(STANDARD.type) }),
-  );
-  await user.type(
-    screen.getByLabelText(STAY_RESERVE_LABELS.guestName),
-    GUEST.name,
-  );
-  await user.type(
-    screen.getByLabelText(STAY_RESERVE_LABELS.guestPhone),
-    GUEST.phone,
-  );
-  await user.type(
-    screen.getByLabelText(STAY_RESERVE_LABELS.guestEmail),
-    GUEST.email,
+    await screen.findByRole("radio", { name: new RegExp(STANDARD.name) }),
   );
   await user.click(
     screen.getByRole("button", { name: STAY_RESERVE_MESSAGES.submit }),
@@ -108,9 +105,9 @@ describe("StayReserve", () => {
     renderStayReserve();
 
     const standard = await screen.findByRole("radio", {
-      name: new RegExp(STANDARD.type),
+      name: new RegExp(STANDARD.name),
     });
-    const deluxe = screen.getByRole("radio", { name: new RegExp(DELUXE.type) });
+    const deluxe = screen.getByRole("radio", { name: new RegExp(DELUXE.name) });
     expect(fetchHotelRoomTypes).toHaveBeenCalledWith(
       HOTEL_ID,
       CRITERIA,
@@ -120,7 +117,7 @@ describe("StayReserve", () => {
     expect(deluxe).toBeDisabled();
     expect(screen.getByText(SEARCH_CHILD)).toBeInTheDocument();
     expect(
-      screen.queryByLabelText(STAY_RESERVE_LABELS.guestName),
+      screen.queryByRole("button", { name: STAY_RESERVE_MESSAGES.submit }),
     ).not.toBeInTheDocument();
   });
 
@@ -129,9 +126,14 @@ describe("StayReserve", () => {
       data: {
         id: 11,
         hotel: { id: HOTEL_ID, name: "어반스테이 강남" },
-        roomType: STANDARD.type,
+        roomType: { id: STANDARD.id, name: STANDARD.name },
         ...CRITERIA,
-        guest: { name: GUEST.name },
+        roomRate: STANDARD.roomRate,
+        nights: 2,
+        baseAmount: 180000,
+        discountAmount: 0,
+        totalAmount: 180000,
+        guest: { name: GUEST_NAME },
       },
       message: "예약을 완료했습니다.",
     });
@@ -145,18 +147,17 @@ describe("StayReserve", () => {
     expect(heading).toHaveFocus();
     expect(vi.mocked(createStay).mock.calls[0][0]).toEqual({
       hotelId: HOTEL_ID,
-      roomType: STANDARD.type,
+      roomTypeId: STANDARD.id,
       ...CRITERIA,
-      guest: GUEST,
     });
     expect(
       screen.getAllByRole("definition").map((detail) => detail.textContent),
     ).toEqual([
       "어반스테이 강남",
-      STANDARD.type,
+      STANDARD.name,
       formatStayPeriod(CRITERIA),
       COMMON_MESSAGES.people(CRITERIA.guestCount),
-      GUEST.name,
+      GUEST_NAME,
     ]);
     expect(screen.queryByText(SEARCH_CHILD)).not.toBeInTheDocument();
   });
@@ -170,7 +171,7 @@ describe("StayReserve", () => {
       }),
     );
     const { user } = renderStayReserve();
-    await screen.findByRole("radio", { name: new RegExp(STANDARD.type) });
+    await screen.findByRole("radio", { name: new RegExp(STANDARD.name) });
     vi.mocked(fetchHotelRoomTypes).mockResolvedValue([
       DELUXE,
       { ...STANDARD, availableCount: 0 },
@@ -183,31 +184,9 @@ describe("StayReserve", () => {
     );
     await waitFor(() =>
       expect(
-        screen.getByRole("radio", { name: new RegExp(STANDARD.type) }),
+        screen.getByRole("radio", { name: new RegExp(STANDARD.name) }),
       ).toBeDisabled(),
     );
     expect(fetchHotelRoomTypes).toHaveBeenCalledTimes(2);
-  });
-
-  it("400 fieldErrors는 경로가 같은 이용객 칸에 서버 문구로 보여준다", async () => {
-    vi.mocked(createStay).mockRejectedValue(
-      new ApiResponseError("createStay", 400, {
-        code: API_ERROR_CODES.invalidInput,
-        message: "입력값이 올바르지 않습니다.",
-        fieldErrors: [
-          { field: "guest.phone", message: "전화번호 형식이 올바르지 않습니다." },
-        ],
-      }),
-    );
-    const { user } = renderStayReserve();
-
-    await selectStandardAndSubmit(user);
-
-    const phone = screen.getByLabelText(STAY_RESERVE_LABELS.guestPhone);
-    await waitFor(() => expect(phone).toHaveAttribute("aria-invalid", "true"));
-    expect(
-      screen.getByText("전화번호 형식이 올바르지 않습니다."),
-    ).toBeInTheDocument();
-    expect(phone).toHaveFocus();
   });
 });

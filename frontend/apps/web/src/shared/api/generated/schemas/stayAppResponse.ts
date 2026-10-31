@@ -7,20 +7,31 @@
  */
 import type { StayGuestAppResponse } from './stayGuestAppResponse';
 import type { StayHotelAppResponse } from './stayHotelAppResponse';
+import type { StayRoomTypeSummaryAppResponse } from './stayRoomTypeSummaryAppResponse';
 
 export interface StayAppResponse {
   /** 이용(예약) ID */
   id: number;
   /** 예약한 호텔 */
   hotel: StayHotelAppResponse;
-  /** 예약한 객실 유형. 배정한 객실(호수)은 담지 않습니다. */
-  roomType: string;
+  /** 예약한 객실 유형(id와 조회 시점의 이름). 배정한 객실(호수)은 담지 않습니다. */
+  roomType: StayRoomTypeSummaryAppResponse;
   /** 체크인 날짜("YYYY-MM-DD") */
   checkInDate: string;
   /** 체크아웃 날짜("YYYY-MM-DD"). 이 날은 묵지 않습니다. */
   checkOutDate: string;
   /** 인원 */
   guestCount: number;
+  /** 예약할 때의 1박 요금(원). 나중에 유형의 요금이 바뀌어도 그대로입니다. */
+  roomRate: number;
+  /** 박 수(체크아웃 날짜 - 체크인 날짜) */
+  nights: number;
+  /** 기본 금액(원). 1박 요금 × 박 수 */
+  baseAmount: number;
+  /** 할인 금액(원). 지금은 항상 0입니다. */
+  discountAmount: number;
+  /** 최종 금액(원). 기본 금액 - 할인 금액 */
+  totalAmount: number;
   /** 예약한 이용객. 같은 전화번호의 이용객이 이미 있었으면 그 이용객의 이름입니다. */
   guest: StayGuestAppResponse;
 }

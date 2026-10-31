@@ -16,20 +16,24 @@ const HEADERS = new Headers();
 
 const BODY = {
   hotelId: 3,
-  roomType: "스탠다드",
+  roomTypeId: 2,
   checkInDate: "2026-11-04",
   checkOutDate: "2026-11-06",
   guestCount: 2,
-  guest: { name: "김이용", phone: "010-1234-5678", email: "guest@example.com" },
 };
 
 const RESERVED_STAY = {
   id: 11,
   hotel: { id: 3, name: "어반스테이 강남" },
-  roomType: "스탠다드",
+  roomType: { id: 2, name: "스탠다드" },
   checkInDate: "2026-11-04",
   checkOutDate: "2026-11-06",
   guestCount: 2,
+  roomRate: 90000,
+  nights: 2,
+  baseAmount: 180000,
+  discountAmount: 0,
+  totalAmount: 180000,
   guest: { name: "김이용" },
 };
 
@@ -64,10 +68,10 @@ describe("createStay", () => {
     expect(generated.createStay).toHaveBeenCalledWith(BODY);
   });
 
-  it("전화번호 형식이 틀리면 요청을 보내지 않고 요청 검증 오류를 던진다", async () => {
-    await expect(
-      createStay({ ...BODY, guest: { ...BODY.guest, phone: "010-12" } }),
-    ).rejects.toBeInstanceOf(RequestValidationError);
+  it("인원이 1보다 작으면 요청을 보내지 않고 요청 검증 오류를 던진다", async () => {
+    await expect(createStay({ ...BODY, guestCount: 0 })).rejects.toBeInstanceOf(
+      RequestValidationError,
+    );
     expect(generated.createStay).not.toHaveBeenCalled();
   });
 
