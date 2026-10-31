@@ -5,3 +5,8 @@ const HOTEL_LIST_PARAMS = { page: 0, size: 100 } as const;
 export function getHotelList() {
   return fetchHotels(HOTEL_LIST_PARAMS);
 }
+
+export async function findHotel(hotelId: number) {
+  const { items } = await getHotelList();
+  return items.find((hotel) => hotel.id === hotelId);
+}
