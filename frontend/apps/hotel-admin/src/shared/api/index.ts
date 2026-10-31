@@ -79,6 +79,8 @@ export type {
   UpdateRoomStatusBody,
 } from "./room";
 export {
+  cancelStay,
+  cancelStayBodySchema,
   fetchStay,
   fetchStays,
   stayListParamsSchema,
@@ -86,4 +88,4 @@ export {
   stayParamsSchema,
   stayQueryKey,
 } from "./stay";
-export type { Stay, StayListParams, StayPage } from "./stay";
+export type { CancelStayBody, Stay, StayListParams, StayPage } from "./stay";

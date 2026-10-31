@@ -10,11 +10,20 @@ const koreanDateTimeFormat = new Intl.DateTimeFormat("ko-KR", {
   hourCycle: "h23",
 });
 
-export function formatKoreanDateTime(isoDateTime: string) {
-  const parts = Object.fromEntries(
+function toKoreanParts(date: Date) {
+  return Object.fromEntries(
     koreanDateTimeFormat
-      .formatToParts(new Date(isoDateTime))
+      .formatToParts(date)
       .map(({ type, value }) => [type, value]),
   );
+}
+
+export function formatKoreanDateTime(isoDateTime: string) {
+  const parts = toKoreanParts(new Date(isoDateTime));
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
+}
+
+export function getKoreanToday() {
+  const parts = toKoreanParts(new Date());
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }

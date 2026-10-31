@@ -39,6 +39,11 @@
   - 이용객 거르기는 선택 입력 없이 URL의 `guestId`로만 받는다(이용객 상세의 '이용 보기'). 걸려 있으면 검색 폼 아래에 '이용객: 이름 (전화번호)'와 이용객 거르기만 푸는 링크를 보여준다. 이름은 이용객 조회로 읽고, 불러오는 중·찾을 수 없음·실패에는 `entities/guest`의 문구를 대신 보여준다.
   - URL의 `roomId`·`guestId`는 숫자만 있는 1 이상의 안전한 정수만, `canceled`는 `true`·`false`(소문자)만 쓰고 그 밖의 값은 지운다. 거르기 값이 하나라도 있는데 목록이 비면 '검색 결과가 없습니다'를 보여준다.
   - 상세는 객실(객실 상세 링크)·이용객(이용객 상세 링크)·이용객 전화번호·체크인 날짜·체크아웃 날짜·박 수·인원이다. 취소한 이용은 아래에 '취소 정보' 카드(취소 시각(한국 시간 `YYYY-MM-DD HH:mm`)·처리한 계정 이름·사유, 사유가 없으면 '사유 없음'을 회색으로)를 더한다. 대상 없음은 `STAY_NOT_FOUND`다.
+  - 이용은 상세에서 취소한다. 취소하지 않았고 끝나지 않은 이용(체크아웃 날짜가 한국 시간 오늘(`getKoreanToday`)보다 뒤)이면 상세 내용 아래에 '이용 취소' 묶음을 둔다. 판단은 `entities/stay`의 `isStayCancelable`이다.
+  - '이용 취소'를 누르면 라이브러리나 `window.confirm` 없이 화면 안에 되돌릴 수 없다는 안내, 취소 사유 칸(선택), '취소 확정'·'닫기' 버튼이 열리고 사유 칸에 초점이 간다. '취소 확정'이 확인 버튼이다. '닫기'는 입력을 버리고 '이용 취소' 버튼에 초점을 돌린다.
+  - 사유는 앞뒤 공백을 지운 뒤 200자 이하(생성된 요청 스키마)로 제출할 때 검사한다. 비면 사유 없이 빈 본문(`{}`)을 보낸다. 제출 중에는 '취소 확정'을 로딩 상태로 두고 다시 제출하지 않는다.
+  - 성공하면 이용 상세·목록을 무효화하고, 객실이 예약됨이었으면 공실로 바뀌므로 객실 상세·목록·상태 이력도 `entities/room`의 `refreshRoomStatus`로 무효화한다. 다시 불러올 때까지 요청 중으로 두고, 끝나면 서버 문구를 토스트로 보여준다. 다시 불러온 이용에는 취소 정보 카드가 보이고 '이용 취소' 묶음은 사라진다.
+  - 이미 취소했다는 409(`STAY_ALREADY_CANCELED`)와 끝난 이용이라는 409(`STAY_ALREADY_ENDED`)는 서버 문구를 오류 토스트로 보여주고 성공과 같게 다시 불러온다. 사유 칸의 400은 칸 아래에, 그 밖의 실패는 오류 토스트로 보여준다. 401은 사용 중 로그인 만료를 따른다.
 - 운영자 관리는 호텔 마스터(`MASTER`)만 한다(`docs/domain.md`의 '호텔 운영자'). 목록(`/operators`, `?keyword=&active=&page=`), 등록(`/operators/new`), 상세(`/operators/$operatorId`), 수정(`/operators/$operatorId/edit`) 화면이다. 화면 동작은 `frontend/docs/admin-app.md`의 '목록 화면'·'상세 화면'·'등록·수정 화면'을 따르고, 아래만 더한다.
   - 마스터 판단은 `entities/account`의 `isMaster`다. `/operators/**`는 `operators/route.tsx`의 `beforeLoad`가 캐시된 내 정보로 `isMaster`를 route context에 넣고(`app/auth/master-guard.ts`), `pages/operator-access`가 마스터가 아니면 하위 화면 대신 '권한이 없습니다' 문구와 '객실 목록으로' 버튼을 카드에 보여준다. 하위 화면을 그리지 않으므로 운영자 API 요청을 보내지 않는다. 서버도 403 `FORBIDDEN`으로 막는다.
   - 목록 열은 이름·아이디·사용 여부('사용 중'·'사용 안 함', `entities/operator`의 `OPERATOR_ACTIVE_LABELS`)다. 검색어는 이름 또는 아이디다. 사용 여부 거르기는 검색 폼 안의 선택 입력(`SelectField`, '전체'·'사용 중'·'사용 안 함')으로 하고, 객실 상태처럼 '검색'을 눌러야 반영한다. URL의 `active`는 `true`·`false`만 쓰고 그 밖의 값은 지운다. 정렬(최근 등록순)과 검색 기준은 서버가 정한다.
@@ -58,13 +63,13 @@
 - 라우터의 URL search 직렬화는 `src/shared/lib/search-params`의 `parseSearch`·`stringifySearch`를 쓴다(일반 쿼리 문자열). 테스트용 memory 라우터도 같은 함수를 넣는다.
 - 도메인과 무관한 폼 도우미, 토스트 상태, 화면 이동 링크, 요청·응답 검증과 서버와 같은 입력 검증 문구는 `@repo/admin-kit`의 것을 쓴다(`frontend/docs/admin-app.md`의 'packages/admin-kit를 쓰는 법').
 - 서버 상태는 `frontend/CLAUDE.md`의 '서버 상태'를 따른다.
-  - `shared/api`: 검증을 거친 요청 함수(`fetchMe`, 로그인·로그아웃, 객실 목록·조회·등록·수정·상태 변경, 객실 상태 이력 조회, 이용객 목록·조회·등록·수정, 이용 목록·조회, 운영자 목록·조회·등록·수정·비밀번호 재설정·사용 여부 변경)와 쿼리 키 함수(`meQueryKey`, `roomListQueryKey`, `roomQueryKey`, `roomStatusHistoriesQueryKey`, `guestListQueryKey`, `guestQueryKey`, `stayListQueryKey`, `stayQueryKey`, `operatorListQueryKey`, `operatorQueryKey`), 서버 오류 정보 읽기(`getApiError`)와 오류 코드(`API_ERROR_CODES`)
+  - `shared/api`: 검증을 거친 요청 함수(`fetchMe`, 로그인·로그아웃, 객실 목록·조회·등록·수정·상태 변경, 객실 상태 이력 조회, 이용객 목록·조회·등록·수정, 이용 목록·조회·취소, 운영자 목록·조회·등록·수정·비밀번호 재설정·사용 여부 변경)와 쿼리 키 함수(`meQueryKey`, `roomListQueryKey`, `roomQueryKey`, `roomStatusHistoriesQueryKey`, `guestListQueryKey`, `guestQueryKey`, `stayListQueryKey`, `stayQueryKey`, `operatorListQueryKey`, `operatorQueryKey`), 서버 오류 정보 읽기(`getApiError`)와 오류 코드(`API_ERROR_CODES`)
   - `entities/account/api`: 내 정보 조회(`useMe`, `ensureMe`)와 로그인 상태 캐시 규칙(`startSession`, `endSession`, `forgetMe`, `isPendingMeQuery`). 마스터 판단(`isMaster`)은 `entities/account/lib`에 둔다
   - `entities/room/api`: 객실 목록 조회(`useRoomListQuery`), 객실 조회(`useRoomQuery`)와 새로 조회(`useRefetchRoom`), 객실 상태 이력 조회(`useRoomStatusHistoryQuery`), 저장한 객실 캐시 규칙(`cacheSavedRoom`), 상태를 바꾼 뒤 다시 불러오기(`refreshRoomStatus`: 객실 상세·상태 이력을 다시 불러오고 목록을 무효화한다)
   - `entities/guest/api`: 이용객 목록 조회(`useGuestListQuery`), 이용객 조회(`useGuestQuery`)와 새로 조회(`useRefetchGuest`), 저장한 이용객 캐시 규칙(`cacheSavedGuest`)
-  - `entities/stay/api`: 이용 목록 조회(`useStayListQuery`), 이용 조회(`useStayQuery`, `useStay`가 쓴다)
+  - `entities/stay/api`: 이용 목록 조회(`useStayListQuery`), 이용 조회(`useStayQuery`, `useStay`가 쓴다), 취소한 뒤 다시 불러오기(`refreshStay`)
   - `entities/operator/api`: 운영자 목록 조회(`useOperatorListQuery`), 운영자 조회(`useOperatorQuery`)와 새로 조회(`useRefetchOperator`), 저장한 운영자 캐시 규칙(`cacheSavedOperator`), 계정을 바꾼 뒤 다시 불러오기(`refreshOperator`: 운영자 상세를 다시 불러오고 목록을 무효화한다)
-  - `features/<동작>/api`: `auth-login`(`useLogin`), `auth-logout`(`useLogout`), `room-create`(`useCreateRoom`), `room-update`(`useUpdateRoom`), `room-status-change`(`useChangeRoomStatus`: 성공과 상태 409 두 가지면 `refreshRoomStatus`가 끝날 때까지 요청 중으로 둔다), `guest-create`(`useCreateGuest`), `guest-update`(`useUpdateGuest`), `operator-create`(`useCreateOperator`), `operator-update`(`useUpdateOperator`), `operator-password-reset`(`useResetOperatorPassword`), `operator-active-change`(`useChangeOperatorActive`). 뒤 둘은 성공하면 `refreshOperator`가 끝날 때까지 요청 중으로 둔다
+  - `features/<동작>/api`: `auth-login`(`useLogin`), `auth-logout`(`useLogout`), `room-create`(`useCreateRoom`), `room-update`(`useUpdateRoom`), `room-status-change`(`useChangeRoomStatus`: 성공과 상태 409 두 가지면 `refreshRoomStatus`가 끝날 때까지 요청 중으로 둔다), `guest-create`(`useCreateGuest`), `guest-update`(`useUpdateGuest`), `operator-create`(`useCreateOperator`), `operator-update`(`useUpdateOperator`), `operator-password-reset`(`useResetOperatorPassword`), `operator-active-change`(`useChangeOperatorActive`), `stay-cancel`(`useCancelStay`: 성공과 취소할 수 없다는 409 두 가지면 `refreshStay`·`refreshRoomStatus`가 끝날 때까지 요청 중으로 둔다). 운영자의 뒤 둘은 성공하면 `refreshOperator`가 끝날 때까지 요청 중으로 둔다
 - 라우트 트리는 `src/app/router/route-tree.gen.ts`에 생성된다. 직접 수정하지 않고 커밋한다.
 - 라우트 생성 설정은 `tsr.config.json`에만 둔다.
 
@@ -106,7 +111,7 @@ apps/hotel-admin/
    │  ├─ guest-list/   # 이용객 목록. model: useGuestList(상태별 내용, 마지막 페이지를 넘으면 바꿔 이동, 페이지 이동). ui: GuestList(연결)·표·빈 상태·불러오기 실패·페이지 이동
    │  ├─ guest-detail/ # 이용객 상세. 상태별 내용과 '목록으로'·'이용 보기'·'수정' 링크 줄
    │  ├─ stay-list/    # 이용 목록. model: useStayList(상태별 내용, 마지막 페이지를 넘으면 바꿔 이동, 페이지 이동). ui: StayList(연결)·표·빈 상태·불러오기 실패·페이지 이동
-   │  ├─ stay-detail/  # 이용 상세. 상태별 내용, '목록으로' 링크 줄, 취소했으면 취소 정보
+   │  ├─ stay-detail/  # 이용 상세. 상태별 내용, '목록으로' 링크 줄, 취소했으면 취소 정보, 취소할 수 있으면 이용 취소
    │  ├─ operator-list/ # 운영자 목록. model: useOperatorList(상태별 내용, 마지막 페이지를 넘으면 바꿔 이동, 페이지 이동). ui: OperatorList(연결)·표·빈 상태·불러오기 실패·페이지 이동
    │  └─ operator-detail/ # 운영자 상세. 상태별 내용과 '목록으로'·'수정' 링크 줄, 내용 아래의 비밀번호 재설정·사용 여부 바꾸기
    ├─ features/
@@ -118,6 +123,7 @@ apps/hotel-admin/
    │  ├─ room-update/  # 객실 수정. api: useUpdateRoom. model: 폼 스키마·값 채우기, useRoomUpdateForm(수정 충돌이면 최신 내용 불러오기). ui: RoomUpdate(불러오기 상태)·RoomUpdateForm(연결)·표현
    │  ├─ guest-search/ # 이용객 목록 검색(이름 또는 전화번호). model: useGuestSearchForm(제출하면 1페이지로 이동). ui: GuestSearchForm(연결)·GuestSearchFormView(표현)
    │  ├─ stay-search/  # 이용 목록 거르기(객실·취소 여부, 이용객 거르기 표시와 풀기 링크). model: useStaySearchForm(제출하면 이용객 거르기를 두고 1페이지로 이동), useStayGuestFilter(이용객 이름 문구). ui: StaySearchForm·StayGuestFilter(연결)와 표현
+   │  ├─ stay-cancel/  # 이용 취소. api: useCancelStay(성공·409면 이용·객실 캐시 다시 불러오기). model: 사유 폼 스키마, useStayCancel(취소할 수 없음·닫힘·입력 중·제출 중, 닫으면 버튼에 초점). ui: StayCancel(연결)·StayCancelView(표현)
    │  ├─ guest-create/ # 이용객 등록. api: useCreateGuest. model: 폼 스키마, useGuestCreateForm(전화번호 중복은 전화번호 칸 오류, 성공하면 상세로 이동). ui: 연결·표현
    │  ├─ guest-update/ # 이용객 수정. api: useUpdateGuest. model: 폼 스키마·값 채우기, useGuestUpdateForm(수정 충돌이면 최신 내용 불러오기). ui: GuestUpdate(불러오기 상태)·GuestUpdateForm(연결)·표현
    │  ├─ operator-search/ # 운영자 목록 검색(이름 또는 아이디·사용 여부). model: useOperatorSearchForm(제출하면 1페이지로 이동). ui: OperatorSearchForm(연결)·OperatorSearchFormView(표현)
@@ -129,7 +135,7 @@ apps/hotel-admin/
    │  ├─ account/      # api: 내 정보 조회, 로그인 상태 캐시 규칙. config: 역할 문구(ACCOUNT_ROLE_LABELS). lib: 마스터 판단(isMaster)
    │  ├─ room/         # api: 목록·상세·상태 이력 조회, 새로 조회, 캐시 규칙. config: 항목 이름·상태 문구(ROOM_STATUS_LABELS)·화면 문구. lib: 검색어·상태·페이지 검사, 상태 전이 표(ROOM_STATUS_TRANSITIONS). model: 경로 파라미터 검사, useRoom(불러오는 중·실패·찾을 수 없음·내용), 등록·수정이 함께 쓰는 폼 스키마 조각. ui: 객실 정보 입력 칸, 상세 내용, 층 표시, 상태별 카드
    │  ├─ guest/        # api: 목록·상세 조회, 새로 조회, 캐시 규칙. config: 항목 이름·화면 문구. lib: 검색어·페이지 검사. model: 경로 파라미터 검사, useGuest(불러오는 중·실패·찾을 수 없음·내용), 등록·수정이 함께 쓰는 폼 스키마 조각. ui: 이용객 정보 입력 칸, 상세 내용, 상태별 카드
-   │  ├─ stay/         # api: 목록·상세 조회. config: 항목 이름·취소 여부·취소 정보·화면 문구. lib: 거르기 값·페이지 검사, 박 수, 거르기용 객실 선택지. model: 경로 파라미터 검사, useStay(불러오는 중·실패·찾을 수 없음·내용). ui: 상세 내용, 취소 정보, 상태별 카드, '이용 보기' 링크(StayListLink)
+   │  ├─ stay/         # api: 목록·상세 조회, 취소한 뒤 다시 불러오기. config: 항목 이름·취소 여부·취소 정보·화면 문구. lib: 거르기 값·페이지 검사, 박 수, 취소할 수 있는지(isStayCancelable), 거르기용 객실 선택지. model: 경로 파라미터 검사, useStay(불러오는 중·실패·찾을 수 없음·내용). ui: 상세 내용, 취소 정보, 상태별 카드, '이용 보기' 링크(StayListLink)
    │  └─ operator/     # api: 목록·상세 조회, 새로 조회, 캐시 규칙, 바꾼 뒤 다시 불러오기. config: 항목 이름·사용 여부 문구(OPERATOR_ACTIVE_LABELS)·화면 문구. lib: 검색어·사용 여부·페이지 검사, 비밀번호 길이. model: 경로 파라미터 검사, useOperator(불러오는 중·실패·찾을 수 없음·내용), 등록·수정이 함께 쓰는 폼 스키마 조각과 비밀번호 검사. ui: 운영자 계정 입력 칸, 비밀번호 칸, 상세 내용, 사용 여부 표시, 상태별 카드
    └─ shared/
       ├─ api/          # 검증된 API만 index.ts로 내보낸다. TanStack Query를 쓰지 않는다
@@ -137,14 +143,14 @@ apps/hotel-admin/
       │  ├─ room.ts             # 객실 목록·조회·등록·수정·상태 변경, 상태 이력 조회와 쿼리 키, 요청 스키마, 객실·상태 이력 타입
       │  ├─ guest.ts            # 이용객 목록·조회·등록·수정과 쿼리 키, 요청 스키마, 이용객 타입
       │  ├─ operator.ts         # 운영자 목록·조회·등록·수정·비밀번호 재설정·사용 여부 변경과 쿼리 키, 요청 스키마, 운영자 타입
-      │  ├─ stay.ts             # 이용 목록·조회와 쿼리 키, 목록 파라미터 스키마, 이용 타입
-      │  ├─ api-error.ts        # 서버 오류 정보 읽기 (getApiError), 오류 코드 (API_ERROR_CODES: 공통 코드와 ROOM_NOT_FOUND·ROOM_DUPLICATED·ROOM_MODIFIED·ROOM_STATUS_CHANGED·ROOM_STATUS_TRANSITION_NOT_ALLOWED·GUEST_NOT_FOUND·GUEST_PHONE_DUPLICATED·GUEST_MODIFIED·HOTEL_OPERATOR_NOT_FOUND·HOTEL_ADMIN_MODIFIED·LOGIN_ID_DUPLICATED·STAY_NOT_FOUND)
+      │  ├─ stay.ts             # 이용 목록·조회·취소와 쿼리 키, 목록 파라미터·취소 요청 스키마, 이용 타입
+      │  ├─ api-error.ts        # 서버 오류 정보 읽기 (getApiError), 오류 코드 (API_ERROR_CODES: 공통 코드와 ROOM_NOT_FOUND·ROOM_DUPLICATED·ROOM_MODIFIED·ROOM_STATUS_CHANGED·ROOM_STATUS_TRANSITION_NOT_ALLOWED·GUEST_NOT_FOUND·GUEST_PHONE_DUPLICATED·GUEST_MODIFIED·HOTEL_OPERATOR_NOT_FOUND·HOTEL_ADMIN_MODIFIED·LOGIN_ID_DUPLICATED·STAY_NOT_FOUND·STAY_ALREADY_CANCELED·STAY_ALREADY_ENDED)
       │  ├─ http.ts             # orval mutator
       │  └─ generated/ # orval 생성 코드. 직접 수정하지 않고 shared/api 밖에서 import하지 않는다
       │     └─ zod/    # orval 생성 zod 스키마
       ├─ config/       # APP_INFO (앱 이름), COMMON_MESSAGES (여러 화면이 함께 쓰는 문구), TOAST_MESSAGES (토스트 영역·닫기 버튼 이름)
       └─ lib/
-         ├─ date-time/     # 서버의 UTC 시각을 한국 시간 `YYYY-MM-DD HH:mm`으로 보여주기(formatKoreanDateTime)
+         ├─ date-time/     # 서버의 UTC 시각을 한국 시간 `YYYY-MM-DD HH:mm`으로 보여주기(formatKoreanDateTime), 한국 시간 오늘 `YYYY-MM-DD`(getKoreanToday)
          └─ search-params/ # URL search 직렬화(일반 쿼리 문자열). 라우터와 테스트용 라우터가 쓴다
 ```
 

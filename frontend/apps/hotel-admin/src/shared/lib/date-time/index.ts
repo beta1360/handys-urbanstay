@@ -1,1 +1,1 @@
-export { formatKoreanDateTime } from "./korean-date-time";
+export { formatKoreanDateTime, getKoreanToday } from "./korean-date-time";
