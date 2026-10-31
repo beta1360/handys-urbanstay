@@ -69,4 +69,11 @@ interface StayRepository : JpaRepository<Stay, Long>, JpaSpecificationExecutor<S
 
 	@EntityGraph(attributePaths = [ROOM, "room.roomType", GUEST])
 	fun findByRoomHotelIdAndCheckInDateBetween(hotelId: Long, startDate: LocalDate, endDate: LocalDate, pageable: Pageable): Page<Stay>
+
+	@EntityGraph(attributePaths = [ROOM_ROOM_TYPE])
+	fun findFirstByGuestIdAndCheckInDateLessThanEqualAndCheckOutDateAfterAndCanceledAtIsNullOrderByCheckInDateAscIdAsc(
+		guestId: Long,
+		checkInDate: LocalDate,
+		checkOutDate: LocalDate,
+	): Stay?
 }

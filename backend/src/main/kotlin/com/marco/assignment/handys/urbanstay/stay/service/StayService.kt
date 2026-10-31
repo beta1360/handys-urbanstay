@@ -161,6 +161,12 @@ class StayService(
 			.associateBy { checkNotNull(it.room.id) }
 	}
 
+	@Transactional(readOnly = true)
+	fun getCurrentStayOfGuest(guestId: Long): Stay? {
+		val today = LocalDate.now(clock)
+		return stayRepository.findFirstByGuestIdAndCheckInDateLessThanEqualAndCheckOutDateAfterAndCanceledAtIsNullOrderByCheckInDateAscIdAsc(guestId, today, today)
+	}
+
 	companion object {
 		private val LATEST_CHECK_IN_FIRST = Sort.by(Sort.Order.desc(Stay::checkInDate.name), Sort.Order.desc(Stay::id.name))
 		private const val TODAY_OR_LATER = "validation.today-or-later"
