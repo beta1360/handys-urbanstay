@@ -48,13 +48,14 @@
 | 이용객은 한 회원에게만 연결. 연결할 때 이용객의 이름·이메일은 바꾸지 않는다 | `GuestRepository.linkMember`(`where member_id is null or member_id = 회원`). 0행이면 409 `GUEST_LINKED_TO_OTHER_MEMBER`. `Guest.member`는 `updatable = false`라 hotel-admin 수정이 못 바꾼다 | `guest.member_id` 외래 키(V14) | web: 폼 알림 |
 | 회원 이메일은 모든 회원 중 유일(대소문자·앞뒤 공백 무시) | `existsByEmail` + 409 `MEMBER_EMAIL_DUPLICATED`. 소문자로 저장 | `member_email_key` | web 회원가입: 이메일 칸 오류 |
 | 호텔 계정 아이디는 모든 호텔 계정 중 유일 | 409 `LOGIN_ID_DUPLICATED`. `LoginId.normalize`(소문자) | `hotel_admin_login_id_key` | 아이디 칸 오류 |
+| 전체 어드민 아이디는 모든 전체 어드민 중 유일(대소문자·앞뒤 공백 무시). 호텔 계정과는 같아도 된다 | `existsByLoginId` + 409 `LOGIN_ID_DUPLICATED`(`AppAdmin.LOGIN_ID_UNIQUE_CONSTRAINT`). `LoginId.normalize`(소문자) | `app_admin_login_id_key`(V1 컬럼 `unique`에 PostgreSQL이 붙인 이름) | - |
 | 호텔마다 마스터 하나. 호텔과 함께 만들어지거나 함께 실패 | `HotelService.create` 한 트랜잭션(호텔 → 마스터) | `hotel_admin_master_key`(`where role = 'MASTER'` 부분 유일 인덱스) | - |
 
 ## 낙관적 잠금
 
 | 규칙 | 서버(서비스) | DB 제약 이름 | 화면 |
 |---|---|---|---|
-| 나중에 저장한 쪽이 먼저 저장된 변경을 덮어쓰지 않는다 | `@Version`. 수정 요청은 `version` 필수, 다르거나 flush 때 막히면 409: `Hotel` `HOTEL_MODIFIED`, `HotelAdmin` `HOTEL_ADMIN_MODIFIED`, `Room` `ROOM_MODIFIED`, `RoomType` `ROOM_TYPE_MODIFIED`, `Guest` `GUEST_MODIFIED`. `Stay`·`Member`는 수정이 없어 version이 없다 | `version bigint not null` | '최신 내용 불러오기'와 함께 폼 안에 |
+| 나중에 저장한 쪽이 먼저 저장된 변경을 덮어쓰지 않는다 | `@Version`. 수정 요청은 `version` 필수, 다르거나 flush 때 막히면 409: `Hotel` `HOTEL_MODIFIED`, `AppAdmin` `APP_ADMIN_MODIFIED`(V15), `HotelAdmin` `HOTEL_ADMIN_MODIFIED`, `Room` `ROOM_MODIFIED`, `RoomType` `ROOM_TYPE_MODIFIED`, `Guest` `GUEST_MODIFIED`. `Stay`·`Member`는 수정이 없어 version이 없다 | `version bigint not null` | '최신 내용 불러오기'와 함께 폼 안에 |
 
 ## 범위와 조회
 
@@ -78,5 +79,6 @@
 | 규칙 | 서버(서비스) | DB 제약 이름 | 화면 |
 |---|---|---|---|
 | 비활성화·비밀번호 재설정·아이디 변경이면 그 계정의 기존 세션은 다음 요청에서 끊긴다. 이름 변경은 끊지 않는다 | 엔티티 메서드가 `credential_version`을 올리고 `HotelAdminSessionVerifier`가 요청마다 확인해 401 | `hotel_admin.credential_version` | 수정 화면 안내 문구, 비활성화 확인 문구 |
+| 전체 어드민은 목록·상세·추가·이름 수정만. 아이디·비밀번호 변경, 비활성화·삭제는 없고 이름 변경은 세션을 끊지 않는다 | `AppAdminService`. 수정 요청은 `name`, `version`만 받는다. 어드민 세션은 요청마다 확인하지 않는다 | - | - |
 | 비활성 계정의 로그인은 아이디·비밀번호가 틀렸을 때와 같은 응답 | `HotelAdminUserDetailsService`가 활성 계정만 읽는다. 401 `INVALID_CREDENTIALS` | - | - |
 | 비밀번호: 8~64자, 영문과 숫자 모두, 영문 자판 글자(ASCII 0x20~0x7E)만, 앞뒤 공백도 비밀번호 | `@Password`. 계정을 만들거나 비밀번호를 바꾸는 모든 요청과 회원가입 | - | `passwordSchema`(어드민), 서버와 같은 문구 |
