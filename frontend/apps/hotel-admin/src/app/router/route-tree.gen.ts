@@ -17,6 +17,7 @@ import { Route as AuthenticatedGuestsGuestIdRouteRouteImport } from "./../routes
 import { Route as AuthenticatedRoomsIndexRouteImport } from "./../routes/_authenticated/rooms/index";
 import { Route as AuthenticatedRoomsRoomIdRouteRouteImport } from "./../routes/_authenticated/rooms/$roomId/route";
 import { Route as AuthenticatedRoomsNewRouteImport } from "./../routes/_authenticated/rooms/new";
+import { Route as AuthenticatedGuestsGuestIdIndexRouteImport } from "./../routes/_authenticated/guests/$guestId/index";
 import { Route as AuthenticatedRoomsRoomIdIndexRouteImport } from "./../routes/_authenticated/rooms/$roomId/index";
 import { Route as AuthenticatedRoomsRoomIdEditRouteImport } from "./../routes/_authenticated/rooms/$roomId/edit";
 
@@ -62,6 +63,12 @@ const AuthenticatedRoomsNewRoute = AuthenticatedRoomsNewRouteImport.update({
   path: "/rooms/new",
   getParentRoute: () => AuthenticatedRoute,
 } as any);
+const AuthenticatedGuestsGuestIdIndexRoute =
+  AuthenticatedGuestsGuestIdIndexRouteImport.update({
+    id: "/",
+    path: "/",
+    getParentRoute: () => AuthenticatedGuestsGuestIdRouteRoute,
+  } as any);
 const AuthenticatedRoomsRoomIdIndexRoute =
   AuthenticatedRoomsRoomIdIndexRouteImport.update({
     id: "/",
@@ -78,22 +85,23 @@ const AuthenticatedRoomsRoomIdEditRoute =
 export interface FileRoutesByFullPath {
   "/": typeof AuthenticatedIndexRoute;
   "/login": typeof LoginRoute;
-  "/guests/$guestId": typeof AuthenticatedGuestsGuestIdRouteRoute;
+  "/guests/$guestId": typeof AuthenticatedGuestsGuestIdRouteRouteWithChildren;
   "/rooms/$roomId": typeof AuthenticatedRoomsRoomIdRouteRouteWithChildren;
   "/rooms/new": typeof AuthenticatedRoomsNewRoute;
   "/guests/": typeof AuthenticatedGuestsIndexRoute;
   "/rooms/": typeof AuthenticatedRoomsIndexRoute;
   "/rooms/$roomId/edit": typeof AuthenticatedRoomsRoomIdEditRoute;
+  "/guests/$guestId/": typeof AuthenticatedGuestsGuestIdIndexRoute;
   "/rooms/$roomId/": typeof AuthenticatedRoomsRoomIdIndexRoute;
 }
 export interface FileRoutesByTo {
   "/login": typeof LoginRoute;
   "/": typeof AuthenticatedIndexRoute;
-  "/guests/$guestId": typeof AuthenticatedGuestsGuestIdRouteRoute;
   "/rooms/new": typeof AuthenticatedRoomsNewRoute;
   "/guests": typeof AuthenticatedGuestsIndexRoute;
   "/rooms": typeof AuthenticatedRoomsIndexRoute;
   "/rooms/$roomId/edit": typeof AuthenticatedRoomsRoomIdEditRoute;
+  "/guests/$guestId": typeof AuthenticatedGuestsGuestIdIndexRoute;
   "/rooms/$roomId": typeof AuthenticatedRoomsRoomIdIndexRoute;
 }
 export interface FileRoutesById {
@@ -101,12 +109,13 @@ export interface FileRoutesById {
   "/_authenticated": typeof AuthenticatedRouteWithChildren;
   "/login": typeof LoginRoute;
   "/_authenticated/": typeof AuthenticatedIndexRoute;
-  "/_authenticated/guests/$guestId": typeof AuthenticatedGuestsGuestIdRouteRoute;
+  "/_authenticated/guests/$guestId": typeof AuthenticatedGuestsGuestIdRouteRouteWithChildren;
   "/_authenticated/rooms/$roomId": typeof AuthenticatedRoomsRoomIdRouteRouteWithChildren;
   "/_authenticated/rooms/new": typeof AuthenticatedRoomsNewRoute;
   "/_authenticated/guests/": typeof AuthenticatedGuestsIndexRoute;
   "/_authenticated/rooms/": typeof AuthenticatedRoomsIndexRoute;
   "/_authenticated/rooms/$roomId/edit": typeof AuthenticatedRoomsRoomIdEditRoute;
+  "/_authenticated/guests/$guestId/": typeof AuthenticatedGuestsGuestIdIndexRoute;
   "/_authenticated/rooms/$roomId/": typeof AuthenticatedRoomsRoomIdIndexRoute;
 }
 export interface FileRouteTypes {
@@ -120,16 +129,17 @@ export interface FileRouteTypes {
     | "/guests/"
     | "/rooms/"
     | "/rooms/$roomId/edit"
+    | "/guests/$guestId/"
     | "/rooms/$roomId/";
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/login"
     | "/"
-    | "/guests/$guestId"
     | "/rooms/new"
     | "/guests"
     | "/rooms"
     | "/rooms/$roomId/edit"
+    | "/guests/$guestId"
     | "/rooms/$roomId";
   id:
     | "__root__"
@@ -142,6 +152,7 @@ export interface FileRouteTypes {
     | "/_authenticated/guests/"
     | "/_authenticated/rooms/"
     | "/_authenticated/rooms/$roomId/edit"
+    | "/_authenticated/guests/$guestId/"
     | "/_authenticated/rooms/$roomId/";
   fileRoutesById: FileRoutesById;
 }
@@ -208,6 +219,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthenticatedRoomsNewRouteImport;
       parentRoute: typeof AuthenticatedRoute;
     };
+    "/_authenticated/guests/$guestId/": {
+      id: "/_authenticated/guests/$guestId/";
+      path: "/";
+      fullPath: "/guests/$guestId/";
+      preLoaderRoute: typeof AuthenticatedGuestsGuestIdIndexRouteImport;
+      parentRoute: typeof AuthenticatedGuestsGuestIdRouteRoute;
+    };
     "/_authenticated/rooms/$roomId/": {
       id: "/_authenticated/rooms/$roomId/";
       path: "/";
@@ -224,6 +242,20 @@ declare module "@tanstack/react-router" {
     };
   }
 }
+
+interface AuthenticatedGuestsGuestIdRouteRouteChildren {
+  AuthenticatedGuestsGuestIdIndexRoute: typeof AuthenticatedGuestsGuestIdIndexRoute;
+}
+
+const AuthenticatedGuestsGuestIdRouteRouteChildren: AuthenticatedGuestsGuestIdRouteRouteChildren =
+  {
+    AuthenticatedGuestsGuestIdIndexRoute: AuthenticatedGuestsGuestIdIndexRoute,
+  };
+
+const AuthenticatedGuestsGuestIdRouteRouteWithChildren =
+  AuthenticatedGuestsGuestIdRouteRoute._addFileChildren(
+    AuthenticatedGuestsGuestIdRouteRouteChildren,
+  );
 
 interface AuthenticatedRoomsRoomIdRouteRouteChildren {
   AuthenticatedRoomsRoomIdEditRoute: typeof AuthenticatedRoomsRoomIdEditRoute;
@@ -243,7 +275,7 @@ const AuthenticatedRoomsRoomIdRouteRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute;
-  AuthenticatedGuestsGuestIdRouteRoute: typeof AuthenticatedGuestsGuestIdRouteRoute;
+  AuthenticatedGuestsGuestIdRouteRoute: typeof AuthenticatedGuestsGuestIdRouteRouteWithChildren;
   AuthenticatedRoomsRoomIdRouteRoute: typeof AuthenticatedRoomsRoomIdRouteRouteWithChildren;
   AuthenticatedRoomsNewRoute: typeof AuthenticatedRoomsNewRoute;
   AuthenticatedGuestsIndexRoute: typeof AuthenticatedGuestsIndexRoute;
@@ -252,7 +284,8 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
-  AuthenticatedGuestsGuestIdRouteRoute: AuthenticatedGuestsGuestIdRouteRoute,
+  AuthenticatedGuestsGuestIdRouteRoute:
+    AuthenticatedGuestsGuestIdRouteRouteWithChildren,
   AuthenticatedRoomsRoomIdRouteRoute:
     AuthenticatedRoomsRoomIdRouteRouteWithChildren,
   AuthenticatedRoomsNewRoute: AuthenticatedRoomsNewRoute,
