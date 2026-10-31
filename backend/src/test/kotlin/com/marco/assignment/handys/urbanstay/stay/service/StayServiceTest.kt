@@ -14,7 +14,9 @@ import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRepository
 import com.marco.assignment.handys.urbanstay.room.entity.Room
 import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
+import com.marco.assignment.handys.urbanstay.room.entity.RoomType
 import com.marco.assignment.handys.urbanstay.room.repository.RoomRepository
+import com.marco.assignment.handys.urbanstay.room.repository.RoomTypeRepository
 import com.marco.assignment.handys.urbanstay.stay.exception.StayErrorCode
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
@@ -46,6 +48,11 @@ class StayServiceTest {
 
 	@Autowired
 	private lateinit var roomRepository: RoomRepository
+
+	@Autowired
+	private lateinit var roomTypeRepository: RoomTypeRepository
+
+	private val roomTypes = mutableMapOf<String, RoomType>()
 
 	@Autowired
 	private lateinit var guestRepository: GuestRepository
@@ -162,12 +169,15 @@ class StayServiceTest {
 	}
 
 	private fun saveRoom(name: String, type: String): Room =
-		roomRepository.save(Room(hotel, name, type, 2, null, null, LocalTime.of(15, 0), LocalTime.of(11, 0)))
+		roomRepository.save(Room(hotel, name, roomType(type), null, null))
+
+	private fun roomType(name: String): RoomType =
+		roomTypes.getOrPut(name) { roomTypeRepository.save(RoomType(hotel, name, 2, 100000, LocalTime.of(15, 0), LocalTime.of(11, 0))) }
 
 	private fun create(checkInDate: LocalDate, checkOutDate: LocalDate) = reserve(STANDARD, checkInDate, checkOutDate, guest.name, guest.phone)
 
 	private fun reserve(roomType: String, checkInDate: LocalDate, checkOutDate: LocalDate, name: String, phone: String) =
-		stayService.reserve(checkNotNull(hotel.id), roomType, checkInDate, checkOutDate, 2, name, phone, "guest@example.com")
+		stayService.reserve(checkNotNull(hotel.id), checkNotNull(roomType(roomType).id), checkInDate, checkOutDate, 2, name, phone, "guest@example.com")
 
 	private fun cancel(stayId: Long, reason: String) = stayService.cancel(checkNotNull(hotel.id), stayId, checkNotNull(hotelAdmin.id), reason)
 
@@ -225,6 +235,7 @@ class StayServiceTest {
 			"delete from room_status_history where room_id in (select id from room where hotel_id = ?)",
 			"delete from guest where hotel_id = ?",
 			"delete from room where hotel_id = ?",
+			"delete from room_type where hotel_id = ?",
 		)
 		private const val INSERT_STAY = """
 			insert into stay (room_id, guest_id, check_in_date, check_out_date, guest_count, created_at, updated_at)

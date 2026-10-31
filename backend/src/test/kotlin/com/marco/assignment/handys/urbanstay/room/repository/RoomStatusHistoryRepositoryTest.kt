@@ -8,6 +8,7 @@ import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.room.entity.Room
 import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
 import com.marco.assignment.handys.urbanstay.room.entity.RoomStatusHistory
+import com.marco.assignment.handys.urbanstay.room.entity.RoomType
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -49,8 +50,9 @@ class RoomStatusHistoryRepositoryTest {
 	@BeforeEach
 	fun saveRoomsAndHotelAdmin() {
 		val hotel = entityManager.persistAndFlush(Hotel("어반스테이 $suffix", "서울 $suffix", PHONE, null))
-		room = entityManager.persistAndFlush(Room(hotel, "101", "스탠다드", 2, null, null, CHECK_IN, CHECK_OUT))
-		otherRoom = entityManager.persistAndFlush(Room(hotel, "102", "스탠다드", 2, null, null, CHECK_IN, CHECK_OUT))
+		val roomType = entityManager.persistAndFlush(RoomType(hotel, "스탠다드", 2, 100000, CHECK_IN, CHECK_OUT))
+		room = entityManager.persistAndFlush(Room(hotel, "101", roomType, null, null))
+		otherRoom = entityManager.persistAndFlush(Room(hotel, "102", roomType, null, null))
 		hotelAdmin = entityManager.persistAndFlush(HotelAdmin(hotel, "master-$suffix@test.local", "password-hash", " 홍길동 ", HotelAdminRole.MASTER))
 	}
 

@@ -19,13 +19,13 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
-import java.time.LocalTime
 
 @Service
 class RoomService(
 	private val roomRepository: RoomRepository,
 	private val roomStatusHistoryRepository: RoomStatusHistoryRepository,
 	private val hotelService: HotelService,
+	private val roomTypeService: RoomTypeService,
 	private val hotelAdminService: HotelAdminService,
 	private val clock: Clock,
 ) {
@@ -35,19 +35,15 @@ class RoomService(
 		hotelId: Long,
 		hotelAdminId: Long,
 		name: String,
-		type: String,
-		capacity: Int,
+		roomTypeId: Long,
 		floor: Int?,
 		description: String?,
-		checkInTime: LocalTime,
-		checkOutTime: LocalTime,
 	): Room {
 		val hotel = hotelService.getHotel(hotelId)
+		val roomType = roomTypeService.getRoomType(hotelId, roomTypeId)
 		checkNotDuplicated(hotelId, name, null)
 		val createdBy = hotelAdminService.getHotelAdmin(hotelAdminId)
-		val room = translateConflicts {
-			roomRepository.saveAndFlush(Room(hotel, name, type, capacity, floor, description, checkInTime, checkOutTime))
-		}
+		val room = translateConflicts { roomRepository.saveAndFlush(Room(hotel, name, roomType, floor, description)) }
 		roomStatusHistoryRepository.save(RoomStatusHistory(room, null, room.status, createdBy))
 		return room
 	}
@@ -70,16 +66,13 @@ class RoomService(
 	}
 
 	@Transactional(readOnly = true)
-	fun getHotelRoomsInTypeOrder(hotelId: Long): List<Room> {
-		hotelService.getHotel(hotelId)
-		return roomRepository.findByHotelIdInTypeOrder(hotelId)
-	}
+	fun getHotelRooms(hotelId: Long): List<Room> = roomRepository.findAllByHotelId(hotelId)
 
 	@Transactional
-	fun lockRoomsByType(hotelId: Long, type: String): List<Room> {
-		val locked = roomRepository.lockByHotelIdAndType(hotelId, type)
+	fun lockRoomsByType(roomTypeId: Long): List<Room> {
+		val locked = roomRepository.lockByRoomTypeId(roomTypeId)
 		if (locked.isEmpty()) {
-			throw BusinessException(RoomErrorCode.ROOM_TYPE_NOT_FOUND)
+			return emptyList()
 		}
 		return roomRepository.findByIdIn(locked.map { checkNotNull(it.id) }, NAME_ORDER)
 	}
@@ -93,19 +86,17 @@ class RoomService(
 		roomId: Long,
 		version: Long,
 		name: String,
-		type: String,
-		capacity: Int,
+		roomTypeId: Long,
 		floor: Int?,
 		description: String?,
-		checkInTime: LocalTime,
-		checkOutTime: LocalTime,
 	): Room {
 		val room = findRoom(hotelId, roomId)
 		if (room.version != version) {
 			throw BusinessException(RoomErrorCode.ROOM_MODIFIED)
 		}
+		val roomType = roomTypeService.getRoomType(hotelId, roomTypeId)
 		checkNotDuplicated(hotelId, name, roomId)
-		room.update(name, type, capacity, floor, description, checkInTime, checkOutTime)
+		room.update(name, roomType, floor, description)
 		return translateConflicts { roomRepository.saveAndFlush(room) }
 	}
 

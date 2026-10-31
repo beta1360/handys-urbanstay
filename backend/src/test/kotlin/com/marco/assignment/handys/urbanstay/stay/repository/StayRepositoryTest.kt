@@ -8,6 +8,7 @@ import com.marco.assignment.handys.urbanstay.common.exception.violates
 import com.marco.assignment.handys.urbanstay.guest.entity.Guest
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.room.entity.Room
+import com.marco.assignment.handys.urbanstay.room.entity.RoomType
 import com.marco.assignment.handys.urbanstay.stay.entity.Stay
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -43,6 +44,8 @@ class StayRepositoryTest {
 
 	private lateinit var hotel: Hotel
 
+	private lateinit var roomType: RoomType
+
 	private lateinit var room: Room
 
 	private lateinit var otherRoom: Room
@@ -54,6 +57,7 @@ class StayRepositoryTest {
 	@BeforeEach
 	fun saveRoomsAndGuest() {
 		hotel = entityManager.persistAndFlush(Hotel("어반스테이 $suffix", "서울 $suffix", PHONE, null))
+		roomType = entityManager.persistAndFlush(RoomType(hotel, "스탠다드", 20, 100000, LocalTime.of(15, 0), LocalTime.of(11, 0)))
 		room = entityManager.persistAndFlush(room("101"))
 		otherRoom = entityManager.persistAndFlush(room("102"))
 		guest = entityManager.persistAndFlush(Guest(hotel, "홍길동", PHONE, "guest@example.com"))
@@ -195,7 +199,7 @@ class StayRepositoryTest {
 	private fun overlaps(room: Room, checkIn: LocalDate, checkOut: LocalDate): Boolean =
 		stayRepository.findOverlappedRoomIds(listOf(checkNotNull(room.id)), checkIn, checkOut).isNotEmpty()
 
-	private fun room(name: String): Room = Room(hotel, name, "스탠다드", 20, null, null, LocalTime.of(15, 0), LocalTime.of(11, 0))
+	private fun room(name: String): Room = Room(hotel, name, roomType, null, null)
 
 	companion object {
 		private const val PHONE = "02-1234-5678"

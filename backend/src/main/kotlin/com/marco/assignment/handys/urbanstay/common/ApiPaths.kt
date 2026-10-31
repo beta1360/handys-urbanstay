@@ -7,4 +7,6 @@ object ApiPaths {
 	const val AUTH = "/auth"
 	const val LOGIN = "/login"
 	const val OPERATORS = "/operators"
+	const val ROOMS = "/rooms"
+	const val ROOM_TYPES = "/room-types"
 }

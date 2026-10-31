@@ -41,7 +41,7 @@ import org.springframework.web.bind.annotation.RestController
 
 @Tag(name = "room", description = "openapi.hotel-admin.tag.room")
 @RestController
-@RequestMapping(ApiPaths.HOTEL_ADMIN + "/rooms")
+@RequestMapping(ApiPaths.HOTEL_ADMIN + ApiPaths.ROOMS)
 class RoomHotelAdminController(
 	private val roomService: RoomService,
 	private val stayService: StayService,
@@ -53,7 +53,7 @@ class RoomHotelAdminController(
 	}
 
 	@Operation(summary = "openapi.hotel-admin.operation.createRoom.summary", description = "openapi.hotel-admin.operation.createRoom.description")
-	@RoomApiErrors(RoomErrorCode.ROOM_DUPLICATED)
+	@RoomApiErrors(RoomErrorCode.ROOM_TYPE_NOT_FOUND, RoomErrorCode.ROOM_DUPLICATED)
 	@SuccessMessage("success.room.created")
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
@@ -65,12 +65,9 @@ class RoomHotelAdminController(
 			hotelId = hotelAdmin.hotelId,
 			hotelAdminId = hotelAdmin.id,
 			name = request.name,
-			type = request.type,
-			capacity = request.capacity,
+			roomTypeId = request.roomTypeId,
 			floor = request.floor,
 			description = request.description,
-			checkInTime = request.checkInTime,
-			checkOutTime = request.checkOutTime,
 		)
 		return ApiResponse.success(RoomHotelAdminResponse.from(room, null))
 	}
@@ -112,7 +109,7 @@ class RoomHotelAdminController(
 		ApiResponse.success(withCurrentStay(roomService.getRoom(hotelAdmin.hotelId, roomId)))
 
 	@Operation(summary = "openapi.hotel-admin.operation.updateRoom.summary", description = "openapi.hotel-admin.operation.updateRoom.description")
-	@RoomApiErrors(RoomErrorCode.ROOM_NOT_FOUND, RoomErrorCode.ROOM_DUPLICATED, RoomErrorCode.ROOM_MODIFIED)
+	@RoomApiErrors(RoomErrorCode.ROOM_NOT_FOUND, RoomErrorCode.ROOM_TYPE_NOT_FOUND, RoomErrorCode.ROOM_DUPLICATED, RoomErrorCode.ROOM_MODIFIED)
 	@SuccessMessage("success.room.updated")
 	@PutMapping("/{roomId}")
 	fun updateRoom(
@@ -125,12 +122,9 @@ class RoomHotelAdminController(
 			roomId = roomId,
 			version = request.version,
 			name = request.name,
-			type = request.type,
-			capacity = request.capacity,
+			roomTypeId = request.roomTypeId,
 			floor = request.floor,
 			description = request.description,
-			checkInTime = request.checkInTime,
-			checkOutTime = request.checkOutTime,
 		)
 		return ApiResponse.success(withCurrentStay(room))
 	}

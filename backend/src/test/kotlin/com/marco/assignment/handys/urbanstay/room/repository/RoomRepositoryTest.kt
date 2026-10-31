@@ -6,6 +6,7 @@ import com.marco.assignment.handys.urbanstay.common.exception.violates
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.room.entity.Room
 import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
+import com.marco.assignment.handys.urbanstay.room.entity.RoomType
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -44,22 +45,29 @@ class RoomRepositoryTest {
 
 	private lateinit var otherHotel: Hotel
 
+	private lateinit var roomType: RoomType
+
+	private lateinit var deluxe: RoomType
+
+	private lateinit var otherHotelType: RoomType
+
 	@BeforeEach
 	fun saveHotels() {
 		hotel = entityManager.persistAndFlush(Hotel("어반스테이 $suffix", "서울 $suffix", PHONE, null))
 		otherHotel = entityManager.persistAndFlush(Hotel("어반스테이 $suffix", "부산 $suffix", PHONE, null))
+		roomType = entityManager.persistAndFlush(RoomType(hotel, TYPE, 2, ROOM_RATE, CHECK_IN, CHECK_OUT))
+		deluxe = entityManager.persistAndFlush(RoomType(hotel, "디럭스", 4, ROOM_RATE, CHECK_IN, CHECK_OUT))
+		otherHotelType = entityManager.persistAndFlush(RoomType(otherHotel, TYPE, 2, ROOM_RATE, CHECK_IN, CHECK_OUT))
 	}
 
 	@Test
-	fun `문자열은 앞뒤 공백을 지워 저장하고 공백만 있는 소개는 null로, 시각은 분 단위로 저장한다`() {
-		val saved = roomRepository.saveAndFlush(
-			Room(hotel, " 101\t", "\n스탠다드 ", 2, null, " 　 ", LocalTime.of(15, 0, 30), LocalTime.of(11, 0, 0, 500)),
-		)
+	fun `문자열은 앞뒤 공백을 지워 저장하고 공백만 있는 소개는 null로 저장하며 객실 유형을 가리킨다`() {
+		val saved = roomRepository.saveAndFlush(Room(hotel, " 101\t", roomType, null, " 　 "))
 		entityManager.clear()
 
 		val found = roomRepository.findById(checkNotNull(saved.id)).orElseThrow()
-		assertThat(listOf(found.hotel.id, found.name, found.type, found.capacity, found.floor, found.description, found.checkInTime, found.checkOutTime))
-			.containsExactly(hotel.id, "101", "스탠다드", 2, null, null, LocalTime.of(15, 0), LocalTime.of(11, 0))
+		assertThat(listOf(found.hotel.id, found.name, found.roomType.id, found.floor, found.description))
+			.containsExactly(hotel.id, "101", roomType.id, null, null)
 	}
 
 	@Test
@@ -67,11 +75,11 @@ class RoomRepositoryTest {
 		val room = roomRepository.saveAndFlush(room(hotel, NAME))
 		assertThat(room.version).isZero()
 
-		room.update(NAME, TYPE, 4, -1, DESCRIPTION, CHECK_IN, CHECK_OUT)
+		room.update(NAME, deluxe, -1, DESCRIPTION)
 		roomRepository.flush()
 		assertThat(room.version).isEqualTo(1)
 
-		room.update(" $NAME ", TYPE, 4, -1, " $DESCRIPTION ", CHECK_IN.plusSeconds(30), CHECK_OUT)
+		room.update(" $NAME ", deluxe, -1, " $DESCRIPTION ")
 		roomRepository.flush()
 		entityManager.clear()
 		assertThat(roomRepository.findById(checkNotNull(room.id)).orElseThrow().version).isEqualTo(1)
@@ -81,7 +89,7 @@ class RoomRepositoryTest {
 	fun `같은 호텔에 이름이 같은 객실은 이름 있는 DB 유일 제약이 저장을 막는다`() {
 		roomRepository.saveAndFlush(room(hotel, NAME))
 
-		assertThatThrownBy { roomRepository.saveAndFlush(Room(hotel, " $NAME ", "디럭스", 4, 3, DESCRIPTION, CHECK_OUT, CHECK_IN)) }
+		assertThatThrownBy { roomRepository.saveAndFlush(Room(hotel, " $NAME ", deluxe, 3, DESCRIPTION)) }
 			.isInstanceOfSatisfying(DataIntegrityViolationException::class.java) {
 				assertThat(it.violates(Room.HOTEL_NAME_UNIQUE_CONSTRAINT)).isTrue()
 			}
@@ -99,9 +107,9 @@ class RoomRepositoryTest {
 
 	@Test
 	fun `다른 제약 위반은 호텔과 이름의 유일 제약 위반으로 보지 않는다`() {
-		assertThatThrownBy { roomRepository.saveAndFlush(Room(hotel, NAME, TYPE, 0, null, null, CHECK_IN, CHECK_OUT)) }
+		assertThatThrownBy { roomRepository.saveAndFlush(Room(hotel, NAME, roomType, 201, null)) }
 			.isInstanceOfSatisfying(DataIntegrityViolationException::class.java) {
-				assertThat(it.violates("room_capacity_check")).isTrue()
+				assertThat(it.violates("room_floor_check")).isTrue()
 				assertThat(it.violates(Room.HOTEL_NAME_UNIQUE_CONSTRAINT)).isFalse()
 			}
 	}
@@ -111,20 +119,11 @@ class RoomRepositoryTest {
 		"name, '', room_name_check",
 		"name, ' 101', room_name_check",
 		"name, '101 ', room_name_check",
-		"type, '', room_type_check",
-		"type, ' 디럭스', room_type_check",
-		"type, '디럭스 ', room_type_check",
-		"capacity, 0, room_capacity_check",
-		"capacity, 21, room_capacity_check",
 		"floor, -11, room_floor_check",
 		"floor, 201, room_floor_check",
 		"description, '', room_description_check",
 		"description, '소개 ', room_description_check",
 		"description, ' 소개', room_description_check",
-		"check_in_time, '15:00:30', room_check_in_time_check",
-		"check_in_time, '15:00:00.5', room_check_in_time_check",
-		"check_out_time, '11:00:01', room_check_out_time_check",
-		"check_out_time, '11:00:00.000001', room_check_out_time_check",
 	)
 	fun `규칙에 맞지 않는 값은 DB CHECK 제약이 저장을 막는다`(column: String, value: String, constraint: String) {
 		assertThatThrownBy { insertWithoutEntity(mapOf(column to value)) }
@@ -169,12 +168,12 @@ class RoomRepositoryTest {
 		val room = roomRepository.saveAndFlush(room(hotel, NAME))
 		jdbcTemplate.update(UPDATE_STATUS, RoomStatus.RESERVED.name, room.id)
 
-		room.update(NAME, "디럭스", 4, null, null, CHECK_IN, CHECK_OUT)
+		room.update(NAME, deluxe, null, null)
 		roomRepository.flush()
 
 		assertThat(room.status).isEqualTo(RoomStatus.VACANT)
 		assertThat(jdbcTemplate.queryForMap(SELECT_STATUS_TYPE_VERSION, room.id))
-			.containsExactlyInAnyOrderEntriesOf(mapOf("status" to "RESERVED", "type" to "디럭스", "version" to 1L))
+			.containsExactlyInAnyOrderEntriesOf(mapOf("status" to "RESERVED", "room_type_id" to deluxe.id, "version" to 1L))
 	}
 
 	@Test
@@ -205,14 +204,10 @@ class RoomRepositoryTest {
 
 	@ParameterizedTest
 	@CsvSource(
-		"capacity, 1",
-		"capacity, 20",
 		"floor, -10",
 		"floor, 200",
 		"floor, ",
 		"description, ",
-		"check_in_time, '00:00'",
-		"check_out_time, '23:59'",
 	)
 	fun `범위 끝 값과 선택 항목의 null은 DB 제약을 통과한다`(column: String, value: String?) {
 		insertWithoutEntity(mapOf(column to value))
@@ -228,6 +223,13 @@ class RoomRepositoryTest {
 	}
 
 	@Test
+	fun `다른 호텔의 객실 유형을 가리키면 호텔까지 묶은 외래 키 제약이 저장을 막는다`() {
+		assertThatThrownBy { insertWithoutEntity(mapOf("room_type_id" to checkNotNull(otherHotelType.id))) }
+			.isInstanceOf(DataIntegrityViolationException::class.java)
+			.hasMessageContaining("room_room_type_id_hotel_id_fkey")
+	}
+
+	@Test
 	fun `이름 컬럼은 숫자를 숫자로 비교하는 결정적 ICU collation이라 같은 이름은 글자 그대로 비교한다`() {
 		val collation = jdbcTemplate.queryForMap(NAME_COLLATION)
 
@@ -237,13 +239,12 @@ class RoomRepositoryTest {
 	}
 
 	@Test
-	fun `시각 컬럼은 time, version은 호텔처럼 기본값 없는 bigint not null, 상태는 기본값 없는 문자열 not null이다`() {
+	fun `객실 유형은 기본값 없는 bigint not null이고 유형 이름·인원·시각 컬럼은 객실에 없다`() {
 		val columns = jdbcTemplate.query(COLUMNS) { rs, _ -> rs.getString(1) to rs.getString(2) }.toMap()
 
 		assertThat(columns).containsExactlyInAnyOrderEntriesOf(
 			mapOf(
-				"check_in_time" to "time without time zone not null",
-				"check_out_time" to "time without time zone not null",
+				"room_type_id" to "bigint not null",
 				"version" to "bigint not null",
 				"status" to "character varying not null",
 			),
@@ -320,30 +321,24 @@ class RoomRepositoryTest {
 	private fun search(keyword: String): List<String> =
 		roomRepository.findByHotelIdAndNameContainingIgnoreCase(checkNotNull(hotel.id), keyword, FIRST_PAGE_BY_NAME).content.map { it.name }
 
-	private fun room(hotel: Hotel, name: String): Room = Room(hotel, name, TYPE, 2, null, null, CHECK_IN, CHECK_OUT)
+	private fun room(hotel: Hotel, name: String): Room = Room(hotel, name, if (hotel == otherHotel) otherHotelType else roomType, null, null)
 
 	private fun insertWithoutEntity(overrides: Map<String, Any?>) {
 		val values = mapOf(
 			"hotel_id" to checkNotNull(hotel.id),
 			"name" to NAME,
-			"type" to TYPE,
-			"capacity" to "2",
+			"room_type_id" to checkNotNull(if (overrides["hotel_id"] == otherHotel.id) otherHotelType.id else roomType.id),
 			"floor" to "1",
 			"description" to DESCRIPTION,
-			"check_in_time" to "15:00",
-			"check_out_time" to "11:00",
 			"status" to RoomStatus.VACANT.name,
 		) + overrides
 		jdbcTemplate.update(
 			INSERT_ROOM,
 			values["hotel_id"],
 			values["name"],
-			values["type"],
-			values["capacity"],
+			values["room_type_id"],
 			values["floor"],
 			values["description"],
-			values["check_in_time"],
-			values["check_out_time"],
 			values["status"],
 		)
 	}
@@ -353,21 +348,22 @@ class RoomRepositoryTest {
 		private const val NAME = "101"
 		private const val TYPE = "스탠다드"
 		private const val DESCRIPTION = "창이 큰 객실"
+		private const val ROOM_RATE = 100000
 		private val CHECK_IN: LocalTime = LocalTime.of(15, 0)
 		private val CHECK_OUT: LocalTime = LocalTime.of(11, 0)
 		private val FIRST_PAGE_BY_NAME = PageRequest.of(0, 100, Sort.by("name", "id"))
 		private const val INSERT_ROOM = """
-			insert into room (hotel_id, name, type, capacity, floor, description, check_in_time, check_out_time, status, version, created_at, updated_at)
-			values (?, ?, ?, cast(? as integer), cast(? as integer), ?, cast(? as time), cast(? as time), ?, 0, now(), now())
+			insert into room (hotel_id, name, room_type_id, floor, description, status, version, created_at, updated_at)
+			values (?, ?, ?, cast(? as integer), ?, ?, 0, now(), now())
 		"""
 		private const val SELECT_STATUS = "select status from room where id = ?"
 		private const val UPDATE_STATUS = "update room set status = ? where id = ?"
-		private const val SELECT_STATUS_TYPE_VERSION = "select status, type, version from room where id = ?"
+		private const val SELECT_STATUS_TYPE_VERSION = "select status, room_type_id, version from room where id = ?"
 		private const val SELECT_STATUS_VERSION_UPDATED_AT = "select status, version, updated_at from room where id = ?"
 		private const val COLUMNS = """
 			select column_name, concat_ws(' ', data_type, case when is_nullable = 'NO' then 'not null' end, 'default ' || column_default)
 			from information_schema.columns
-			where table_schema = 'public' and table_name = 'room' and column_name in ('check_in_time', 'check_out_time', 'version', 'status')
+			where table_schema = 'public' and table_name = 'room' and column_name in ('room_type_id', 'version', 'status', 'type', 'capacity', 'check_in_time', 'check_out_time')
 		"""
 		private const val NAME_COLLATION = """
 			select c.collation_name, p.collprovider, p.colllocale, p.collisdeterministic
