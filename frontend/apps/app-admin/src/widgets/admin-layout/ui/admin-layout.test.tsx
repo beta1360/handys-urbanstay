@@ -149,7 +149,7 @@ describe("AdminLayout", () => {
     expect(screen.getByText(APP_INFO.name)).toBeInTheDocument();
   });
 
-  it("메뉴에는 /hotels로 가는 호텔 메뉴와 /members로 가는 회원 메뉴를 둔다", async () => {
+  it("메뉴에는 호텔(/hotels)·회원(/members)·어드민 계정(/admins) 메뉴를 차례로 둔다", async () => {
     renderAdminLayout("/hotels");
 
     const navigation = await screen.findByRole("navigation", {
@@ -161,6 +161,7 @@ describe("AdminLayout", () => {
     ).toEqual([
       [ADMIN_LAYOUT_MESSAGES.hotelMenuLabel, "/hotels"],
       [ADMIN_LAYOUT_MESSAGES.memberMenuLabel, "/members"],
+      [ADMIN_LAYOUT_MESSAGES.adminMenuLabel, "/admins"],
     ]);
   });
 
