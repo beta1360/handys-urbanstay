@@ -149,6 +149,7 @@ FSD 레이어(app~shared)가 코드를 '어디에 두는가'를 정한다면, 3�
 - 테스트 이름은 한국어 문장으로 쓴다. 예: `헤더에 앱 이름과 마이페이지 버튼을 보여준다`
 - 화면 문구 같은 기대값은 상수에서 읽는다. 운영 코드의 문구를 테스트에 복사하지 않는다.
 - async Server Component는 Vitest로 단위 테스트할 수 없다(Next.js 가이드).
+- 앱의 테스트 제한 시간은 15초(`vitest.config.mts`의 `testTimeout`), Testing Library의 `findBy`·`waitFor` 제한 시간은 3초(`vitest-setup.ts`의 `asyncUtilTimeout`)다. 기본값(5초, 1초)은 백엔드 테스트·빌드와 함께 돌릴 때 사용자 조작이 많은 화면 테스트가 시간 초과로 실패하기 때문이다.
 
 ## 명령어 (`frontend/`에서 실행)
 
