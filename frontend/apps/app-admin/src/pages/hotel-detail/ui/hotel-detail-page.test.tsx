@@ -25,17 +25,26 @@ import {
   HOTEL_MASTER_INFO_MESSAGES,
   HOTEL_MASTER_LOAD_MESSAGES,
 } from "@/entities/hotel-master";
+import {
+  ROOM_FIELD_LABELS,
+  ROOM_INFORMATION_MESSAGES,
+  ROOM_STATUS_LABELS,
+} from "@/entities/room";
 import { HOTEL_MASTER_PASSWORD_RESET_MESSAGES } from "@/features/hotel-master-password-reset";
 import { API_ERROR_CODES, resetHotelMasterPassword } from "@/shared/api";
-import type { Hotel, HotelMaster } from "@/shared/api";
+import type { Hotel, HotelMaster, HotelRoom } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
-import { HOTEL_DETAIL_ACTION_MESSAGES } from "@/widgets/hotel-detail";
+import {
+  HOTEL_DETAIL_ACTION_MESSAGES,
+  HOTEL_ROOM_LIST_MESSAGES,
+} from "@/widgets/hotel-detail";
 import { HotelDetailPage } from "./hotel-detail-page";
 
-const { fetchHotel, fetchHotelMaster } = vi.hoisted(() => ({
+const { fetchHotel, fetchHotelMaster, fetchHotelRooms } = vi.hoisted(() => ({
   fetchHotel: vi.fn(),
   fetchHotelMaster: vi.fn(),
+  fetchHotelRooms: vi.fn(),
 }));
 
 vi.mock("@/shared/api", async (importOriginal) => {
@@ -44,6 +53,8 @@ vi.mock("@/shared/api", async (importOriginal) => {
     ...actual,
     fetchHotel: (hotelId: number) => fetchHotel(hotelId),
     fetchHotelMaster: (hotelId: number) => fetchHotelMaster(hotelId),
+    fetchHotelRooms: (hotelId: number, params: { page?: number }) =>
+      fetchHotelRooms(hotelId, params),
     resetHotelMasterPassword: vi.fn(),
   };
 });
@@ -68,6 +79,27 @@ const MASTER: HotelMaster = {
   name: "홍길동",
   version: 2,
 };
+
+const ROOMS: HotelRoom[] = [
+  {
+    id: 21,
+    name: "101",
+    roomType: { id: 4, name: "스탠다드" },
+    floor: 1,
+    status: "VACANT",
+  },
+  {
+    id: 22,
+    name: "B01",
+    roomType: { id: 5, name: "디럭스" },
+    floor: null,
+    status: "MAINTENANCE",
+  },
+];
+
+function createRoomPage(rooms: HotelRoom[], totalPages = 1) {
+  return { items: rooms, page: 0, size: 10, totalElements: rooms.length, totalPages };
+}
 
 const MULTILINE_DESCRIPTION = "바다가 보이는 호텔입니다.\n\n조식을 제공합니다.";
 
@@ -192,6 +224,7 @@ function findMasterRegion() {
 beforeEach(() => {
   fetchHotel.mockResolvedValue(HOTEL);
   fetchHotelMaster.mockReturnValue(new Promise<never>(() => {}));
+  fetchHotelRooms.mockResolvedValue(createRoomPage([]));
 });
 
 afterEach(() => {
@@ -558,5 +591,87 @@ describe("HotelDetailPage 마스터 비밀번호 재설정", () => {
       });
     });
     expect(password).toHaveValue("master123");
+  });
+});
+
+describe("HotelDetailPage 객실", () => {
+  function findRoomRegion() {
+    return screen.findByRole("region", { name: ROOM_FIELD_LABELS.room });
+  }
+
+  it("호텔 내용 아래 객실 묶음에 호실·유형·층·상태 표를 보여준다", async () => {
+    fetchHotelRooms.mockResolvedValue(createRoomPage(ROOMS));
+    renderHotelDetailPage();
+
+    const rooms = within(await findRoomRegion());
+    const table = await rooms.findByRole("table");
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((header) => header.textContent),
+    ).toEqual([
+      ROOM_FIELD_LABELS.name,
+      ROOM_FIELD_LABELS.type,
+      ROOM_FIELD_LABELS.floor,
+      ROOM_FIELD_LABELS.status,
+    ]);
+    const [, ...rows] = within(table).getAllByRole("row");
+    expect(
+      rows.map((row) =>
+        within(row)
+          .getAllByRole("cell")
+          .map((cell) => cell.textContent),
+      ),
+    ).toEqual([
+      ["101", "스탠다드", "1", ROOM_STATUS_LABELS.VACANT],
+      [
+        "B01",
+        "디럭스",
+        ROOM_INFORMATION_MESSAGES.emptyFloor,
+        ROOM_STATUS_LABELS.MAINTENANCE,
+      ],
+    ]);
+    expect(fetchHotelRooms).toHaveBeenCalledExactlyOnceWith(HOTEL.id, {
+      page: 0,
+    });
+  });
+
+  it("다음 페이지를 누르면 URL은 그대로 두고 다음 페이지를 조회한다", async () => {
+    const user = userEvent.setup();
+    fetchHotelRooms.mockResolvedValue(createRoomPage(ROOMS, 2));
+    const router = renderHotelDetailPage();
+
+    const rooms = within(await findRoomRegion());
+    await user.click(
+      await rooms.findByRole("button", { name: COMMON_MESSAGES.nextPage }),
+    );
+
+    expect(
+      await rooms.findByText(COMMON_MESSAGES.pageStatus(2, 2)),
+    ).toBeInTheDocument();
+    expect(fetchHotelRooms).toHaveBeenLastCalledWith(HOTEL.id, { page: 1 });
+    expect(router.state.location.href).toBe(hotelPath(HOTEL.id));
+  });
+
+  it("객실이 없으면 빈 상태 문구를, 불러오지 못하면 묶음 안에 오류와 다시 시도를 보여준다", async () => {
+    const user = userEvent.setup();
+    fetchHotelRooms.mockRejectedValueOnce(
+      createApiError(500, "INTERNAL_SERVER_ERROR"),
+    );
+    renderHotelDetailPage();
+
+    const rooms = within(await findRoomRegion());
+    expect(await rooms.findByRole("alert")).toHaveTextContent(
+      HOTEL_ROOM_LIST_MESSAGES.loadFailed,
+    );
+    expect(screen.getByText(HOTEL.address)).toBeInTheDocument();
+
+    await user.click(rooms.getByRole("button", { name: COMMON_MESSAGES.retry }));
+
+    expect(
+      await rooms.findByText(HOTEL_ROOM_LIST_MESSAGES.empty),
+    ).toBeInTheDocument();
+    expect(fetchHotelRooms).toHaveBeenCalledTimes(2);
+    expect(fetchHotel).toHaveBeenCalledOnce();
   });
 });

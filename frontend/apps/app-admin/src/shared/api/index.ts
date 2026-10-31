@@ -58,3 +58,14 @@ export type {
   MemberStayListParams,
   MemberStayPage,
 } from "./member";
+export {
+  fetchHotelRooms,
+  hotelRoomListParamsSchema,
+  hotelRoomListQueryKey,
+} from "./room";
+export type {
+  HotelRoom,
+  HotelRoomListParams,
+  HotelRoomPage,
+  RoomStatus,
+} from "./room";

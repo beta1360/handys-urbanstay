@@ -1,8 +1,6 @@
 export const MEMBER_STAY_HISTORY_MESSAGES = {
   title: "호텔 이용 기록",
   hotel: "호텔",
-  room: "객실",
-  roomType: "유형",
   period: "기간",
   periodValue: (checkInDate: string, checkOutDate: string, nights: number) =>
     `${checkInDate} ~ ${checkOutDate} (${nights}박)`,

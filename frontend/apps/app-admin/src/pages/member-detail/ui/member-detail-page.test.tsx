@@ -16,6 +16,7 @@ import {
   parseMemberPathParams,
   stringifyMemberPathParams,
 } from "@/entities/member";
+import { ROOM_FIELD_LABELS } from "@/entities/room";
 import { API_ERROR_CODES } from "@/shared/api";
 import type { Member, MemberStay, MemberStayPage } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
@@ -214,8 +215,8 @@ describe("MemberDetailPage 호텔 이용 기록", () => {
         .map((header) => header.textContent),
     ).toEqual([
       MEMBER_STAY_HISTORY_MESSAGES.hotel,
-      MEMBER_STAY_HISTORY_MESSAGES.room,
-      MEMBER_STAY_HISTORY_MESSAGES.roomType,
+      ROOM_FIELD_LABELS.room,
+      ROOM_FIELD_LABELS.type,
       MEMBER_STAY_HISTORY_MESSAGES.period,
       MEMBER_STAY_HISTORY_MESSAGES.guestCount,
       MEMBER_STAY_HISTORY_MESSAGES.totalAmount,

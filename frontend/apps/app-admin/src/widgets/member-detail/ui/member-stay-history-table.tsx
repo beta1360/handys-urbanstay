@@ -1,5 +1,6 @@
 import { Table } from "@repo/ui/table";
 import type { TableColumn } from "@repo/ui/table";
+import { ROOM_FIELD_LABELS } from "@/entities/room";
 import type { MemberStay } from "@/shared/api";
 import { formatWon } from "@/shared/lib/currency";
 import { MEMBER_STAY_HISTORY_MESSAGES } from "../config/messages";
@@ -12,12 +13,12 @@ const MEMBER_STAY_COLUMNS: readonly TableColumn<MemberStay>[] = [
   },
   {
     key: "room",
-    header: MEMBER_STAY_HISTORY_MESSAGES.room,
+    header: ROOM_FIELD_LABELS.room,
     cell: (stay) => stay.room.name,
   },
   {
     key: "roomType",
-    header: MEMBER_STAY_HISTORY_MESSAGES.roomType,
+    header: ROOM_FIELD_LABELS.type,
     cell: (stay) => stay.roomType.name,
   },
   {
