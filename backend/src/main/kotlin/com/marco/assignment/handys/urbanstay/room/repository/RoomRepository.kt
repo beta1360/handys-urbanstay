@@ -29,6 +29,9 @@ interface RoomRepository : JpaRepository<Room, Long> {
 
 	fun findByHotelIdAndStatusAndNameContainingIgnoreCase(hotelId: Long, status: RoomStatus, keyword: String, pageable: Pageable): Page<Room>
 
+	@Query("select r from Room r where r.hotel.id = :hotelId order by collate(r.type as natural_sort), r.id")
+	fun findByHotelIdInTypeOrder(hotelId: Long): List<Room>
+
 	@Modifying(flushAutomatically = true, clearAutomatically = true)
 	@Query(
 		"""

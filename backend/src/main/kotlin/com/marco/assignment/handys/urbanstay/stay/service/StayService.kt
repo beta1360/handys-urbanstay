@@ -50,6 +50,16 @@ class StayService(
 	}
 
 	@Transactional(readOnly = true)
+	fun getRoomTypes(hotelId: Long, checkInDate: LocalDate, checkOutDate: LocalDate, guestCount: Int): List<RoomTypeAvailability> {
+		checkPeriod(checkInDate, checkOutDate)
+		val rooms = roomService.getHotelRoomsInTypeOrder(hotelId)
+		val availableIds = availableRooms(rooms, checkInDate, checkOutDate, guestCount).mapTo(HashSet()) { it.id }
+		return rooms.groupBy(Room::type).map { (type, typeRooms) ->
+			RoomTypeAvailability(type, typeRooms.size, typeRooms.maxOf(Room::capacity), typeRooms.count { it.id in availableIds })
+		}
+	}
+
+	@Transactional(readOnly = true)
 	fun getReservedPeriods(roomId: Long, page: Int, size: Int): Page<Stay> {
 		roomService.getRoomWithHotel(roomId)
 		return stayRepository.findByRoomIdAndCanceledAtIsNullAndCheckOutDateAfter(roomId, LocalDate.now(clock), PageRequest.of(page, size, EARLIEST_CHECK_IN_FIRST))
@@ -84,15 +94,25 @@ class StayService(
 		stayRepository.findByIdAndRoomHotelId(stayId, hotelId) ?: throw BusinessException(StayErrorCode.STAY_NOT_FOUND)
 
 	private fun checkValid(room: Room, checkInDate: LocalDate, checkOutDate: LocalDate, guestCount: Int) {
-		val invalidFields = listOfNotNull(
-			InvalidField(Stay::checkInDate.name, TODAY_OR_LATER).takeIf { checkInDate < LocalDate.now(clock) },
-			invalidCheckOutDate(checkInDate, checkOutDate),
-			InvalidField(Stay::guestCount.name, MAX_VALUE, mapOf("value" to room.capacity)).takeIf { guestCount > room.capacity },
+		throwIfInvalid(
+			invalidPeriod(checkInDate, checkOutDate) +
+				listOfNotNull(InvalidField(Stay::guestCount.name, MAX_VALUE, mapOf("value" to room.capacity)).takeIf { guestCount > room.capacity }),
 		)
+	}
+
+	private fun checkPeriod(checkInDate: LocalDate, checkOutDate: LocalDate) = throwIfInvalid(invalidPeriod(checkInDate, checkOutDate))
+
+	private fun throwIfInvalid(invalidFields: List<InvalidField>) {
 		if (invalidFields.isNotEmpty()) {
 			throw BusinessException(CommonErrorCode.INVALID_INPUT, invalidFields)
 		}
 	}
+
+	private fun invalidPeriod(checkInDate: LocalDate, checkOutDate: LocalDate): List<InvalidField> =
+		listOfNotNull(
+			InvalidField(Stay::checkInDate.name, TODAY_OR_LATER).takeIf { checkInDate < LocalDate.now(clock) },
+			invalidCheckOutDate(checkInDate, checkOutDate),
+		)
 
 	private fun invalidCheckOutDate(checkInDate: LocalDate, checkOutDate: LocalDate): InvalidField? =
 		when {
@@ -101,6 +121,15 @@ class StayService(
 				InvalidField(Stay::checkOutDate.name, MAX_NIGHTS, mapOf("max" to Stay.MAX_NIGHTS))
 			else -> null
 		}
+
+	private fun availableRooms(rooms: List<Room>, checkInDate: LocalDate, checkOutDate: LocalDate, guestCount: Int): List<Room> {
+		val candidates = rooms.filter { it.capacity >= guestCount }
+		if (candidates.isEmpty()) {
+			return emptyList()
+		}
+		val overlappedIds = stayRepository.findOverlappedRoomIds(candidates.map { checkNotNull(it.id) }, checkInDate, checkOutDate).toSet()
+		return candidates.filter { it.id !in overlappedIds }
+	}
 
 	private fun checkNotOverlapped(roomId: Long, checkInDate: LocalDate, checkOutDate: LocalDate) {
 		if (stayRepository.existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfterAndCanceledAtIsNull(roomId, checkOutDate, checkInDate)) {

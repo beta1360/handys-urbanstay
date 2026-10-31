@@ -76,6 +76,12 @@ class RoomService(
 	}
 
 	@Transactional(readOnly = true)
+	fun getHotelRoomsInTypeOrder(hotelId: Long): List<Room> {
+		hotelService.getHotel(hotelId)
+		return roomRepository.findByHotelIdInTypeOrder(hotelId)
+	}
+
+	@Transactional(readOnly = true)
 	fun getRoom(hotelId: Long, roomId: Long): Room = findRoom(hotelId, roomId)
 
 	@Transactional(readOnly = true)
