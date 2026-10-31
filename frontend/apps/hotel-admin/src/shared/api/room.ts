@@ -9,11 +9,14 @@ import {
   GetRoomsResponse,
   UpdateRoomParams,
   UpdateRoomResponse,
+  UpdateRoomStatusParams,
+  UpdateRoomStatusResponse,
 } from "./generated/zod";
 import {
   PageResponseRoomHotelAdminResponse,
   RoomCreateHotelAdminRequest,
   RoomHotelAdminResponse,
+  RoomStatusUpdateHotelAdminRequest,
   RoomUpdateHotelAdminRequest,
 } from "./generated/zod/schemas";
 
@@ -28,6 +31,10 @@ export const roomParamsSchema = GetRoomParams;
 export type CreateRoomBody = z.input<typeof RoomCreateHotelAdminRequest>;
 
 export type UpdateRoomBody = z.input<typeof RoomUpdateHotelAdminRequest>;
+
+export type UpdateRoomStatusBody = z.input<
+  typeof RoomStatusUpdateHotelAdminRequest
+>;
 
 export type Room = z.output<typeof RoomHotelAdminResponse>;
 
@@ -59,6 +66,10 @@ const CreateRoomSuccessResponse = CreateRoomResponse.extend(
 );
 
 const UpdateRoomSuccessResponse = UpdateRoomResponse.extend(
+  ROOM_CHANGE_SUCCESS_SHAPE,
+);
+
+const UpdateRoomStatusSuccessResponse = UpdateRoomStatusResponse.extend(
   ROOM_CHANGE_SUCCESS_SHAPE,
 );
 
@@ -122,6 +133,30 @@ export async function updateRoom(roomId: number, body: UpdateRoomBody) {
   const { data, message } = parseResponseBody(
     "updateRoom",
     UpdateRoomSuccessResponse,
+    response,
+  );
+  return { data, message };
+}
+
+export async function updateRoomStatus(
+  roomId: number,
+  body: UpdateRoomStatusBody,
+) {
+  const validParams = parseRequest("updateRoomStatus", UpdateRoomStatusParams, {
+    roomId,
+  });
+  const validBody = parseRequest(
+    "updateRoomStatus",
+    RoomStatusUpdateHotelAdminRequest,
+    body,
+  );
+  const response = await generated.updateRoomStatus(
+    validParams.roomId,
+    validBody,
+  );
+  const { data, message } = parseResponseBody(
+    "updateRoomStatus",
+    UpdateRoomStatusSuccessResponse,
     response,
   );
   return { data, message };

@@ -6,10 +6,11 @@ import {
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { showToast } from "@repo/admin-kit/toast";
 import {
   parseRoomPathParams,
   ROOM_FIELD_LABELS,
@@ -19,8 +20,9 @@ import {
   ROOM_STATUS_LABELS,
   stringifyRoomPathParams,
 } from "@/entities/room";
-import { API_ERROR_CODES } from "@/shared/api";
-import type { Room } from "@/shared/api";
+import { ROOM_STATUS_CHANGE_MESSAGES } from "@/features/room-status-change";
+import { API_ERROR_CODES, updateRoomStatus } from "@/shared/api";
+import type { Room, RoomStatus } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { RoomDetailPage } from "./room-detail-page";
@@ -31,9 +33,15 @@ vi.mock("@/shared/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/api")>();
   return {
     ...actual,
+    updateRoomStatus: vi.fn(),
     fetchRoom: (roomId: number) => fetchRoom(roomId),
   };
 });
+
+vi.mock("@repo/admin-kit/toast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@repo/admin-kit/toast")>()),
+  showToast: vi.fn(),
+}));
 
 const ROOM: Room = {
   id: 1,
@@ -50,17 +58,27 @@ const ROOM: Room = {
 
 const EDIT_PAGE_TEXT = "객실 수정 화면";
 
+const STATUS_MESSAGE = "객실 상태를 바꿨습니다.";
+
+type StatusChangeResult = Awaited<ReturnType<typeof updateRoomStatus>>;
+
+const STATUS_CONFLICT_MESSAGE = "다른 사용자가 먼저 상태를 바꿨습니다.";
+
 function roomPath(roomId: number | string) {
   return `/rooms/${roomId}`;
 }
 
-function createApiError(status: number, code: string) {
+function createApiError(
+  status: number,
+  code: string,
+  message = "요청을 처리하지 못했습니다.",
+) {
   const config = { headers: new AxiosHeaders() };
   const data = {
     success: false,
     data: null,
     message: null,
-    error: { code, message: "요청을 처리하지 못했습니다.", fieldErrors: [] },
+    error: { code, message, fieldErrors: [] },
   };
   return new AxiosError(
     "Request failed",
@@ -126,6 +144,12 @@ function getDescriptionTexts() {
   return screen
     .getAllByRole("definition")
     .map((definition) => definition.textContent);
+}
+
+function getStatusButtons() {
+  return within(
+    screen.getByRole("group", { name: ROOM_STATUS_CHANGE_MESSAGES.title }),
+  ).getAllByRole("button");
 }
 
 function getBackLink() {
@@ -290,4 +314,94 @@ describe("RoomDetailPage 찾을 수 없음", () => {
       expect(router.state.location.href).toBe("/rooms");
     });
   });
+});
+
+describe("RoomDetailPage 상태 바꾸기", () => {
+  it.each<[RoomStatus, RoomStatus[]]>([
+    ["VACANT", ["RESERVED", "MAINTENANCE"]],
+    ["RESERVED", ["OCCUPIED", "VACANT"]],
+    ["OCCUPIED", ["MAINTENANCE"]],
+    ["MAINTENANCE", ["VACANT"]],
+  ])(
+    "지금 상태가 %s면 갈 수 있는 상태만 버튼으로 보여준다",
+    async (status, nextStatuses) => {
+      fetchRoom.mockResolvedValue({ ...ROOM, status });
+      renderRoomDetailPage();
+
+      expect(
+        await screen.findByRole("group", {
+          name: ROOM_STATUS_CHANGE_MESSAGES.title,
+        }),
+      ).toBeInTheDocument();
+      expect(getStatusButtons().map((button) => button.textContent)).toEqual(
+        nextStatuses.map((nextStatus) => ROOM_STATUS_LABELS[nextStatus]),
+      );
+    },
+  );
+
+  it("누르면 화면에서 본 상태와 바꿀 상태를 보내고 요청 중에는 버튼을 막는다. 성공하면 서버 문구를 토스트로 보여주고 객실을 다시 불러온다", async () => {
+    const changedRoom: Room = { ...ROOM, status: "OCCUPIED" };
+    let resolveChange: (result: StatusChangeResult) => void = () => {};
+    vi.mocked(updateRoomStatus).mockReturnValue(
+      new Promise((resolve) => {
+        resolveChange = resolve;
+      }),
+    );
+    fetchRoom.mockResolvedValueOnce(ROOM).mockResolvedValueOnce(changedRoom);
+    const { user } = renderRoomDetailPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: ROOM_STATUS_LABELS.OCCUPIED }),
+    );
+
+    expect(updateRoomStatus).toHaveBeenCalledExactlyOnceWith(ROOM.id, {
+      from: "RESERVED",
+      to: "OCCUPIED",
+    });
+    getStatusButtons().forEach((button) => expect(button).toBeDisabled());
+
+    resolveChange({ data: changedRoom, message: STATUS_MESSAGE });
+
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalledExactlyOnceWith({
+        type: "success",
+        message: STATUS_MESSAGE,
+      });
+    });
+    expect(fetchRoom).toHaveBeenCalledTimes(2);
+    expect(getDescriptionTexts().at(-1)).toBe(ROOM_STATUS_LABELS.OCCUPIED);
+    expect(getStatusButtons().map((button) => button.textContent)).toEqual([
+      ROOM_STATUS_LABELS.MAINTENANCE,
+    ]);
+    expect(getStatusButtons()[0]).toBeEnabled();
+  });
+
+  it.each([
+    API_ERROR_CODES.roomStatusChanged,
+    API_ERROR_CODES.roomStatusTransitionNotAllowed,
+  ])(
+    "409 %s면 서버 문구를 오류 토스트로 보여주고 객실을 다시 불러온다",
+    async (code) => {
+      const latestRoom: Room = { ...ROOM, status: "OCCUPIED" };
+      vi.mocked(updateRoomStatus).mockRejectedValue(
+        createApiError(409, code, STATUS_CONFLICT_MESSAGE),
+      );
+      fetchRoom.mockResolvedValueOnce(ROOM).mockResolvedValueOnce(latestRoom);
+      const { user } = renderRoomDetailPage();
+
+      await user.click(
+        await screen.findByRole("button", { name: ROOM_STATUS_LABELS.VACANT }),
+      );
+
+      await vi.waitFor(() => {
+        expect(showToast).toHaveBeenCalledExactlyOnceWith({
+          type: "error",
+          message: STATUS_CONFLICT_MESSAGE,
+        });
+      });
+      expect(fetchRoom).toHaveBeenCalledTimes(2);
+      expect(getDescriptionTexts().at(-1)).toBe(ROOM_STATUS_LABELS.OCCUPIED);
+      expect(getStatusButtons()[0]).toBeEnabled();
+    },
+  );
 });

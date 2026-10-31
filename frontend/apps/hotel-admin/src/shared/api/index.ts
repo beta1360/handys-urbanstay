@@ -37,6 +37,7 @@ export {
   roomQueryKey,
   updateRoom,
   updateRoomBodySchema,
+  updateRoomStatus,
 } from "./room";
 export type {
   CreateRoomBody,
@@ -45,4 +46,5 @@ export type {
   RoomPage,
   RoomStatus,
   UpdateRoomBody,
+  UpdateRoomStatusBody,
 } from "./room";

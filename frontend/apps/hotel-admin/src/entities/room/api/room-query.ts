@@ -29,3 +29,15 @@ export function cacheSavedRoom(queryClient: QueryClient, room: Room) {
   void queryClient.invalidateQueries({ queryKey: roomListQueryKey() });
   queryClient.setQueryData(roomQueryOptions(room.id).queryKey, room);
 }
+
+export async function refreshRoomStatus(
+  queryClient: QueryClient,
+  roomId: number,
+) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: roomListQueryKey() }),
+    queryClient.invalidateQueries({
+      queryKey: roomQueryOptions(roomId).queryKey,
+    }),
+  ]);
+}
