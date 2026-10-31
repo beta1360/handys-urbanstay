@@ -204,6 +204,7 @@ urbanstay/
   - 조회·수정할 객실은 같은 호텔에서만 찾는다(`findByIdAndHotelId`). 없는 id와 다른 호텔의 객실 id는 모두 404 `RoomErrorCode.ROOM_NOT_FOUND`다. 다른 호텔 객실의 존재를 알리지 않기 위해서다.
   - 수정은 PUT으로 모든 항목을 바꾼다. 층과 소개를 보내지 않거나 null이면 null로 바뀐다. 순서는 객실 조회 → version 확인(`ROOM_MODIFIED`) → 이름 중복 확인 → 엔티티 변경 → `saveAndFlush`이고, 유일 제약 위반과 `OptimisticLockingFailureException`을 함께 변환한다. version 충돌과 이름 중복이 겹치면 version 충돌이 먼저다.
   - 목록은 같은 호텔의 객실을 이름 오름차순, 같으면 id 오름차순으로 준다(목록 조회 절). `keyword`(선택, 100자)는 이름에서 대소문자 구분 없이 찾고, `status`(선택, 하나)는 그 상태의 객실만 거른다. 둘을 함께 보내면 AND다(조합별 파생 쿼리, 목록 조회 절). 상태 필터용 인덱스는 따로 두지 않는다(`hotel_id` 조건에 유일 제약의 인덱스를 쓴다).
+  - 객실 응답(`RoomHotelAdminResponse`)에는 지금 이용 `currentStay: { id, checkInDate, checkOutDate, guest: { id, name, phone } }`를 담고, 없으면 null이다. 지금 이용은 오늘(`Clock`, Asia/Seoul)이 [체크인, 체크아웃) 안에 있는 취소하지 않은 이용이며, 배제 제약 때문에 객실마다 많아야 하나다. 컨트롤러가 `StayService.getCurrentStays(roomIds)`로 조회해 붙인다. 목록은 페이지의 객실을 한 번에 조회하고(이용객은 `@EntityGraph`, 인덱스는 `stay_room_id_check_in_date_id_idx`), 조회·수정·상태 변경은 그 객실 하나를 조회한다. 등록 응답은 항상 null이다. 서비스 방향은 `StayService → RoomService` 그대로이고 `RoomService`는 이용 도메인을 쓰지 않는다.
 - 테스트
   - 마스터와 운영자가 모두 쓰는 API는 두 역할의 principal로 정상 흐름을 확인한다(`@EnumSource(HotelAdminRole::class)`, `RoomHotelAdminControllerTest`).
   - 객실이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔 객실의 `room_status_history`, 그다음 `room`을 먼저 지운다. 이력은 바꾼 호텔 계정(`hotel_admin`)도 가리키므로, 여러 호텔을 지울 때는 모든 호텔의 이력을 먼저 지운 뒤 객실과 호텔 계정을 지운다.
