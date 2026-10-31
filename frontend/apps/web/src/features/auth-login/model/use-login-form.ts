@@ -8,6 +8,7 @@ import {
   SUBMIT_ONLY_VALIDATION,
   toFieldPropsMap,
 } from "@/shared/lib/form";
+import { showToast } from "@/shared/lib/toast";
 import { useLogin } from "../api/use-login";
 import {
   EMPTY_LOGIN_VALUES,
@@ -29,7 +30,8 @@ export function useLoginForm(redirectTo: string) {
 
   const submit = form.handleSubmit(async (body) => {
     try {
-      await login(body);
+      const message = await login(body);
+      showToast(message);
       router.replace(redirectTo);
     } catch (error) {
       showSubmitError(getApiError(error), {

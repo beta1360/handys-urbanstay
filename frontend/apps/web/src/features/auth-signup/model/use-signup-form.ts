@@ -9,6 +9,7 @@ import {
   SUBMIT_ONLY_VALIDATION,
   toFieldPropsMap,
 } from "@/shared/lib/form";
+import { showToast } from "@/shared/lib/toast";
 import { useSignup } from "../api/use-signup";
 import {
   EMPTY_SIGNUP_VALUES,
@@ -35,7 +36,8 @@ export function useSignupForm(redirectTo: string) {
 
   const submit = form.handleSubmit(async (body) => {
     try {
-      await signup(body);
+      const message = await signup(body);
+      showToast(message);
       router.replace(redirectTo);
     } catch (error) {
       showSubmitError(getApiError(error), {

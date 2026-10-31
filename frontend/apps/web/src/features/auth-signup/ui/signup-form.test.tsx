@@ -11,6 +11,7 @@ import {
   signupMember,
 } from "@/shared/api";
 import { COMMON_MESSAGES, FORM_VALIDATION_MESSAGES } from "@/shared/config";
+import { showToast } from "@/shared/lib/toast";
 import { SignupForm } from "./signup-form";
 
 vi.mock("next/navigation", () => ({
@@ -20,6 +21,10 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/shared/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/shared/api")>()),
   signupMember: vi.fn(),
+}));
+
+vi.mock("@/shared/lib/toast", () => ({
+  showToast: vi.fn(),
 }));
 
 const REDIRECT_TO = "/hotels/3?checkInDate=2026-11-13";
@@ -110,7 +115,7 @@ describe("SignupForm", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
-  it("가입하면 로그인 상태로 두고 원래 가려던 곳으로 간다", async () => {
+  it("가입하면 로그인 상태로 두고 서버 문구를 띄운 뒤 원래 가려던 곳으로 간다", async () => {
     vi.mocked(signupMember).mockResolvedValue({
       data: MEMBER,
       message: "회원가입을 완료했습니다.",
@@ -127,5 +132,6 @@ describe("SignupForm", () => {
       phone: MEMBER.phone,
     });
     expect(queryClient.getQueryData(memberQueryKey())).toEqual(MEMBER);
+    expect(showToast).toHaveBeenCalledWith("회원가입을 완료했습니다.");
   });
 });

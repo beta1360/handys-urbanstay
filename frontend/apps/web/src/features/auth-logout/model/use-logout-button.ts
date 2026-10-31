@@ -1,4 +1,7 @@
 import { useRouter } from "next/navigation";
+import { getApiError } from "@/shared/api";
+import { COMMON_MESSAGES } from "@/shared/config";
+import { showToast } from "@/shared/lib/toast";
 import { useLogout } from "../api/use-logout";
 
 export function useLogoutButton() {
@@ -9,7 +12,17 @@ export function useLogoutButton() {
     if (isPending) {
       return;
     }
-    logout(undefined, { onSuccess: () => router.refresh() });
+    logout(undefined, {
+      onSuccess: (message) => {
+        if (message !== undefined) {
+          showToast(message);
+        }
+        router.refresh();
+      },
+      onError: (error) => {
+        showToast(getApiError(error)?.message ?? COMMON_MESSAGES.requestFailed);
+      },
+    });
   }
 
   return { isPending, handleLogout };

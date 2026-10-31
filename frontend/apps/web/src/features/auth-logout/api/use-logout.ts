@@ -2,13 +2,15 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { endMemberSession } from "@/entities/member";
 import { API_ERROR_CODES, getApiError, logoutMember } from "@/shared/api";
 
-async function logoutIgnoringEndedSession() {
+async function logoutIgnoringEndedSession(): Promise<string | undefined> {
   try {
-    await logoutMember();
+    const { message } = await logoutMember();
+    return message;
   } catch (error) {
     if (getApiError(error)?.code !== API_ERROR_CODES.unauthorized) {
       throw error;
     }
+    return undefined;
   }
 }
 

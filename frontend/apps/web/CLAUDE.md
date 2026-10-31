@@ -10,7 +10,7 @@
 
 - 어반스테이 앱처럼 앱 형태의 UI로 만든다. 데스크톱에서도 모바일 폭으로 고정된 가운데 컬럼으로 보여준다.
 - 폰트는 Pretendard를 쓴다.
-- UI 라이브러리 없이 Tailwind 기본값으로 만든다. 앱 안에서 함께 쓰는 화면 조각(버튼, 링크, 입력창, 불러오는 중 문구)은 `shared/ui`에 둔다. 어드민 전용 패키지(`@repo/ui`, `@repo/admin-kit`)는 쓰지 않는다.
+- UI 라이브러리 없이 Tailwind 기본값으로 만든다. 앱 안에서 함께 쓰는 화면 조각(버튼, 링크, 입력창, 불러오는 중 문구, 토스트)은 `shared/ui`에 둔다. 어드민 전용 패키지(`@repo/ui`, `@repo/admin-kit`)는 쓰지 않는다.
 
 ### 화면 목록
 
@@ -35,7 +35,15 @@
 - 로그인·회원가입이 성공하면 받은 회원을 그 캐시에 넣고 `redirect`로 `router.replace`한다. 로그아웃은 캐시를 `null`로 바꾸고 `router.refresh()`로 서버 컴포넌트를 다시 그린다(로그인이 필요한 화면은 서버가 로그인으로 보낸다). 로그아웃의 401은 이미 끊긴 세션이라 성공으로 본다.
 - `redirect`는 `/`로 시작하는 앱 안의 경로만 받는다. 비었거나, `//`로 시작하거나, 로그인·회원가입 경로면 `/`로 간다(`shared/lib/login-redirect`).
 - 헤더: 확인 중에는 비워 두고, 비회원은 지금 주소로 돌아오는 로그인·회원가입 링크, 회원은 이름·'내 이용'·로그아웃을 보여준다. 지금 주소를 `useSearchParams`로 읽어 `<Suspense>` 안에 둔다.
-- 로그인·회원가입·로그아웃의 성공 문구는 보여주지 않고 바로 다음 화면으로 간다(토스트 없음).
+- 로그인·회원가입·로그아웃이 성공하면 서버 `message`를 토스트로 띄우고 다음 화면으로 간다. 로그아웃이 401로 끝나면 받은 문구가 없으므로 띄우지 않는다.
+- 로그아웃이 실패하면 서버 오류 문구(없으면 '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.')를 토스트로 띄우고 회원 메뉴를 그대로 둔다.
+
+### 토스트
+
+- 로그인·회원가입·로그아웃의 결과 문구만 토스트로 보여준다. 폼 오류는 토스트가 아니라 폼 안에 둔다(아래 '폼').
+- 한 번에 하나만 보여준다. 새 문구가 오면 바로 바꾸고, 마지막 문구에서 3초 뒤 사라진다. 닫기 버튼은 두지 않는다.
+- 가운데 컬럼 아래쪽에 띄운다. 영역은 늘 그려 두는 `role="status"`라 문구가 바뀌면 화면 낭독기가 읽는다.
+- 표현은 `shared/ui`의 `ToastRegion`·`ToastMessage`, 상태와 `showToast`는 `shared/lib/toast`, 영역은 `_app/toast`의 `ToastProvider`가 맡는다. 화면을 옮겨도 남도록 `ToastProvider`는 레이아웃 바깥(`AppProviders`)에 둔다.
 
 ### 폼
 
@@ -69,12 +77,12 @@
 apps/web/
 ├─ app/                    # Next.js 라우팅 (page, not-found, error)
 └─ src/
-   ├─ _app/                # QueryClient, Provider
+   ├─ _app/                # QueryClient, 토스트 영역, Provider
    ├─ _pages/              # hotel-list, hotel-booking, login, signup, my-stays, not-found, error
    ├─ widgets/             # app-layout (헤더 로그인 상태), hotel-booking (서버에서 호텔을 찾아 예약 화면 조립), my-stays (쿠키를 넘겨 내 이용 조회)
    ├─ features/            # stay-search (날짜·인원 → URL), stay-reserve (유형 선택·금액·예약·완료), auth-login, auth-signup, auth-logout
    ├─ entities/            # hotel (목록, 호텔 찾기), room-type (유형 조회, 예약불가 표시), stay (조건 검사·URL, 기간·금액, 내 이용 표시), member (로그인 상태)
-   └─ shared/              # api, config, lib (form, date, path-param, login-redirect, current-href, money), ui
+   └─ shared/              # api, config, lib (form, date, path-param, login-redirect, current-href, money, toast), ui
 ```
 
 ### 서버 컴포넌트의 조회

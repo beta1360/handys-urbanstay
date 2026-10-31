@@ -7,8 +7,9 @@ export function useSignup() {
   const queryClient = useQueryClient();
 
   async function signup(body: SignupBody) {
-    const { data } = await signupMember(body);
+    const { data, message } = await signupMember(body);
     startMemberSession(queryClient, data);
+    return message;
   }
 
   return { signup };
