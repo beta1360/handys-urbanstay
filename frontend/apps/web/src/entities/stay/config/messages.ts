@@ -3,6 +3,8 @@ export const STAY_LABELS = {
   checkOutDate: "체크아웃 날짜",
   guestCount: "인원",
   period: "기간",
+  roomRate: "1박 요금",
+  totalAmount: "최종 금액",
 } as const;
 
 export const STAY_MESSAGES = {

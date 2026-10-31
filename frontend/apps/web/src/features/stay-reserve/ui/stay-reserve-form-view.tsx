@@ -4,10 +4,14 @@ import { formatStayPeriod, STAY_LABELS } from "@/entities/stay";
 import type { RoomType } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import type { FormFieldProps } from "@/shared/lib/form";
-import { Button } from "@/shared/ui";
+import { formatWon } from "@/shared/lib/money";
+import { Button, ButtonLink } from "@/shared/ui";
 import { STAY_RESERVE_MESSAGES } from "../config/messages";
 import type { StayReserveField } from "../model/stay-reserve-form-schema";
-import type { ReservationSummary } from "../model/use-stay-reserve";
+import type {
+  ReservationSummary,
+  ReserveAction,
+} from "../model/use-stay-reserve";
 import { StayDetailList } from "./stay-detail-list";
 
 type StayReserveFormViewProps = {
@@ -15,7 +19,7 @@ type StayReserveFormViewProps = {
   fields: Record<StayReserveField, FormFieldProps>;
   summary: ReservationSummary | undefined;
   formAlert: string | undefined;
-  isSubmitting: boolean;
+  action: ReserveAction;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
@@ -24,7 +28,7 @@ export function StayReserveFormView({
   fields,
   summary,
   formAlert,
-  isSubmitting,
+  action,
   onSubmit,
 }: StayReserveFormViewProps) {
   return (
@@ -49,6 +53,14 @@ export function StayReserveFormView({
                 label: STAY_LABELS.guestCount,
                 value: COMMON_MESSAGES.people(summary.criteria.guestCount),
               },
+              {
+                label: STAY_LABELS.roomRate,
+                value: formatWon(summary.roomType.roomRate),
+              },
+              {
+                label: STAY_LABELS.totalAmount,
+                value: formatWon(summary.totalAmount),
+              },
             ]}
           />
         </section>
@@ -58,8 +70,17 @@ export function StayReserveFormView({
           {formAlert}
         </p>
       ) : null}
-      {summary ? (
-        <Button type="submit" variant="primary" loading={isSubmitting}>
+      {summary && action.status === "loginRequired" ? (
+        <ButtonLink href={action.loginHref} variant="primary">
+          {STAY_RESERVE_MESSAGES.loginToReserve}
+        </ButtonLink>
+      ) : null}
+      {summary && action.status !== "loginRequired" ? (
+        <Button
+          type="submit"
+          variant="primary"
+          loading={action.status === "checking" || action.isSubmitting}
+        >
           {STAY_RESERVE_MESSAGES.submit}
         </Button>
       ) : null}

@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { formatStayPeriod } from "@/entities/stay";
 import {
@@ -9,28 +9,36 @@ import {
   ApiResponseError,
   createStay,
   fetchHotelRoomTypes,
+  fetchMe,
 } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
+import { loginHref } from "@/shared/lib/login-redirect";
 import { STAY_RESERVE_MESSAGES } from "../config/messages";
 import { StayReserve } from "./stay-reserve";
 
 vi.mock("next/navigation", () => ({
+  usePathname: vi.fn(),
   useSearchParams: vi.fn(),
 }));
 
 vi.mock("@/shared/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/shared/api")>()),
   fetchHotelRoomTypes: vi.fn(),
+  fetchMe: vi.fn(),
   createStay: vi.fn(),
 }));
 
 const HOTEL_ID = 3;
+
+const HOTEL_PATH = `/hotels/${HOTEL_ID}`;
 
 const CRITERIA = {
   checkInDate: "2026-11-13",
   checkOutDate: "2026-11-15",
   guestCount: 2,
 };
+
+const SEARCH = new URLSearchParams({ ...CRITERIA, guestCount: "2" });
 
 const ROOM_TYPE_TIMES = { checkInTime: "15:00", checkOutTime: "11:00" };
 
@@ -54,9 +62,22 @@ const STANDARD = {
   availableCount: 2,
 };
 
-const GUEST_NAME = "김이용";
+const MEMBER = {
+  id: 1,
+  email: "guest@example.com",
+  name: "김회원",
+  phone: "010-1234-5678",
+};
 
 const SEARCH_CHILD = "검색 폼 자리";
+
+function unauthorizedError(operation: string) {
+  return new ApiResponseError(operation, 401, {
+    code: API_ERROR_CODES.unauthorized,
+    message: "로그인이 필요합니다.",
+    fieldErrors: [],
+  });
+}
 
 function renderStayReserve() {
   const queryClient = new QueryClient({
@@ -73,25 +94,31 @@ function renderStayReserve() {
   return { user };
 }
 
-async function selectStandardAndSubmit(
-  user: ReturnType<typeof userEvent.setup>,
-) {
+async function selectStandard(user: ReturnType<typeof userEvent.setup>) {
   await user.click(
     await screen.findByRole("radio", { name: new RegExp(STANDARD.name) }),
   );
-  await user.click(
-    screen.getByRole("button", { name: STAY_RESERVE_MESSAGES.submit }),
-  );
+}
+
+async function selectStandardAndSubmit(
+  user: ReturnType<typeof userEvent.setup>,
+) {
+  await selectStandard(user);
+  const submit = await screen.findByRole("button", {
+    name: STAY_RESERVE_MESSAGES.submit,
+  });
+  await waitFor(() => expect(submit).toBeEnabled());
+  await user.click(submit);
 }
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-31T03:00:00Z"));
   vi.spyOn(console, "error").mockImplementation(() => {});
-  vi.mocked(useSearchParams).mockReturnValue(
-    new URLSearchParams({ ...CRITERIA, guestCount: "2" }) as never,
-  );
+  vi.mocked(usePathname).mockReturnValue(HOTEL_PATH);
+  vi.mocked(useSearchParams).mockReturnValue(SEARCH as never);
   vi.mocked(fetchHotelRoomTypes).mockResolvedValue([DELUXE, STANDARD]);
+  vi.mocked(fetchMe).mockResolvedValue(MEMBER);
 });
 
 afterEach(() => {
@@ -101,7 +128,7 @@ afterEach(() => {
 });
 
 describe("StayReserve", () => {
-  it("URL의 조건으로 유형을 조회하고 남은 객실이 없는 유형은 고를 수 없다", async () => {
+  it("URL의 조건으로 유형을 조회해 1박 요금을 보여주고 남은 객실이 없는 유형은 고를 수 없다", async () => {
     renderStayReserve();
 
     const standard = await screen.findByRole("radio", {
@@ -115,13 +142,38 @@ describe("StayReserve", () => {
     );
     expect(standard).toBeEnabled();
     expect(deluxe).toBeDisabled();
+    expect(standard.closest("label")).toHaveTextContent(
+      COMMON_MESSAGES.won("90,000"),
+    );
     expect(screen.getByText(SEARCH_CHILD)).toBeInTheDocument();
+  });
+
+  it("로그인하지 않았으면 예약 내용과 금액을 보여주고 예약 버튼 대신 지금 주소로 돌아오는 로그인 링크를 보여준다", async () => {
+    vi.mocked(fetchMe).mockRejectedValue(unauthorizedError("getMe"));
+    const { user } = renderStayReserve();
+
+    await selectStandard(user);
+
+    expect(
+      await screen.findByRole("link", {
+        name: STAY_RESERVE_MESSAGES.loginToReserve,
+      }),
+    ).toHaveAttribute("href", loginHref(`${HOTEL_PATH}?${SEARCH.toString()}`));
     expect(
       screen.queryByRole("button", { name: STAY_RESERVE_MESSAGES.submit }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("definition").map((detail) => detail.textContent),
+    ).toEqual([
+      STANDARD.name,
+      formatStayPeriod(CRITERIA),
+      COMMON_MESSAGES.people(CRITERIA.guestCount),
+      COMMON_MESSAGES.won("90,000"),
+      COMMON_MESSAGES.won("180,000"),
+    ]);
   });
 
-  it("유형을 골라 예약하면 같은 화면에서 호수 없이 예약 내용을 보여주고 제목에 초점을 옮긴다", async () => {
+  it("회원이 예약하면 유형 ID로 요청하고 같은 화면에서 최종 금액과 함께 예약 내용을 보여준다", async () => {
     vi.mocked(createStay).mockResolvedValue({
       data: {
         id: 11,
@@ -133,7 +185,7 @@ describe("StayReserve", () => {
         baseAmount: 180000,
         discountAmount: 0,
         totalAmount: 180000,
-        guest: { name: GUEST_NAME },
+        guest: { name: MEMBER.name },
       },
       message: "예약을 완료했습니다.",
     });
@@ -157,9 +209,26 @@ describe("StayReserve", () => {
       STANDARD.name,
       formatStayPeriod(CRITERIA),
       COMMON_MESSAGES.people(CRITERIA.guestCount),
-      GUEST_NAME,
+      MEMBER.name,
+      COMMON_MESSAGES.won("180,000"),
     ]);
     expect(screen.queryByText(SEARCH_CHILD)).not.toBeInTheDocument();
+  });
+
+  it("예약 중 로그인이 끊기면 폼 알림에 서버 문구를 보여주고 로그인 링크로 바꾼다", async () => {
+    vi.mocked(createStay).mockRejectedValue(unauthorizedError("createStay"));
+    const { user } = renderStayReserve();
+
+    await selectStandardAndSubmit(user);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "로그인이 필요합니다.",
+    );
+    expect(
+      await screen.findByRole("link", {
+        name: STAY_RESERVE_MESSAGES.loginToReserve,
+      }),
+    ).toBeInTheDocument();
   });
 
   it("그사이 빈 객실이 없어지면 폼 알림에 서버 문구를 보여주고 유형 목록을 다시 조회한다", async () => {

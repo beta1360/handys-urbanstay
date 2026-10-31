@@ -2,6 +2,7 @@ import type { Ref } from "react";
 import { ROOM_TYPE_LABELS } from "@/entities/room-type";
 import { formatStayPeriod, STAY_LABELS } from "@/entities/stay";
 import { COMMON_MESSAGES, ROUTES } from "@/shared/config";
+import { formatWon } from "@/shared/lib/money";
 import { ButtonLink } from "@/shared/ui";
 import { STAY_RESERVE_LABELS } from "../config/messages";
 import type { Reservation } from "../model/use-stay-reserve";
@@ -37,6 +38,10 @@ export function StayReserveCompleted({
           {
             label: STAY_RESERVE_LABELS.reservedGuestName,
             value: stay.guest.name,
+          },
+          {
+            label: STAY_LABELS.totalAmount,
+            value: formatWon(stay.totalAmount),
           },
         ]}
       />

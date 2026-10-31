@@ -4,6 +4,7 @@ export const ROOM_TYPE_LABELS = {
 
 export const ROOM_TYPE_MESSAGES = {
   maxGuests: (maxGuests: number) => `최대 ${maxGuests}명`,
+  roomRate: (roomRate: string) => `1박 ${roomRate}`,
   available: (availableCount: number) => `남은 객실 ${availableCount}개`,
   unavailable: "예약불가",
   empty: "예약할 수 있는 객실 유형이 없습니다.",

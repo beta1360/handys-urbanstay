@@ -1,5 +1,6 @@
 export { STAY_LABELS, STAY_VALIDATION_MESSAGES } from "./config/messages";
 export { STAY_RULES } from "./config/rules";
+export { estimateTotalAmount } from "./lib/stay-amount";
 export { formatStayPeriod } from "./lib/stay-period";
 export {
   STAY_CRITERIA_FIELDS,

@@ -6,4 +6,5 @@ export const COMMON_MESSAGES = {
   login: "로그인",
   signup: "회원가입",
   people: (count: number) => `${count}명`,
+  won: (amount: string) => `${amount}원`,
 } as const;

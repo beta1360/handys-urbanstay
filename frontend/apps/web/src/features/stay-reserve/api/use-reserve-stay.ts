@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { endMemberSession } from "@/entities/member";
 import { refreshRoomTypes } from "@/entities/room-type";
 import { API_ERROR_CODES, createStay, getApiError } from "@/shared/api";
 
@@ -13,6 +14,10 @@ function isStaleRoomTypesError(error: unknown) {
   return code !== undefined && STALE_ROOM_TYPES_ERROR_CODES.includes(code);
 }
 
+function isEndedSessionError(error: unknown) {
+  return getApiError(error)?.code === API_ERROR_CODES.unauthorized;
+}
+
 export function useReserveStay(hotelId: number) {
   const queryClient = useQueryClient();
   const { mutate } = useMutation({
@@ -20,10 +25,15 @@ export function useReserveStay(hotelId: number) {
     onSuccess: () => {
       void refreshRoomTypes(queryClient, hotelId);
     },
-    onError: (error) =>
-      isStaleRoomTypesError(error)
+    onError: (error) => {
+      if (isEndedSessionError(error)) {
+        endMemberSession(queryClient);
+        return undefined;
+      }
+      return isStaleRoomTypesError(error)
         ? refreshRoomTypes(queryClient, hotelId)
-        : undefined,
+        : undefined;
+    },
   });
 
   return { reserve: mutate };

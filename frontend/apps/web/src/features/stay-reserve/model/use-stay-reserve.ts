@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMember } from "@/entities/member";
 import { useRoomTypes } from "@/entities/room-type";
-import { useStayCriteria } from "@/entities/stay";
+import { estimateTotalAmount, useStayCriteria } from "@/entities/stay";
 import type { StayCriteria } from "@/entities/stay";
 import { getApiError } from "@/shared/api";
 import type { ReservedStay, RoomType } from "@/shared/api";
@@ -13,6 +14,7 @@ import {
   toFieldPropsMap,
 } from "@/shared/lib/form";
 import type { FormFieldProps } from "@/shared/lib/form";
+import { loginHref, useCurrentHref } from "@/shared/lib/login-redirect";
 import { useReserveStay } from "../api/use-reserve-stay";
 import {
   EMPTY_STAY_RESERVE_VALUES,
@@ -29,7 +31,13 @@ export type Reservation = {
 export type ReservationSummary = {
   roomType: RoomType;
   criteria: StayCriteria;
+  totalAmount: number;
 };
+
+export type ReserveAction =
+  | { status: "checking" }
+  | { status: "loginRequired"; loginHref: string }
+  | { status: "submit"; isSubmitting: boolean };
 
 export type StayReserveState =
   | { status: "idle" }
@@ -42,7 +50,7 @@ export type StayReserveState =
       fields: Record<StayReserveField, FormFieldProps>;
       summary: ReservationSummary | undefined;
       formAlert: string | undefined;
-      isSubmitting: boolean;
+      action: ReserveAction;
       handleSubmit: (event: FormEvent<HTMLFormElement>) => void;
     }
   | {
@@ -54,6 +62,8 @@ export type StayReserveState =
 export function useStayReserve(hotelId: number): StayReserveState {
   const criteria = useStayCriteria();
   const roomTypes = useRoomTypes(hotelId, criteria);
+  const member = useMember();
+  const currentHref = useCurrentHref();
   const { reserve } = useReserveStay(hotelId);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [reservation, setReservation] = useState<Reservation>();
@@ -78,8 +88,18 @@ export function useStayReserve(hotelId: number): StayReserveState {
       : undefined;
   const summary =
     criteria !== undefined && selectedRoomType !== undefined
-      ? { roomType: selectedRoomType, criteria }
+      ? {
+          roomType: selectedRoomType,
+          criteria,
+          totalAmount: estimateTotalAmount(selectedRoomType.roomRate, criteria),
+        }
       : undefined;
+  const action: ReserveAction =
+    member.status === "member"
+      ? { status: "submit", isSubmitting }
+      : member.status === "guest"
+        ? { status: "loginRequired", loginHref: loginHref(currentHref) }
+        : { status: "checking" };
 
   useEffect(() => {
     form.resetField("roomTypeId");
@@ -93,7 +113,7 @@ export function useStayReserve(hotelId: number): StayReserveState {
   }, [reservation]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    if (isSubmitting || summary === undefined) {
+    if (action.status !== "submit" || isSubmitting || summary === undefined) {
       event.preventDefault();
       return;
     }
@@ -133,7 +153,7 @@ export function useStayReserve(hotelId: number): StayReserveState {
     fields,
     summary,
     formAlert: formState.errors.root?.server?.message,
-    isSubmitting,
+    action,
     handleSubmit,
   };
 }

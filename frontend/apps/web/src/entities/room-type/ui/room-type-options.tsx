@@ -1,5 +1,6 @@
 import type { RoomType } from "@/shared/api";
 import type { FormFieldProps } from "@/shared/lib/form";
+import { formatWon } from "@/shared/lib/money";
 import { ROOM_TYPE_LABELS, ROOM_TYPE_MESSAGES } from "../config/messages";
 
 type RoomTypeOptionsProps = {
@@ -34,6 +35,9 @@ export function RoomTypeOptions({
               <span className="font-semibold">{roomType.name}</span>
               <span className="text-sm text-gray-500">
                 {ROOM_TYPE_MESSAGES.maxGuests(roomType.capacity)}
+              </span>
+              <span className="text-sm font-medium text-gray-900">
+                {ROOM_TYPE_MESSAGES.roomRate(formatWon(roomType.roomRate))}
               </span>
             </span>
             <span className="text-sm font-medium">
