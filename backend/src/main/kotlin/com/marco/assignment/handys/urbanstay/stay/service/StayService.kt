@@ -7,6 +7,7 @@ import com.marco.assignment.handys.urbanstay.common.exception.InvalidField
 import com.marco.assignment.handys.urbanstay.common.exception.violates
 import com.marco.assignment.handys.urbanstay.guest.service.GuestService
 import com.marco.assignment.handys.urbanstay.room.entity.Room
+import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import com.marco.assignment.handys.urbanstay.room.service.RoomService
 import com.marco.assignment.handys.urbanstay.stay.entity.Stay
 import com.marco.assignment.handys.urbanstay.stay.exception.StayErrorCode
@@ -34,7 +35,8 @@ class StayService(
 
 	@Transactional
 	fun reserve(
-		roomId: Long,
+		hotelId: Long,
+		roomType: String,
 		checkInDate: LocalDate,
 		checkOutDate: LocalDate,
 		guestCount: Int,
@@ -42,17 +44,22 @@ class StayService(
 		guestPhone: String,
 		guestEmail: String,
 	): Stay {
-		val room = roomService.getRoomWithHotel(roomId)
-		checkValid(room, checkInDate, checkOutDate, guestCount)
-		checkNotOverlapped(roomId, checkInDate, checkOutDate)
-		val guest = guestService.getOrCreate(checkNotNull(room.hotel.id), guestName, guestPhone, guestEmail)
+		checkPeriod(checkInDate, checkOutDate)
+		val rooms = roomService.lockRoomsByType(hotelId, roomType)
+		val room = availableRooms(rooms, checkInDate, checkOutDate, guestCount).firstOrNull()
+			?: throw BusinessException(RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
+		val guest = guestService.getOrCreate(hotelId, guestName, guestPhone, guestEmail)
 		return translateConflicts { stayRepository.saveAndFlush(Stay(room, guest, checkInDate, checkOutDate, guestCount)) }
 	}
 
 	@Transactional(readOnly = true)
-	fun getReservedPeriods(roomId: Long, page: Int, size: Int): Page<Stay> {
-		roomService.getRoomWithHotel(roomId)
-		return stayRepository.findByRoomIdAndCanceledAtIsNullAndCheckOutDateAfter(roomId, LocalDate.now(clock), PageRequest.of(page, size, EARLIEST_CHECK_IN_FIRST))
+	fun getRoomTypes(hotelId: Long, checkInDate: LocalDate, checkOutDate: LocalDate, guestCount: Int): List<RoomTypeAvailability> {
+		checkPeriod(checkInDate, checkOutDate)
+		val rooms = roomService.getHotelRoomsInTypeOrder(hotelId)
+		val availableIds = availableRooms(rooms, checkInDate, checkOutDate, guestCount).mapTo(HashSet()) { it.id }
+		return rooms.groupBy(Room::type).map { (type, typeRooms) ->
+			RoomTypeAvailability(type, typeRooms.size, typeRooms.maxOf(Room::capacity), typeRooms.count { it.id in availableIds })
+		}
 	}
 
 	@Transactional(readOnly = true)
@@ -83,11 +90,10 @@ class StayService(
 	private fun findStay(hotelId: Long, stayId: Long): Stay =
 		stayRepository.findByIdAndRoomHotelId(stayId, hotelId) ?: throw BusinessException(StayErrorCode.STAY_NOT_FOUND)
 
-	private fun checkValid(room: Room, checkInDate: LocalDate, checkOutDate: LocalDate, guestCount: Int) {
+	private fun checkPeriod(checkInDate: LocalDate, checkOutDate: LocalDate) {
 		val invalidFields = listOfNotNull(
 			InvalidField(Stay::checkInDate.name, TODAY_OR_LATER).takeIf { checkInDate < LocalDate.now(clock) },
 			invalidCheckOutDate(checkInDate, checkOutDate),
-			InvalidField(Stay::guestCount.name, MAX_VALUE, mapOf("value" to room.capacity)).takeIf { guestCount > room.capacity },
 		)
 		if (invalidFields.isNotEmpty()) {
 			throw BusinessException(CommonErrorCode.INVALID_INPUT, invalidFields)
@@ -102,10 +108,13 @@ class StayService(
 			else -> null
 		}
 
-	private fun checkNotOverlapped(roomId: Long, checkInDate: LocalDate, checkOutDate: LocalDate) {
-		if (stayRepository.existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfterAndCanceledAtIsNull(roomId, checkOutDate, checkInDate)) {
-			throw BusinessException(StayErrorCode.STAY_PERIOD_OVERLAPPED)
+	private fun availableRooms(rooms: List<Room>, checkInDate: LocalDate, checkOutDate: LocalDate, guestCount: Int): List<Room> {
+		val candidates = rooms.filter { it.capacity >= guestCount }
+		if (candidates.isEmpty()) {
+			return emptyList()
 		}
+		val overlappedIds = stayRepository.findOverlappedRoomIds(candidates.map { checkNotNull(it.id) }, checkInDate, checkOutDate).toSet()
+		return candidates.filter { it.id !in overlappedIds }
 	}
 
 	private fun translateConflicts(save: () -> Stay): Stay =
@@ -127,10 +136,8 @@ class StayService(
 
 	companion object {
 		private val LATEST_CHECK_IN_FIRST = Sort.by(Sort.Order.desc(Stay::checkInDate.name), Sort.Order.desc(Stay::id.name))
-		private val EARLIEST_CHECK_IN_FIRST = Sort.by(Sort.Order.asc(Stay::checkInDate.name), Sort.Order.asc(Stay::id.name))
 		private const val TODAY_OR_LATER = "validation.today-or-later"
 		private const val AFTER_CHECK_IN = "validation.after-check-in"
 		private const val MAX_NIGHTS = "validation.max-nights"
-		private const val MAX_VALUE = "validation.max"
 	}
 }

@@ -14,6 +14,7 @@ import com.marco.assignment.handys.urbanstay.common.exception.ErrorCode
 import com.marco.assignment.handys.urbanstay.guest.entity.Guest
 import com.marco.assignment.handys.urbanstay.guest.repository.GuestRepository
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
+import com.marco.assignment.handys.urbanstay.hotel.exception.HotelErrorCode
 import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRepository
 import com.marco.assignment.handys.urbanstay.room.entity.Room
 import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
@@ -117,21 +118,101 @@ class StayAppControllerTest {
 	}
 
 	@Test
-	fun `로그인과 CSRF 토큰 없이 새 이용객으로 예약하면 앞뒤 공백을 지운 이용객과 이용을 함께 저장하고 객실 상태는 그대로 두며 201로 예약 내용을 응답한다`() {
-		jdbcTemplate.update(UPDATE_ROOM_STATUS, RoomStatus.MAINTENANCE.name, room.id)
+	fun `객실 유형 목록은 유형 이름순(숫자 크기)으로 객실 수, 가장 큰 최대 인원, 그 기간·인원으로 예약할 수 있는 객실 수를 상태와 관계없이 보여준다`() {
+		saveRoom(hotel, "103", capacity = 2)
+		val deluxe = saveRoom(hotel, "201", "디럭스")
+		saveRoom(hotel, "301", "10인실", 10)
+		saveRoom(hotel, "302", "2인실", 2)
+		saveRoom(hotel, "401", "deluxe")
+		saveRoom(hotel, "402", "Deluxe")
+		saveRoom(otherHotel, "101")
+		jdbcTemplate.update(UPDATE_ROOM_STATUS, RoomStatus.MAINTENANCE.name, otherRoom.id)
+		saveStay(room, TODAY.plusDays(2), TODAY.plusDays(4))
+		saveStay(otherRoom, TODAY.plusDays(1), TODAY.plusDays(3))
+		saveStay(otherRoom, TODAY.plusDays(5), TODAY.plusDays(6))
+		cancelStay(saveStay(deluxe, TODAY.plusDays(3), TODAY.plusDays(5)))
+
+		val result = roomTypes(checkNotNull(hotel.id), *roomTypeParams(TODAY.plusDays(3), TODAY.plusDays(5), 3)).andReturn()
+		val data = result.andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data).isEqualTo(
+			roomTypesJson(
+				listOf("2인실", 1, 2, 0),
+				listOf("10인실", 1, 10, 1),
+				listOf("deluxe", 1, CAPACITY, 1),
+				listOf("Deluxe", 1, CAPACITY, 1),
+				listOf("디럭스", 1, CAPACITY, 1),
+				listOf("스탠다드", 3, CAPACITY, 1),
+			),
+		)
+		assertThat(result.request.getSession(false)).isNull()
+		assertThat(result.response.cookies).isEmpty()
+	}
+
+	@Test
+	fun `객실 유형 목록은 파라미터가 빠졌거나 형식이 틀렸거나 인원이 1보다 적으면 그 파라미터로, 기간 규칙을 어기면 틀린 날짜들로 400 응답한다`() {
+		val hotelId = checkNotNull(hotel.id)
+
+		roomTypes(hotelId, "checkInDate" to TODAY.toString(), "guestCount" to "1").andExpectError(CommonErrorCode.INVALID_INPUT, "checkOutDate" to message("validation.required"))
+		listOf("11/2/26", "2026-11-02+09:00", "20261102").forEach { date ->
+			roomTypes(hotelId, "checkInDate" to date, "checkOutDate" to TODAY.plusDays(1).toString(), "guestCount" to "1")
+				.andExpectError(CommonErrorCode.INVALID_INPUT, "checkInDate" to message("validation.type"))
+		}
+		roomTypes(hotelId, *roomTypeParams(TODAY.minusDays(1), TODAY.minusDays(1), 0)).andExpectError(CommonErrorCode.INVALID_INPUT, "guestCount" to message(MIN, "value" to "1"))
+		roomTypes(hotelId, *roomTypeParams(TODAY.minusDays(1), TODAY.minusDays(1), 1)).andExpectError(
+			CommonErrorCode.INVALID_INPUT,
+			"checkInDate" to message("validation.today-or-later"),
+			"checkOutDate" to message("validation.after-check-in"),
+		)
+		roomTypes(hotelId, *roomTypeParams(TODAY, TODAY.plusDays(31), 1)).andExpectError(CommonErrorCode.INVALID_INPUT, "checkOutDate" to message("validation.max-nights", "max" to "30"))
+	}
+
+	@Test
+	fun `없는 호텔의 객실 유형 목록은 404 HOTEL_NOT_FOUND로, 객실이 없는 호텔은 빈 목록으로 응답한다`() {
+		roomTypes(MISSING_ID, *roomTypeParams(TODAY, TODAY.plusDays(1), 1)).andExpectError(HotelErrorCode.HOTEL_NOT_FOUND)
+
+		val data = roomTypes(checkNotNull(otherHotel.id), *roomTypeParams(TODAY, TODAY.plusDays(1), 1)).andReturn().andExpectSuccess(HttpStatus.OK)
+		assertThat(data.isArray).isTrue()
+		assertThat(data.isEmpty).isTrue()
+	}
+
+	@Test
+	fun `객실 유형 목록 문서는 게스트 앱 그룹의 stay 태그에 필수 파라미터, HOTEL_NOT_FOUND 예시와 페이지 없는 목록 응답을 보여준다`() {
+		val docs = json(mockMvc.get(APP_DOCS).andExpect { status { isOk() } }.andReturn().response.getContentAsString(StandardCharsets.UTF_8))
+		val operation = docs["paths"]["${ApiPaths.APP}/hotels/{hotelId}/room-types"]["get"]
+		val schemas = docs["components"]["schemas"]
+		val dataSchema = schemas[operation["responses"]["200"]["content"][JSON]["schema"]["\$ref"].stringValue().substringAfterLast('/')]["properties"]["data"]
+
+		assertThat(operation["operationId"].stringValue()).isEqualTo("getHotelRoomTypes")
+		assertThat(operation["tags"].values().map { it.stringValue() }).containsExactly("stay")
+		assertThat(operation["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "404", "500")
+		assertThat(errorCodes(operation, HttpStatus.NOT_FOUND)).containsExactly(HotelErrorCode.HOTEL_NOT_FOUND.code)
+		assertThat(operation["parameters"].values().map { listOf(it["name"].stringValue(), it["required"].booleanValue().toString(), it["schema"]["format"]?.stringValue()) })
+			.containsExactly(listOf("hotelId", "true", "int64"), listOf("checkInDate", "true", "date"), listOf("checkOutDate", "true", "date"), listOf("guestCount", "true", "int32"))
+		assertThat(dataSchema["type"].values().map { it.stringValue() }).contains("array")
+		assertThat(dataSchema["items"]["\$ref"].stringValue()).endsWith("/StayRoomTypeAppResponse")
+		assertThat(schemas["StayRoomTypeAppResponse"]["properties"].propertyNames()).containsExactly("type", "roomCount", "maxGuests", "availableCount")
+		assertThat(required(schemas["StayRoomTypeAppResponse"])).containsExactlyInAnyOrder("type", "roomCount", "maxGuests", "availableCount")
+	}
+
+	@Test
+	fun `로그인과 CSRF 토큰 없이 새 이용객으로 유형을 예약하면 이름순(숫자 크기) 첫 객실을 상태와 관계없이 배정해 이용객과 함께 저장하고 201로 호수 없이 응답한다`() {
+		val first = saveRoom(hotel, "99")
+		jdbcTemplate.update(UPDATE_ROOM_STATUS, RoomStatus.MAINTENANCE.name, first.id)
 		val newGuest = mapOf("name" to " 김철수 ", "phone" to " 010-9999-8888 ", "email" to " Kim@Example.com ")
 
 		val result = reserve(body(TODAY, TODAY.plusDays(2), guestCount = CAPACITY, guest = newGuest)).andReturn()
 		val data = result.andExpectSuccess(HttpStatus.CREATED)
 
 		val id = data["id"].longValue()
-		assertThat(data).isEqualTo(stayJson(id, room, TODAY, TODAY.plusDays(2), CAPACITY, "김철수"))
+		assertThat(data).isEqualTo(stayJson(id, TODAY, TODAY.plusDays(2), CAPACITY, "김철수"))
 		assertThat(result.request.getSession(false)).isNull()
 		assertThat(result.response.cookies).isEmpty()
+		assertThat(stayRooms()).containsExactly("99")
 		assertThat(guests(hotel)).containsExactly(listOf("홍길동", PHONE, EMAIL), listOf("김철수", "010-9999-8888", "Kim@Example.com"))
 		assertThat(jdbcTemplate.queryForObject(SELECT_GUEST_NAME_OF_STAY, String::class.java, id)).isEqualTo("김철수")
 		assertThat(jdbcTemplate.queryForObject(SELECT_GUEST_CREATED_AT, Timestamp::class.java, id)?.toInstant()).isEqualTo(NOW)
-		assertThat(jdbcTemplate.queryForObject(SELECT_ROOM_STATUS, String::class.java, room.id)).isEqualTo(RoomStatus.MAINTENANCE.name)
+		assertThat(jdbcTemplate.queryForObject(SELECT_ROOM_STATUS, String::class.java, first.id)).isEqualTo(RoomStatus.MAINTENANCE.name)
 	}
 
 	@Test
@@ -164,18 +245,17 @@ class StayAppControllerTest {
 
 		reserve(body(TODAY.plusDays(checkIn), TODAY.plusDays(checkOut), guest = NEW_GUEST)).andExpectError(CommonErrorCode.INVALID_INPUT, *expected.toTypedArray())
 
-		assertThat(stayIds(room)).isEmpty()
+		assertThat(stayRooms()).isEmpty()
 		assertThat(guests(hotel)).hasSize(1)
 	}
 
 	@Test
-	fun `인원이 1보다 적거나 객실 최대 인원보다 많으면 guestCount로, 이용객 항목이 틀리면 guest 아래 경로로 400 응답하고 저장하지 않는다`() {
+	fun `인원이 1보다 적으면 guestCount로, 유형·호텔·이용객 항목이 빠졌거나 틀리면 그 경로로 400 응답하고 저장하지 않는다`() {
 		reserve(body(TODAY, TODAY.plusDays(1), guestCount = 0)).andExpectError(CommonErrorCode.INVALID_INPUT, "guestCount" to message(MIN, "value" to "1"))
-		reserve(body(TODAY.minusDays(1), TODAY.plusDays(1), guestCount = CAPACITY + 1)).andExpectError(
-			CommonErrorCode.INVALID_INPUT,
-			"checkInDate" to message("validation.today-or-later"),
-			"guestCount" to message(MAX, "value" to CAPACITY.toString()),
-		)
+		reserve(body(TODAY, TODAY.plusDays(1), roomType = " ")).andExpectError(CommonErrorCode.INVALID_INPUT, "roomType" to message("validation.required"))
+		reserve(body(TODAY, TODAY.plusDays(1), roomType = "가".repeat(Room.TYPE_MAX_LENGTH + 1)))
+			.andExpectError(CommonErrorCode.INVALID_INPUT, "roomType" to message("validation.max-length", "max" to Room.TYPE_MAX_LENGTH.toString()))
+		reserve(body(TODAY, TODAY.plusDays(1)) - "hotelId").andExpectError(CommonErrorCode.INVALID_INPUT, "hotelId" to message("validation.required"))
 		reserve(body(TODAY, TODAY.plusDays(1), guest = mapOf("name" to " ", "phone" to "1234567", "email" to "guest"))).andExpectError(
 			CommonErrorCode.INVALID_INPUT,
 			"guest.name" to message("validation.required"),
@@ -184,67 +264,68 @@ class StayAppControllerTest {
 		)
 		reserve(body(TODAY, TODAY.plusDays(1)) - "guest").andExpectError(CommonErrorCode.INVALID_INPUT, "guest" to message("validation.required"))
 
-		assertThat(stayIds(room)).isEmpty()
+		assertThat(stayRooms()).isEmpty()
 		assertThat(guests(hotel)).hasSize(1)
 	}
 
 	@Test
-	fun `같은 객실에 기간이 하루라도 겹치면 409 STAY_PERIOD_OVERLAPPED로 응답하고, 체크아웃 날 체크인, 다른 객실, 취소한 이용과 같은 기간은 예약한다`() {
-		val existing = saveStay(room, TODAY.plusDays(5), TODAY.plusDays(7))
-		cancelStay(saveStay(room, TODAY.plusDays(10), TODAY.plusDays(12)))
-
-		listOf(4L to 6L, 6L to 8L, 4L to 8L).forEach { (checkIn, checkOut) ->
-			reserve(body(TODAY.plusDays(checkIn), TODAY.plusDays(checkOut), guest = NEW_GUEST)).andExpectError(StayErrorCode.STAY_PERIOD_OVERLAPPED)
-		}
-		assertThat(guests(hotel)).hasSize(1)
-
-		reserve(body(TODAY.plusDays(7), TODAY.plusDays(9))).andReturn().andExpectSuccess(HttpStatus.CREATED)
-		reserve(body(TODAY.plusDays(5), TODAY.plusDays(7), room = otherRoom)).andReturn().andExpectSuccess(HttpStatus.CREATED)
-		reserve(body(TODAY.plusDays(10), TODAY.plusDays(12))).andReturn().andExpectSuccess(HttpStatus.CREATED)
-		assertThat(stayIds(room)).hasSize(4).contains(existing.id)
-	}
-
-	@Test
-	fun `없는 객실은 예약과 예약된 기간 조회 모두 404 ROOM_NOT_FOUND로 응답한다`() {
-		reserve(body(TODAY, TODAY.plusDays(1)) + ("roomId" to MISSING_ID)).andExpectError(RoomErrorCode.ROOM_NOT_FOUND)
-		reservedPeriods(MISSING_ID).andExpectError(RoomErrorCode.ROOM_NOT_FOUND)
-
-		assertThat(guests(hotel)).hasSize(1)
-	}
-
-	@Test
-	fun `예약된 기간은 취소하지 않았고 끝나지 않은 그 객실 이용의 날짜만 체크인 이른 순으로 페이지로 보여준다`() {
-		saveStay(room, TODAY.minusDays(2), TODAY)
+	fun `겹치는 이용이 있거나 인원보다 작은 객실은 건너뛰고 다음 이름순 객실을 배정하며 예약할 수 있는 객실이 없으면 409 ROOM_TYPE_UNAVAILABLE로 응답한다`() {
+		saveRoom(hotel, "103", capacity = 2)
 		saveStay(room, TODAY.plusDays(5), TODAY.plusDays(7))
-		saveStay(room, TODAY, TODAY.plusDays(2))
-		saveStay(room, TODAY.plusDays(2), TODAY.plusDays(4))
-		cancelStay(saveStay(room, TODAY.plusDays(8), TODAY.plusDays(9)))
-		saveStay(otherRoom, TODAY.plusDays(1), TODAY.plusDays(2))
+		cancelStay(saveStay(otherRoom, TODAY.plusDays(5), TODAY.plusDays(7)))
 
-		val data = reservedPeriods(checkNotNull(room.id)).andReturn().andExpectSuccess(HttpStatus.OK)
+		reserve(body(TODAY.plusDays(4), TODAY.plusDays(6), guestCount = 3)).andReturn().andExpectSuccess(HttpStatus.CREATED)
+		reserve(body(TODAY.plusDays(5), TODAY.plusDays(7), guestCount = 3, guest = NEW_GUEST)).andExpectError(RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
+		reserve(body(TODAY.plusDays(5), TODAY.plusDays(7), guestCount = 2)).andReturn().andExpectSuccess(HttpStatus.CREATED)
+		reserve(body(TODAY.plusDays(5), TODAY.plusDays(6), guestCount = 1, guest = NEW_GUEST)).andExpectError(RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
+		reserve(body(TODAY.plusDays(7), TODAY.plusDays(9))).andReturn().andExpectSuccess(HttpStatus.CREATED)
+		reserve(body(TODAY.plusDays(20), TODAY.plusDays(21), guestCount = CAPACITY + 1, guest = NEW_GUEST)).andExpectError(RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
 
-		assertThat(data["items"]).isEqualTo(periodsJson(TODAY to TODAY.plusDays(2), TODAY.plusDays(2) to TODAY.plusDays(4), TODAY.plusDays(5) to TODAY.plusDays(7)))
-		assertThat(pageInfo(data)).containsExactly(0, 10, 3, 1)
-		val second = reservedPeriods(room.id!!, "page" to "1", "size" to "2").andReturn().andExpectSuccess(HttpStatus.OK)
-		assertThat(second["items"]).isEqualTo(periodsJson(TODAY.plusDays(5) to TODAY.plusDays(7)))
+		assertThat(stayRooms()).containsExactly("101", "102", "102", "103", "101")
+		assertThat(guests(hotel)).hasSize(1)
 	}
 
 	@Test
-	fun `예약 API 문서는 게스트 앱 그룹의 stay 태그에 객실·이용 에러 예시와 요청 규칙을 보여준다`() {
+	fun `그 호텔에 그 유형의 객실이 없거나(글자가 다른 유형, 다른 호텔에만 있는 유형) 없는 호텔이면 404 ROOM_TYPE_NOT_FOUND로 응답한다`() {
+		saveRoom(hotel, "201", "Deluxe")
+		saveRoom(otherHotel, "301", "디럭스")
+
+		listOf(hotel.id to "deluxe", hotel.id to "디럭스", MISSING_ID to STANDARD).forEach { (hotelId, type) ->
+			reserve(body(TODAY, TODAY.plusDays(1), roomType = type, guest = NEW_GUEST) + ("hotelId" to hotelId)).andExpectError(RoomErrorCode.ROOM_TYPE_NOT_FOUND)
+		}
+
+		assertThat(stayRooms()).isEmpty()
+		assertThat(guests(hotel)).hasSize(1)
+	}
+
+	@Test
+	fun `게스트 앱에서 지운 호텔 객실 목록과 객실의 예약된 기간 API는 404 NOT_FOUND로 응답하고 문서에도 없다`() {
+		listOf("${ApiPaths.APP}/hotels/${hotel.id}/rooms", "${ApiPaths.APP}/rooms/${room.id}/reserved-periods").forEach { path ->
+			mockMvc.get(path).andExpectError(CommonErrorCode.NOT_FOUND)
+		}
+
+		val docs = json(mockMvc.get(APP_DOCS).andExpect { status { isOk() } }.andReturn().response.getContentAsString(StandardCharsets.UTF_8))
+		assertThat(docs["paths"].propertyNames()).doesNotContain("${ApiPaths.APP}/hotels/{hotelId}/rooms", "${ApiPaths.APP}/rooms/{roomId}/reserved-periods")
+		assertThat(docs["components"]["schemas"].propertyNames()).doesNotContain("RoomAppResponse", "StayReservedPeriodAppResponse", "StayRoomAppResponse")
+		assertThat(docs.path("tags").values().map { it["name"].stringValue() }).doesNotContain("room")
+	}
+
+	@Test
+	fun `예약 API 문서는 게스트 앱 그룹의 stay 태그에 객실 유형·이용 에러 예시와 요청 규칙을 보여준다`() {
 		val docs = json(mockMvc.get(APP_DOCS).andExpect { status { isOk() } }.andReturn().response.getContentAsString(StandardCharsets.UTF_8))
 		val create = docs["paths"][STAYS]["post"]
-		val periods = docs["paths"]["${ApiPaths.APP}/rooms/{roomId}/reserved-periods"]["get"]
 		val schemas = docs["components"]["schemas"]
 		val guestProperties = schemas["StayGuestCreateAppRequest"]["properties"]
 
-		assertThat(listOf(create, periods).map { it["operationId"].stringValue() }).containsExactly("createStay", "getRoomReservedPeriods")
-		assertThat(listOf(create, periods).map { op -> op["tags"].values().map { it.stringValue() } }).containsOnly(listOf("stay"))
+		assertThat(create["operationId"].stringValue()).isEqualTo("createStay")
+		assertThat(create["tags"].values().map { it.stringValue() }).containsExactly("stay")
 		assertThat(create["responses"].propertyNames()).containsExactlyInAnyOrder("201", "400", "404", "409", "500")
-		assertThat(errorCodes(create, HttpStatus.NOT_FOUND)).containsExactly(RoomErrorCode.ROOM_NOT_FOUND.code)
-		assertThat(errorCodes(create, HttpStatus.CONFLICT)).containsExactly(StayErrorCode.STAY_PERIOD_OVERLAPPED.code)
-		assertThat(periods["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "404", "500")
-		assertThat(errorCodes(periods, HttpStatus.NOT_FOUND)).containsExactly(RoomErrorCode.ROOM_NOT_FOUND.code)
-		assertThat(required(schemas["StayCreateAppRequest"])).containsExactlyInAnyOrder("roomId", "checkInDate", "checkOutDate", "guestCount", "guest")
+		assertThat(errorCodes(create, HttpStatus.NOT_FOUND)).containsExactly(RoomErrorCode.ROOM_TYPE_NOT_FOUND.code)
+		assertThat(errorCodes(create, HttpStatus.CONFLICT))
+			.containsExactlyInAnyOrder(RoomErrorCode.ROOM_TYPE_UNAVAILABLE.code, StayErrorCode.STAY_PERIOD_OVERLAPPED.code)
+		assertThat(required(schemas["StayCreateAppRequest"]))
+			.containsExactlyInAnyOrder("hotelId", "roomType", "checkInDate", "checkOutDate", "guestCount", "guest")
+		assertThat(schemas["StayCreateAppRequest"]["properties"]["roomType"]["maxLength"].asString()).isEqualTo(Room.TYPE_MAX_LENGTH.toString())
 		assertThat(required(schemas["StayGuestCreateAppRequest"])).containsExactlyInAnyOrder("name", "phone", "email")
 		assertThat(listOf("name", "phone", "email").map { field -> listOf("maxLength", "pattern").map { guestProperties[field][it]?.asString() } })
 			.containsExactly(
@@ -253,8 +334,7 @@ class StayAppControllerTest {
 				listOf(Guest.EMAIL_MAX_LENGTH.toString(), LoginId.PATTERN),
 			)
 		assertThat(schemas["StayAppResponse"]["properties"].propertyNames())
-			.containsExactly("id", "hotel", "room", "checkInDate", "checkOutDate", "guestCount", "guest")
-		assertThat(schemas["StayReservedPeriodAppResponse"]["properties"].propertyNames()).containsExactly("checkInDate", "checkOutDate")
+			.containsExactly("id", "hotel", "roomType", "checkInDate", "checkOutDate", "guestCount", "guest")
 	}
 
 	private fun reserve(body: Map<String, Any?>): ResultActionsDsl =
@@ -263,18 +343,22 @@ class StayAppControllerTest {
 			content = jsonMapper.writeValueAsString(body)
 		}
 
-	private fun reservedPeriods(roomId: Long, vararg params: Pair<String, String>): ResultActionsDsl =
-		mockMvc.get("${ApiPaths.APP}/rooms/$roomId/reserved-periods") { params.forEach { (name, value) -> param(name, value) } }
+	private fun roomTypes(hotelId: Long, vararg params: Pair<String, String>): ResultActionsDsl =
+		mockMvc.get("${ApiPaths.APP}/hotels/$hotelId/room-types") { params.forEach { (name, value) -> param(name, value) } }
+
+	private fun roomTypeParams(checkIn: LocalDate, checkOut: LocalDate, guestCount: Int): Array<Pair<String, String>> =
+		arrayOf("checkInDate" to checkIn.toString(), "checkOutDate" to checkOut.toString(), "guestCount" to guestCount.toString())
 
 	private fun body(
 		checkIn: LocalDate,
 		checkOut: LocalDate,
-		room: Room = this.room,
+		roomType: String = STANDARD,
 		guestCount: Int = 2,
 		guest: Map<String, Any?> = mapOf("name" to "홍길동", "phone" to PHONE, "email" to EMAIL),
 	): Map<String, Any?> =
 		linkedMapOf(
-			"roomId" to room.id,
+			"hotelId" to hotel.id,
+			"roomType" to roomType,
 			"checkInDate" to checkIn.toString(),
 			"checkOutDate" to checkOut.toString(),
 			"guestCount" to guestCount,
@@ -284,8 +368,8 @@ class StayAppControllerTest {
 	private fun saveHotel(name: String): Hotel =
 		hotelRepository.save(Hotel(name, "서울 $suffix", HOTEL_PHONE, null)).also { createdHotelIds += checkNotNull(it.id) }
 
-	private fun saveRoom(hotel: Hotel, name: String): Room =
-		roomRepository.save(Room(hotel, name, "스탠다드", CAPACITY, null, null, LocalTime.of(15, 0), LocalTime.of(11, 0)))
+	private fun saveRoom(hotel: Hotel, name: String, type: String = STANDARD, capacity: Int = CAPACITY): Room =
+		roomRepository.save(Room(hotel, name, type, capacity, null, null, LocalTime.of(15, 0), LocalTime.of(11, 0)))
 
 	private fun saveStay(room: Room, checkIn: LocalDate, checkOut: LocalDate): Stay = stayRepository.save(Stay(room, guest, checkIn, checkOut, 2))
 
@@ -293,7 +377,7 @@ class StayAppControllerTest {
 		jdbcTemplate.update(CANCEL_STAY, hotelAdmin.id, stay.id)
 	}
 
-	private fun stayIds(room: Room): List<Long> = jdbcTemplate.queryForList(SELECT_STAY_IDS, Long::class.javaObjectType, room.id).filterNotNull()
+	private fun stayRooms(): List<String?> = jdbcTemplate.queryForList(SELECT_STAY_ROOM_NAMES, String::class.java, hotel.id)
 
 	private fun guests(hotel: Hotel): List<List<String>> =
 		jdbcTemplate.query(SELECT_GUESTS, { rs, _ -> listOf(rs.getString(1), rs.getString(2), rs.getString(3)) }, hotel.id)
@@ -321,13 +405,13 @@ class StayAppControllerTest {
 		assertThat(actualFieldErrors).containsExactlyInAnyOrder(*fieldErrors)
 	}
 
-	private fun stayJson(id: Long, room: Room, checkIn: LocalDate, checkOut: LocalDate, guestCount: Int, guestName: String): JsonNode =
+	private fun stayJson(id: Long, checkIn: LocalDate, checkOut: LocalDate, guestCount: Int, guestName: String): JsonNode =
 		json(
 			jsonMapper.writeValueAsString(
 				linkedMapOf(
 					"id" to id,
 					"hotel" to linkedMapOf("id" to hotel.id, "name" to hotel.name),
-					"room" to linkedMapOf("id" to room.id, "name" to room.name),
+					"roomType" to STANDARD,
 					"checkInDate" to checkIn.toString(),
 					"checkOutDate" to checkOut.toString(),
 					"guestCount" to guestCount,
@@ -336,10 +420,14 @@ class StayAppControllerTest {
 			),
 		)
 
-	private fun periodsJson(vararg periods: Pair<LocalDate, LocalDate>): JsonNode =
-		json(jsonMapper.writeValueAsString(periods.map { (checkIn, checkOut) -> linkedMapOf("checkInDate" to checkIn.toString(), "checkOutDate" to checkOut.toString()) }))
-
-	private fun pageInfo(data: JsonNode): List<Long> = listOf("page", "size", "totalElements", "totalPages").map { data[it].longValue() }
+	private fun roomTypesJson(vararg types: List<Any>): JsonNode =
+		json(
+			jsonMapper.writeValueAsString(
+				types.map { (type, roomCount, maxGuests, availableCount) ->
+					linkedMapOf("type" to type, "roomCount" to roomCount, "maxGuests" to maxGuests, "availableCount" to availableCount)
+				},
+			),
+		)
 
 	private fun errorCodes(operation: JsonNode, status: HttpStatus): List<String> {
 		val content = operation["responses"][status.value().toString()]["content"][JSON]
@@ -361,14 +449,14 @@ class StayAppControllerTest {
 		private const val PHONE = "010-1234-5678"
 		private const val EMAIL = "guest@example.com"
 		private const val CAPACITY = 4
+		private const val STANDARD = "스탠다드"
 		private const val FIELD_ERRORS = "fieldErrors"
 		private const val JSON = "application/json"
 		private const val MIN = "validation.min"
-		private const val MAX = "validation.max"
 		private const val MISSING_ID = Long.MAX_VALUE
 		private val NEW_GUEST = mapOf("name" to "새 이용객", "phone" to "010-7777-6666", "email" to "new@example.com")
 		private const val SELECT_ROOM_STATUS = "select status from room where id = ?"
-		private const val SELECT_STAY_IDS = "select id from stay where room_id = ? order by id"
+		private const val SELECT_STAY_ROOM_NAMES = "select r.name from stay s join room r on r.id = s.room_id where r.hotel_id = ? order by s.id"
 		private const val SELECT_GUESTS = "select name, phone, email from guest where hotel_id = ? order by id"
 		private const val SELECT_GUEST_ID_OF_STAY = "select guest_id from stay where id = ?"
 		private const val SELECT_GUEST_NAME_OF_STAY = "select g.name from stay s join guest g on g.id = s.guest_id where s.id = ?"

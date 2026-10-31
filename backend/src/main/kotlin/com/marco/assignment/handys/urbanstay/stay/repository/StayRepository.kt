@@ -18,10 +18,6 @@ private const val GUEST = "guest"
 
 interface StayRepository : JpaRepository<Stay, Long>, JpaSpecificationExecutor<Stay> {
 
-	fun existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfterAndCanceledAtIsNull(roomId: Long, checkOutDate: LocalDate, checkInDate: LocalDate): Boolean
-
-	fun findByRoomIdAndCanceledAtIsNullAndCheckOutDateAfter(roomId: Long, date: LocalDate, pageable: Pageable): Page<Stay>
-
 	@EntityGraph(attributePaths = [ROOM, GUEST])
 	fun findByIdAndRoomHotelId(id: Long, hotelId: Long): Stay?
 
@@ -44,4 +40,12 @@ interface StayRepository : JpaRepository<Stay, Long>, JpaSpecificationExecutor<S
 		checkInDate: LocalDate,
 		checkOutDate: LocalDate,
 	): List<Stay>
+
+	@Query(
+		"""
+		select distinct s.room.id from Stay s
+		where s.room.id in :roomIds and s.canceledAt is null and s.checkInDate < :checkOutDate and s.checkOutDate > :checkInDate
+		""",
+	)
+	fun findOverlappedRoomIds(roomIds: Collection<Long>, checkInDate: LocalDate, checkOutDate: LocalDate): List<Long>
 }

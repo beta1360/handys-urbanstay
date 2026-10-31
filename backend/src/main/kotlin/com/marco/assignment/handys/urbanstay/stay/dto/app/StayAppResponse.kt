@@ -9,8 +9,8 @@ data class StayAppResponse(
 	val id: Long,
 	@Schema(description = "openapi.schema.StayAppResponse.hotel")
 	val hotel: StayHotelAppResponse,
-	@Schema(description = "openapi.schema.StayAppResponse.room")
-	val room: StayRoomAppResponse,
+	@Schema(description = "openapi.schema.StayAppResponse.roomType", example = "스탠다드")
+	val roomType: String,
 	@Schema(description = "openapi.schema.StayAppResponse.checkInDate", example = "2026-11-02")
 	val checkInDate: LocalDate,
 	@Schema(description = "openapi.schema.StayAppResponse.checkOutDate", example = "2026-11-04")
@@ -27,7 +27,7 @@ data class StayAppResponse(
 			StayAppResponse(
 				id = checkNotNull(stay.id),
 				hotel = StayHotelAppResponse.from(stay.room.hotel),
-				room = StayRoomAppResponse.from(stay.room),
+				roomType = stay.room.type,
 				checkInDate = stay.checkInDate,
 				checkOutDate = stay.checkOutDate,
 				guestCount = stay.guestCount,

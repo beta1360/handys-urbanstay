@@ -9,4 +9,6 @@ enum class RoomErrorCode(override val status: HttpStatus) : ErrorCode {
 	ROOM_MODIFIED(HttpStatus.CONFLICT),
 	ROOM_STATUS_TRANSITION_NOT_ALLOWED(HttpStatus.CONFLICT),
 	ROOM_STATUS_CHANGED(HttpStatus.CONFLICT),
+	ROOM_TYPE_NOT_FOUND(HttpStatus.NOT_FOUND),
+	ROOM_TYPE_UNAVAILABLE(HttpStatus.CONFLICT),
 }
