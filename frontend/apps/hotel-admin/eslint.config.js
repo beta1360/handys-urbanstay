@@ -6,6 +6,12 @@ import tseslint from "typescript-eslint";
 import pluginRouter from "@tanstack/eslint-plugin-router";
 import { defineConfig, globalIgnores } from "eslint/config";
 
+const GENERATED_IMPORT_PATTERN = {
+  regex: "(^|/)api/generated(/|$)",
+  message:
+    "생성 코드(shared/api/generated)는 shared/api 밖에서 가져오지 않는다. 검증된 API를 @/shared/api에서 가져온다.",
+};
+
 const REACT_QUERY_IMPORT_PATH = {
   name: "@tanstack/react-query",
   message:
@@ -19,6 +25,10 @@ const REACT_QUERY_ALLOWED_FILES = [
   "**/*.test.{ts,tsx}",
   "vitest-setup.ts",
 ];
+
+function restrictImports({ paths = [], patterns = [] }) {
+  return { "no-restricted-imports": ["error", { paths, patterns }] };
+}
 
 export default defineConfig([
   globalIgnores(["dist"]),
@@ -37,9 +47,20 @@ export default defineConfig([
   },
   {
     files: ["**/*.{ts,tsx}"],
-    ignores: REACT_QUERY_ALLOWED_FILES,
-    rules: {
-      "no-restricted-imports": ["error", { paths: [REACT_QUERY_IMPORT_PATH] }],
-    },
+    ignores: ["src/shared/api/**", ...REACT_QUERY_ALLOWED_FILES],
+    rules: restrictImports({
+      paths: [REACT_QUERY_IMPORT_PATH],
+      patterns: [GENERATED_IMPORT_PATTERN],
+    }),
+  },
+  {
+    files: REACT_QUERY_ALLOWED_FILES,
+    ignores: ["src/shared/api/**"],
+    rules: restrictImports({ patterns: [GENERATED_IMPORT_PATTERN] }),
+  },
+  {
+    files: ["src/shared/api/**/*.{ts,tsx}"],
+    ignores: ["src/shared/api/generated/**", "**/*.test.{ts,tsx}"],
+    rules: restrictImports({ paths: [REACT_QUERY_IMPORT_PATH] }),
   },
 ]);
