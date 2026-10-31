@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { API_ERROR_CODES, getApiError } from "@/shared/api";
 import type { Room } from "@/shared/api";
 import { getHotelRoomList } from "../api/hotel-room-list";
-import { parseHotelId } from "./room-path-params";
+import { parseHotelId, parseRoomId } from "./room-path-params";
 
 export type HotelRoomsState =
   | { status: "empty" }
@@ -31,4 +31,20 @@ export async function loadHotelRooms(
   return rooms.length === 0
     ? { status: "empty" }
     : { status: "ready", hotelId, rooms };
+}
+
+export async function loadHotelRoom(
+  hotelIdParam: string,
+  roomIdParam: string,
+): Promise<Room> {
+  const roomId = parseRoomId(roomIdParam);
+  if (roomId === undefined) {
+    notFound();
+  }
+  const { rooms } = await getRoomsOrNotFound(hotelIdParam);
+  const room = rooms.find(({ id }) => id === roomId);
+  if (room === undefined) {
+    notFound();
+  }
+  return room;
 }

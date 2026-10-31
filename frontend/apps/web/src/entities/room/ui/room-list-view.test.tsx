@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { ROUTES } from "@/shared/config";
-import { ROOM_LABELS, ROOM_MESSAGES } from "../config/messages";
+import { COMMON_MESSAGES, ROUTES } from "@/shared/config";
+import { ROOM_LABELS } from "../config/messages";
 import { RoomListView } from "./room-list-view";
 
 const HOTEL_ID = 3;
@@ -34,7 +34,7 @@ describe("RoomListView", () => {
       ROOM_LABELS.checkOutTime,
     ]);
     expect(details.map((detail) => detail.textContent)).toEqual([
-      ROOM_MESSAGES.capacity(ROOM.capacity),
+      COMMON_MESSAGES.people(ROOM.capacity),
       ROOM.checkInTime,
       ROOM.checkOutTime,
     ]);

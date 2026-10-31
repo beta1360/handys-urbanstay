@@ -1,5 +1,6 @@
 import type { Room } from "@/shared/api";
-import { ROOM_LABELS, ROOM_MESSAGES } from "../config/messages";
+import { COMMON_MESSAGES } from "@/shared/config";
+import { ROOM_LABELS } from "../config/messages";
 
 type RoomSummaryProps = {
   room: Room;
@@ -18,7 +19,7 @@ export function RoomSummary({ room }: RoomSummaryProps) {
         <div className="flex flex-col gap-0.5">
           <dt className="text-gray-500">{ROOM_LABELS.capacity}</dt>
           <dd className="font-medium text-gray-900">
-            {ROOM_MESSAGES.capacity(room.capacity)}
+            {COMMON_MESSAGES.people(room.capacity)}
           </dd>
         </div>
         <div className="flex flex-col gap-0.5">
