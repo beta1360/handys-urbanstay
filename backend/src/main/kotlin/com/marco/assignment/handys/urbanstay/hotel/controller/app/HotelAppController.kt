@@ -37,5 +37,5 @@ class HotelAppController(
 		@Parameter(description = "openapi.app.operation.getHotels.parameter.size")
 		size: Int,
 	): ApiResponse<PageResponse<HotelAppResponse>> =
-		ApiResponse.success(PageResponse.from(hotelService.getHotelsByName(page, size).map(HotelAppResponse::from)))
+		ApiResponse.success(PageResponse.from(hotelService.getHotelsWithRoomCount(page, size).map(HotelAppResponse::from)))
 }

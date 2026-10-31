@@ -62,6 +62,7 @@
 |---|---|---|---|
 | 호텔 계정은 자기 호텔만. 다른 호텔의 객실·유형·이용객·이용·운영자는 없는 것처럼 | 호텔 id는 `HotelAdminPrincipal.hotelId`. `findByIdAndHotelId` 등으로 찾아 404(`ROOM_NOT_FOUND`, `ROOM_TYPE_NOT_FOUND`, `GUEST_NOT_FOUND`, `STAY_NOT_FOUND`, `HOTEL_OPERATOR_NOT_FOUND`). 목록 거르기의 다른 호텔 id는 빈 목록 | - | - |
 | 회원은 자기와 연결된 이용객(모든 호텔)의 이용만 | `MemberPrincipal` id로 `StayService.getMemberStays`. `period=UPCOMING`은 체크아웃 > 오늘(`Clock`, Asia/Seoul) 체크인 오름차순, `PAST`는 체크아웃 ≤ 오늘 체크인 내림차순(둘 다 취소 포함, 같으면 id 같은 방향), 없으면 전체 체크인 내림차순 | - | web '내 이용': 체크아웃 > 오늘이면 '지금·앞으로의 이용', 아니면 '지난 이용'. 10건씩 무한 스크롤, `UPCOMING`을 다 받은 뒤 `PAST` |
+| 게스트 앱 호텔 목록은 모든 호텔. 객실이 있는 호텔을 앞에, 없는 호텔을 뒤에(각 묶음은 이름순, 같으면 id) | `HotelRepository.findAllWithRoomCountOrderByRoomPresenceAndName`(left join + group by, 정렬·페이지는 DB). 항목에 `roomCount` | - | web: `roomCount`가 0이면 비활성, 고를 수 없다 |
 | 지금 이용: 오늘(한국 시간)이 [체크인, 체크아웃) 안, 취소 제외 | `Clock`(Asia/Seoul) 기준. 객실은 많아야 하나(`StayService.getCurrentStays`), 이용객은 체크인 오름차순 첫 하나(`getCurrentStayOfGuest`) | 인덱스 `stay_room_id_check_in_date_id_idx`, `stay_guest_id_check_in_date_id_idx` | 객실 목록·상세, 이용객 상세의 '지금 이용'. 객실 상태와 따로 |
 
 ## 정산

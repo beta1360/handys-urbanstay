@@ -51,7 +51,7 @@ description: 이 저장소의 도메인 규칙(호텔, 객실 유형, 객실, �
 | 마스터 조회·정보 수정·비밀번호 재설정 | O | - | - | - | 같음 |
 | 호텔의 객실 조회(읽기 전용), 회원 조회(이용 기록 포함) | O | - | - | - | 같음 |
 | 전체 어드민 계정 목록·추가·상세·이름 수정 | O | - | - | - | 같음 |
-| 자기 호텔 정보 조회·수정 | - | O | 403 | - | `HOTEL_MASTER_APIS`(조회도 마스터만) |
+| 자기 호텔 정보 조회·수정 | - | O | 403 | - | `HOTEL_MASTER_APIS`: `GET /hotel`, `PUT /hotel`(조회도 마스터만) |
 | 객실 유형 생성·수정 | - | O | 403 | - | `HOTEL_MASTER_APIS`: `POST /room-types`, `PUT /room-types/*` |
 | 객실 생성·수정 | - | O | 403 | - | `HOTEL_MASTER_APIS`: `POST /rooms`, `PUT /rooms/*` |
 | 월별 정산(요약·이용 로그) | - | O | 403 | - | `HOTEL_MASTER_APIS`: `GET /settlements`, `GET /settlements/stays` |

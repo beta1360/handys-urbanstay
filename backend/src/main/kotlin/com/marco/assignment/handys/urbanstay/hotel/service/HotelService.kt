@@ -6,6 +6,7 @@ import com.marco.assignment.handys.urbanstay.common.exception.violates
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelErrorCode
 import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRepository
+import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRoomCount
 import com.marco.assignment.handys.urbanstay.hotel.repository.HotelSpecifications
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.OptimisticLockingFailureException
@@ -47,7 +48,8 @@ class HotelService(
 	}
 
 	@Transactional(readOnly = true)
-	fun getHotelsByName(page: Int, size: Int): Page<Hotel> = hotelRepository.findAll(PageRequest.of(page, size, NAME_ORDER))
+	fun getHotelsWithRoomCount(page: Int, size: Int): Page<HotelRoomCount> =
+		hotelRepository.findAllWithRoomCountOrderByRoomPresenceAndName(PageRequest.of(page, size))
 
 	@Transactional(readOnly = true)
 	fun getHotel(hotelId: Long): Hotel = findHotel(hotelId)
@@ -90,6 +92,5 @@ class HotelService(
 
 	companion object {
 		private val NEWEST_FIRST = Sort.by(Sort.Direction.DESC, Hotel::id.name)
-		private val NAME_ORDER = Sort.by(Sort.Order.asc(Hotel::name.name), Sort.Order.asc(Hotel::id.name))
 	}
 }
