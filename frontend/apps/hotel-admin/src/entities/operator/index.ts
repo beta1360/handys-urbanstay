@@ -1,5 +1,8 @@
 export { useOperatorListQuery } from "./api/operator-list-query";
-export { cacheSavedOperator } from "./api/operator-query";
+export {
+  cacheSavedOperator,
+  useRefetchOperator,
+} from "./api/operator-query";
 export {
   OPERATOR_ACTIVE_LABELS,
   OPERATOR_FIELD_LABELS,

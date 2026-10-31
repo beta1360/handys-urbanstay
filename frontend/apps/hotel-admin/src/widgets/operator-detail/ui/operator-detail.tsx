@@ -34,7 +34,7 @@ export function OperatorDetail({ operatorId }: OperatorDetailProps) {
     case "ready":
       return (
         <>
-          <OperatorDetailActions />
+          <OperatorDetailActions editOperatorId={state.operator.id} />
           <OperatorInformation operator={state.operator} />
         </>
       );

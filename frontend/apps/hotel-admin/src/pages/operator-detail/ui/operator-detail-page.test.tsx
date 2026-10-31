@@ -105,7 +105,7 @@ afterEach(() => {
 });
 
 describe("OperatorDetailPage 내용", () => {
-  it("운영자의 이름·아이디·사용 여부를 항목 목록으로 보여주고 위쪽에 목록으로 링크를 둔다", async () => {
+  it("운영자의 이름·아이디·사용 여부를 항목 목록으로 보여주고 위쪽에 목록으로 링크와 수정 버튼을 둔다", async () => {
     fetchOperator.mockResolvedValue(OPERATOR);
     renderOperatorDetailPage();
 
@@ -118,6 +118,9 @@ describe("OperatorDetailPage 내용", () => {
     expect(
       screen.getByRole("link", { name: COMMON_MESSAGES.backToList }),
     ).toHaveAttribute("href", "/operators");
+    expect(
+      screen.getByRole("link", { name: COMMON_MESSAGES.edit }),
+    ).toHaveAttribute("href", `/operators/${OPERATOR.id}/edit`);
     expect(fetchOperator).toHaveBeenCalledExactlyOnceWith(OPERATOR.id);
   });
 

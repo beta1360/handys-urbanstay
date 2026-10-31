@@ -1,4 +1,4 @@
-import { queryOptions, useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import {
   fetchOperator,
@@ -16,6 +16,23 @@ function operatorQueryOptions(operatorId: number) {
 
 export function useOperatorQuery(operatorId: number) {
   return useQuery(operatorQueryOptions(operatorId));
+}
+
+export async function refetchOperator(
+  queryClient: QueryClient,
+  operatorId: number,
+) {
+  const { queryKey } = operatorQueryOptions(operatorId);
+  await queryClient.cancelQueries({ queryKey });
+  return queryClient.fetchQuery({
+    ...operatorQueryOptions(operatorId),
+    staleTime: 0,
+  });
+}
+
+export function useRefetchOperator(operatorId: number) {
+  const queryClient = useQueryClient();
+  return () => refetchOperator(queryClient, operatorId);
 }
 
 export function cacheSavedOperator(
