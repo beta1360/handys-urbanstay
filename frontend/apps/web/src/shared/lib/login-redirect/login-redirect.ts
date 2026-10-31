@@ -4,10 +4,13 @@ export const LOGIN_REDIRECT_PARAM = "redirect";
 
 const AUTH_PATHS: readonly string[] = [ROUTES.login, ROUTES.signup];
 
-const PROTOCOL_RELATIVE_PATH_PATTERN = /^\/[\t\n\r]*[\\/]/;
+const PARSE_BASE_URL = "http://login-redirect.invalid";
 
-function isAuthPath(path: string) {
-  const [pathname] = path.split(/[?#]/, 1);
+const PARSE_BASE_ORIGIN = new URL(PARSE_BASE_URL).origin;
+
+const UNSAFE_CHARACTER_PATTERN = /[\\\u0000-\u001f\u007f]/;
+
+function isAuthPath(pathname: string) {
   return AUTH_PATHS.includes(pathname.replace(/\/$/, ""));
 }
 
@@ -15,12 +18,26 @@ export function sanitizeLoginRedirect(value: unknown): string {
   if (
     typeof value !== "string" ||
     !value.startsWith("/") ||
-    PROTOCOL_RELATIVE_PATH_PATTERN.test(value) ||
-    isAuthPath(value)
+    UNSAFE_CHARACTER_PATTERN.test(value)
   ) {
     return ROUTES.hotels;
   }
-  return value;
+  const url = new URL(value, PARSE_BASE_URL);
+  if (
+    url.origin !== PARSE_BASE_ORIGIN ||
+    url.pathname.startsWith("//") ||
+    isAuthPath(url.pathname)
+  ) {
+    return ROUTES.hotels;
+  }
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+export function loginReturnTo(currentHref: string) {
+  const { pathname, searchParams } = new URL(currentHref, PARSE_BASE_URL);
+  return isAuthPath(pathname)
+    ? sanitizeLoginRedirect(searchParams.get(LOGIN_REDIRECT_PARAM))
+    : currentHref;
 }
 
 function withRedirect(path: string, redirectTo: string) {

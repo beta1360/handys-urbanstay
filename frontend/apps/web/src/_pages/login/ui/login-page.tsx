@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { GuestOnly } from "@/widgets/guest-only";
 import { LoginForm } from "@/features/auth-login";
 import { COMMON_MESSAGES } from "@/shared/config";
 import {
@@ -25,7 +26,7 @@ export function LoginPage({ searchParams }: LoginPageProps) {
             search[LOGIN_REDIRECT_PARAM],
           );
           return (
-            <>
+            <GuestOnly redirectTo={redirectTo}>
               <LoginForm redirectTo={redirectTo} />
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <span>{LOGIN_PAGE_MESSAGES.signupPrompt}</span>
@@ -33,7 +34,7 @@ export function LoginPage({ searchParams }: LoginPageProps) {
                   {COMMON_MESSAGES.signup}
                 </TextLink>
               </div>
-            </>
+            </GuestOnly>
           );
         })}
       </Suspense>

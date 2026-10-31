@@ -18,8 +18,8 @@
 |---|---|
 | `/` | 호텔 목록. 고르면 그 호텔의 예약 화면으로 간다 |
 | `/hotels/[hotelId]` | 호텔 이름, 날짜·인원 → 객실 유형 선택(1박 요금) → 예약 내용(최종 금액) → 예약(회원만) → 같은 화면의 완료 화면 |
-| `/login` | 로그인(이메일, 비밀번호). 성공하면 `?redirect`로 간다 |
-| `/signup` | 회원가입(이메일, 비밀번호, 이름, 전화번호). 가입하면 바로 로그인되고 `?redirect`로 간다 |
+| `/login` | 로그인(이메일, 비밀번호). 성공하면 `?redirect`로 간다. 회원이면 폼 없이 바로 간다 |
+| `/signup` | 회원가입(이메일, 비밀번호, 이름, 전화번호). 가입하면 바로 로그인되고 `?redirect`로 간다. 회원이면 폼 없이 바로 간다 |
 | `/me/stays` | 내 이용. 로그인 필요. 지금·앞으로의 이용과 지난 이용 |
 
 - 예약 조건(체크인·체크아웃 날짜, 인원)은 URL search(`?checkInDate&checkOutDate&guestCount`)에 둔다. 공유·새로고침·뒤로 가기로 같은 조건을 다시 볼 수 있게 하기 위해서다.
@@ -33,8 +33,13 @@
 
 - 로그인 상태는 브라우저에서 내 정보(`GET /auth/me`)로 확인한다(`entities/member`). 401 `UNAUTHORIZED`는 오류가 아니라 비회원(`null`)으로 캐시하고, 그 밖의 실패도 비회원으로 본다. 상태는 `checking | guest | member` 하나의 값이다.
 - 로그인·회원가입이 성공하면 받은 회원을 그 캐시에 넣고 `redirect`로 `router.replace`한다. 로그아웃은 캐시를 `null`로 바꾸고 `router.refresh()`로 서버 컴포넌트를 다시 그린다(로그인이 필요한 화면은 서버가 로그인으로 보낸다). 로그아웃의 401은 이미 끊긴 세션이라 성공으로 본다.
-- `redirect`는 `/`로 시작하는 앱 안의 경로만 받는다. 비었거나, `//`로 시작하거나, 로그인·회원가입 경로면 `/`로 간다(`shared/lib/login-redirect`).
+- `redirect`는 `/`로 시작하는 앱 안의 경로만 받는다(`shared/lib/login-redirect`의 `sanitizeLoginRedirect`).
+  - 역슬래시나 제어 문자가 있으면 `/`로 간다.
+  - `new URL`로 정규화한 뒤 출처가 앱이 아니거나, 경로가 `//`로 시작하거나(예: `/.//evil.com`), 로그인·회원가입 경로면 `/`로 간다.
+  - 통과하면 정규화한 경로·search·hash를 쓴다.
+- 회원이 로그인·회원가입 화면에 오면 폼 대신 불러오는 중 문구를 보여주고 `redirect`로 `router.replace`한다(`widgets/guest-only`). 로그인 확인 중에도 폼 대신 불러오는 중 문구다.
 - 헤더: 확인 중에는 비워 두고, 비회원은 지금 주소로 돌아오는 로그인·회원가입 링크, 회원은 이름·'내 이용'·로그아웃을 보여준다. 지금 주소를 `useSearchParams`로 읽어 `<Suspense>` 안에 둔다.
+  - 로그인·회원가입 화면에서는 지금 주소 대신 그 화면의 `redirect`를 그대로 넘긴다(`loginReturnTo`). 인증 화면 주소가 새 `redirect`로 감싸이지 않게 하기 위해서다.
 - 로그인·회원가입·로그아웃이 성공하면 서버 `message`를 토스트로 띄우고 다음 화면으로 간다. 로그아웃이 401로 끝나면 받은 문구가 없으므로 띄우지 않는다.
 - 로그아웃이 실패하면 서버 오류 문구(없으면 '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.')를 토스트로 띄우고 회원 메뉴를 그대로 둔다.
 
@@ -79,7 +84,7 @@ apps/web/
 └─ src/
    ├─ _app/                # QueryClient, 토스트 영역, Provider
    ├─ _pages/              # hotel-list, hotel-booking, login, signup, my-stays, not-found, error
-   ├─ widgets/             # app-layout (헤더 로그인 상태), hotel-booking (서버에서 호텔을 찾아 예약 화면 조립), my-stays (쿠키를 넘겨 내 이용 조회)
+   ├─ widgets/             # app-layout (헤더 로그인 상태), hotel-booking (서버에서 호텔을 찾아 예약 화면 조립), my-stays (쿠키를 넘겨 내 이용 조회), guest-only (회원을 로그인·가입 화면에서 내보내기)
    ├─ features/            # stay-search (날짜·인원 → URL), stay-reserve (유형 선택·금액·예약·완료), auth-login, auth-signup, auth-logout
    ├─ entities/            # hotel (목록, 호텔 찾기), room-type (유형 조회, 예약불가 표시), stay (조건 검사·URL, 기간·금액, 내 이용 표시), member (로그인 상태)
    └─ shared/              # api, config, lib (form, date, path-param, login-redirect, current-href, money, toast), ui
