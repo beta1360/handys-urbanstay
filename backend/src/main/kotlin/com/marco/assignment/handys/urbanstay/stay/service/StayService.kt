@@ -56,9 +56,16 @@ class StayService(
 	}
 
 	@Transactional(readOnly = true)
-	fun getMemberStays(memberId: Long, page: Int, size: Int): Page<Stay> {
+	fun getMemberStays(memberId: Long, page: Int, size: Int, period: StayPeriod? = null): Page<Stay> {
 		memberService.getMember(memberId)
-		return stayRepository.findByGuestMemberId(memberId, PageRequest.of(page, size, LATEST_CHECK_IN_FIRST))
+		val today = LocalDate.now(clock)
+		return when (period) {
+			null -> stayRepository.findByGuestMemberId(memberId, PageRequest.of(page, size, LATEST_CHECK_IN_FIRST))
+			StayPeriod.UPCOMING ->
+				stayRepository.findByGuestMemberIdAndCheckOutDateAfter(memberId, today, PageRequest.of(page, size, EARLIEST_CHECK_IN_FIRST))
+			StayPeriod.PAST ->
+				stayRepository.findByGuestMemberIdAndCheckOutDateLessThanEqual(memberId, today, PageRequest.of(page, size, LATEST_CHECK_IN_FIRST))
+		}
 	}
 
 	@Transactional(readOnly = true)
@@ -169,6 +176,7 @@ class StayService(
 
 	companion object {
 		private val LATEST_CHECK_IN_FIRST = Sort.by(Sort.Order.desc(Stay::checkInDate.name), Sort.Order.desc(Stay::id.name))
+		private val EARLIEST_CHECK_IN_FIRST = Sort.by(Sort.Order.asc(Stay::checkInDate.name), Sort.Order.asc(Stay::id.name))
 		private const val TODAY_OR_LATER = "validation.today-or-later"
 		private const val AFTER_CHECK_IN = "validation.after-check-in"
 		private const val MAX_NIGHTS = "validation.max-nights"
