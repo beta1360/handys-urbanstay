@@ -2,8 +2,10 @@ export { toFieldProps, toFieldPropsMap } from "./field-props";
 export type { FormFieldProps } from "./field-props";
 export { useFormErrorToast } from "./form-error-toast";
 export {
+  optionalIntegerSchema,
   optionalTextSchema,
   passwordSchema,
+  requiredIntegerSchema,
   requiredTextSchema,
 } from "./form-field-schema";
 export { SUBMIT_ONLY_VALIDATION } from "./form-options";

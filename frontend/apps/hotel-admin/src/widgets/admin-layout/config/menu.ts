@@ -7,5 +7,5 @@ type AdminMenuItem = {
 };
 
 export const ADMIN_MENU_ITEMS: readonly AdminMenuItem[] = [
-  { to: "/", label: ADMIN_LAYOUT_MESSAGES.homeMenuLabel },
+  { to: "/rooms", label: ADMIN_LAYOUT_MESSAGES.roomMenuLabel },
 ];

@@ -67,7 +67,7 @@
 
 ### 목록 화면
 
-- 검색어와 페이지는 URL search(`?keyword=&page=`)에 둔다. 새로고침·뒤로 가기·주소 공유에도 같은 목록을 보여준다.
+- 검색어와 페이지는 URL search(`?keyword=&page=`)에 둔다. 거르기 값(예: hotel-admin 객실 목록의 `status`)이 있으면 함께 둔다. 새로고침·뒤로 가기·주소 공유에도 같은 목록을 보여준다.
   - search 스키마는 그 화면의 pages slice에 두고, 라우트 파일이 `validateSearch`와 `stripSearchParams`로 연결한다.
   - 기본값(1페이지, 검색 없음)은 URL에 남기지 않는다.
   - 화면과 URL의 페이지는 1부터 센다. API에는 1을 뺀 값(0부터)을 보낸다.
@@ -84,7 +84,7 @@
   - 페이지를 옮기는 동안 이전 목록을 그대로 보여준다(`placeholderData`). 그동안 표에 `aria-busy`를 붙여 흐리게 보여준다. 마지막 페이지를 넘은 페이지의 응답은 이전 목록으로 쓰지 않는다.
   - 결과가 없으면 페이지 이동을 감춘다.
 - 목록 자리에는 상태에 따라 하나만 보여준다.
-  - 데이터가 있으면 표를, 항목이 없으면 빈 상태 문구를 보여준다. 빈 상태 문구는 검색어가 있을 때와 없을 때를 나눈다.
+  - 데이터가 있으면 표를, 항목이 없으면 빈 상태 문구를 보여준다. 빈 상태 문구는 검색어나 거르기 값이 있을 때와 없을 때를 나눈다.
   - 데이터 없이 실패하면 오류 문구(`role="alert"`)와 '다시 시도' 버튼(다시 조회)을 보여준다. 데이터가 있을 때 다시 조회가 실패하면 데이터를 그대로 보여준다.
   - 401은 아래 '로그인'의 사용 중 로그인 만료를 따른다.
   - 처음 불러오는 동안과 마지막 페이지로 옮기는 동안에는 불러오는 중 문구(`role="status"`)를 보여준다.
@@ -122,11 +122,12 @@
   - 문자열은 앞뒤 공백을 지운 값으로 검사하고 지운 값을 보낸다. 공백만 있는 값은 빈 값이다. 로그인은 입력한 그대로 보낸다.
   - 비밀번호만 입력한 그대로 검사하고 보낸다(`docs/domain.md`의 비밀번호 규칙).
   - 선택 항목은 지운 뒤 비었으면 null로 보낸다. 여러 줄 입력은 줄바꿈을 그대로 보낸다.
-- 오류 문구는 서버와 같은 문구를 쓴다(필수 입력, 최대 길이, 형식, 비밀번호 규칙). 필드마다 오류는 하나이고 우선순위도 서버와 같다.
+- 오류 문구는 서버와 같은 문구를 쓴다(필수 입력, 최대 길이, 형식, 비밀번호 규칙, 숫자 범위). 필드마다 오류는 하나이고 우선순위도 서버와 같다.
   - 빈 값은 필수 오류만 보여준다.
   - 형식이 있는 값(전화번호, 이메일)은 형식이 틀리면 길이와 관계없이 형식 오류, 형식이 맞는데 길면 길이 오류다.
   - 비밀번호는 규칙(길이 포함)을 어기면 비밀번호 규칙 문구 하나다.
 - 입력창에 글자 수 제한(`maxLength`)을 걸지 않는다. 길면 제출할 때 오류로 알린다. 목록의 검색창과 다르다.
+- 정수 칸(예: 객실 최대 인원·층)은 `type="number"` 대신 글자 입력창에 `inputMode="numeric"`을 준다. 숫자 입력창은 잘못 친 값을 빈 값으로 돌려줘 '필수 입력'으로 잘못 알리고, 마우스 휠로 값이 바뀌기 때문이다. 범위는 입력창에 걸지 않고 안내 문구로 알린 뒤 제출할 때 검사한다.
 - 형식이 있는 칸은 입력창 아래에 짧은 안내 문구(`hint`)를 두고 입력창과 연결한다(`aria-describedby`). 오류가 나도 안내 문구는 그대로 둔다.
 - 선택 항목만 이름 옆에 '(선택)'을 붙인다.
 - 다른 사람의 계정을 만드는 칸(예: 마스터 아이디·처음 비밀번호)은 브라우저가 로그인한 어드민의 아이디·비밀번호를 채우지 않도록 아이디에 `autocomplete="off"`, 비밀번호에 `autocomplete="new-password"`를 준다. 비밀번호를 보여주는 버튼은 두지 않는다.
@@ -179,6 +180,7 @@
 | `@repo/ui/button-class-name` | `buttonClassName`, `ButtonVariant` | 버튼 모양 class(variant별). `Button`과 앱의 `ButtonLink`가 함께 쓴다. hover 모양은 링크에도 걸리고 비활성 버튼에는 걸리지 않는다. 컴포넌트 파일과 따로 두는 것은 컴포넌트 파일이 컴포넌트만 내보내야 하기 때문이다(`react-refresh/only-export-components`) |
 | `@repo/ui/text-field` | `TextField` | label·입력창·안내 문구·오류 문구를 묶는다. 선택 `hint`(안내 문구)는 입력창 아래에 보여준다. 입력창의 `aria-describedby`는 안내 문구와 오류 문구 중 있는 것을 모두 가리킨다. `error`가 있으면 `aria-invalid`를 붙인다 |
 | `@repo/ui/textarea-field` | `TextareaField` | `TextField`의 여러 줄 입력창(`textarea`)판. label·`hint`·`error` 연결과 색·테두리가 `TextField`와 같다 |
+| `@repo/ui/select-field` | `SelectField`, `SelectFieldOption` | `TextField`의 선택 입력창(네이티브 `select`)판. 선택지는 `options`(`value`·`label`)로 받는다. label·`hint`·`error` 연결과 색·테두리가 `TextField`와 같다 |
 | `@repo/ui/card` | `Card` | 테두리가 있는 흰색 상자. 선택 `header` 영역 |
 | `@repo/ui/form-section` | `FormSection` | 관련 있는 입력창을 `fieldset`으로 묶어 `Card` 안에 보여준다. `legend`가 묶음의 이름이 된다 |
 | `@repo/ui/description-list` | `DescriptionList`, `DescriptionListItem` | 항목 이름과 값의 목록(`dl`). `DescriptionListItem`은 `term`을 항목 이름(`dt`)으로, children을 값(`dd`)으로 한 줄에 보여준다. 값은 줄바꿈을 살리고, 긴 낱말은 칸 안에서 줄을 바꾼다 |
@@ -217,10 +219,10 @@
 | 경로 | 내보내는 것 | 내용 |
 |---|---|---|
 | `@repo/admin-kit/api` | `parseRequest`, `parseResponseBody`, `RequestValidationError`, `ResponseValidationError`, `createApiErrorReader`, `COMMON_API_ERROR_CODES`, `ApiError` | 요청·응답 zod 검증과 검증 오류(아래 'API 호출'). `createApiErrorReader`는 오류 응답 스키마를 받아 서버 오류 정보를 읽는 함수를 만든다. 공통 오류 코드는 백엔드 `CommonErrorCode`와 같다 |
-| `@repo/admin-kit/form` | `SUBMIT_ONLY_VALIDATION`, `toFieldProps`, `toFieldPropsMap`, `FormFieldProps`, `showSubmitError`, `FORM_ALERT`, `FormAlert`, `useFormErrorToast`, `requiredTextSchema`, `optionalTextSchema`, `passwordSchema` | 제출할 때만 검사, 칸 props와 고치면 그 칸 오류 지우기, 서버 오류를 칸 오류와 폼 알림으로 나누기(`getApiError`로 읽은 오류를 받는다), 그 폼이 띄운 오류 토스트 지우기, 필수·선택 문자열·비밀번호 검사 |
+| `@repo/admin-kit/form` | `SUBMIT_ONLY_VALIDATION`, `toFieldProps`, `toFieldPropsMap`, `FormFieldProps`, `showSubmitError`, `FORM_ALERT`, `FormAlert`, `useFormErrorToast`, `requiredTextSchema`, `optionalTextSchema`, `passwordSchema`, `requiredIntegerSchema`, `optionalIntegerSchema` | 제출할 때만 검사, 칸 props와 고치면 그 칸 오류 지우기, 서버 오류를 칸 오류와 폼 알림으로 나누기(`getApiError`로 읽은 오류를 받는다), 그 폼이 띄운 오류 토스트 지우기, 필수·선택 문자열·비밀번호 검사, 필수·선택 정수 검사(글자 입력을 숫자로 바꾼다. 빈 값은 필수 오류 또는 null, 정수가 아니면 형식 오류, 범위를 벗어나면 서버와 같은 이상·이하 문구) |
 | `@repo/admin-kit/toast` | `showToast`, `dismissToast`, `useToasts`, `ToastId`, `ToastItem` | 토스트 store(위 '토스트'). 성공 4초 뒤 사라짐, 최대 3개 |
 | `@repo/admin-kit/link` | `ButtonLink`, `TextLink` | TanStack Router `createLink`로 만든 버튼 모양 링크와 글자 링크 |
-| `@repo/admin-kit/config` | `FORM_VALIDATION_MESSAGES`, `FORM_ALERT_MESSAGES` | 서버(`validation.*`)와 같은 입력 검증 문구, 본문을 쓸 수 없는 오류의 일반 오류 문구 |
+| `@repo/admin-kit/config` | `FORM_VALIDATION_MESSAGES`, `FORM_ALERT_MESSAGES` | 서버(`validation.*`)와 같은 입력 검증 문구(필수, 최대 길이, 전화번호·이메일 형식, 비밀번호 규칙, 형식(`typeMismatch`), 이상(`min`)·이하(`max`)), 본문을 쓸 수 없는 오류의 일반 오류 문구 |
 
 ## API 호출
 

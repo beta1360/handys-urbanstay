@@ -61,3 +61,58 @@ export function passwordSchema(rule: z.ZodType, invalidMessage: string) {
     }),
   );
 }
+
+const INTEGER_PATTERN = /^-?\d+$/;
+
+function toInteger(value: string) {
+  if (!INTEGER_PATTERN.test(value)) {
+    return undefined;
+  }
+  const integer = Number(value);
+  return Number.isSafeInteger(integer) ? integer : undefined;
+}
+
+function integerMessage(rule: z.ZodType, value: string) {
+  const integer = toInteger(value);
+  if (integer === undefined) {
+    return FORM_VALIDATION_MESSAGES.typeMismatch;
+  }
+  const result = rule.safeParse(integer);
+  if (result.success) {
+    return undefined;
+  }
+  const [issue] = result.error.issues;
+  if (issue.code === "too_small") {
+    return FORM_VALIDATION_MESSAGES.min(Number(issue.minimum));
+  }
+  if (issue.code === "too_big") {
+    return FORM_VALIDATION_MESSAGES.max(Number(issue.maximum));
+  }
+  return issue.message;
+}
+
+export function requiredIntegerSchema(rule: z.ZodType) {
+  return z
+    .string()
+    .trim()
+    .superRefine(
+      checkMessage((value) =>
+        value === ""
+          ? FORM_VALIDATION_MESSAGES.required
+          : integerMessage(rule, value),
+      ),
+    )
+    .transform(Number);
+}
+
+export function optionalIntegerSchema(rule: z.ZodType) {
+  return z
+    .string()
+    .trim()
+    .superRefine(
+      checkMessage((value) =>
+        value === "" ? undefined : integerMessage(rule, value),
+      ),
+    )
+    .transform((value) => (value === "" ? null : Number(value)));
+}
