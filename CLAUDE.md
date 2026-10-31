@@ -16,6 +16,10 @@
 - 도메인 뼈대: docs/domain.md (개발 시 참고)
 - API 규약: docs/api-convention.md (프론트엔드·백엔드 공통, 개발 시 반드시 따른다)
 - 코드 규칙: docs/code-convention.md (프론트엔드·백엔드 공통, 개발 시 반드시 따른다)
+- Claude 스킬: .claude/skills (작업에 맞는 스킬을 먼저 읽는다)
+  - 공통: pr-workflow(브랜치·커밋·PR·병합), local-run(로컬 실행·더미 계정·브라우저 확인)
+  - 백엔드: backend-feature(도메인 API 추가), db-migration(Flyway 마이그레이션)
+  - 프론트엔드: admin-screen(어드민 화면 추가), web-feature(게스트 앱), api-codegen(orval 코드 생성), structure-check(PR 전 FSD·3계층 점검)
 
 ## 필수 사항
 
