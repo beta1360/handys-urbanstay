@@ -1,5 +1,11 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
-import { fetchOperator, operatorQueryKey } from "@/shared/api";
+import type { QueryClient } from "@tanstack/react-query";
+import {
+  fetchOperator,
+  operatorListQueryKey,
+  operatorQueryKey,
+} from "@/shared/api";
+import type { Operator } from "@/shared/api";
 
 function operatorQueryOptions(operatorId: number) {
   return queryOptions({
@@ -10,4 +16,12 @@ function operatorQueryOptions(operatorId: number) {
 
 export function useOperatorQuery(operatorId: number) {
   return useQuery(operatorQueryOptions(operatorId));
+}
+
+export function cacheSavedOperator(
+  queryClient: QueryClient,
+  operator: Operator,
+) {
+  void queryClient.invalidateQueries({ queryKey: operatorListQueryKey() });
+  queryClient.setQueryData(operatorQueryOptions(operator.id).queryKey, operator);
 }

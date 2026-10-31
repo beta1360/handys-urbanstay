@@ -16,3 +16,11 @@ export const OPERATOR_LOAD_MESSAGES = {
 export const OPERATOR_NOT_FOUND_MESSAGES = {
   description: "운영자를 찾을 수 없습니다.",
 } as const;
+
+export const OPERATOR_INFO_MESSAGES = {
+  legend: "운영자 계정",
+  loginIdLabel: "아이디(이메일)",
+  loginIdHint: "이메일 형식. 운영자가 로그인할 때 씁니다.",
+  passwordHint: (minLength: number | null, maxLength: number | null) =>
+    `영문과 숫자를 모두 넣어 ${minLength}~${maxLength}자`,
+} as const;
