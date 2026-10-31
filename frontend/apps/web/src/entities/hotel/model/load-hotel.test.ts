@@ -13,7 +13,12 @@ vi.mock("../api/hotel-list", () => ({
   findHotel: vi.fn(),
 }));
 
-const HOTEL = { id: 3, name: "어반스테이 강남", address: "서울 강남구" };
+const HOTEL = {
+  id: 3,
+  name: "어반스테이 강남",
+  address: "서울 강남구",
+  roomCount: 12,
+};
 
 afterEach(() => {
   vi.clearAllMocks();

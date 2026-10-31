@@ -10,7 +10,8 @@ import * as zod from 'zod';
 export const HotelAppResponse = zod.object({
   "id": zod.int().describe('호텔 ID'),
   "name": zod.string().describe('호텔 이름'),
-  "address": zod.string().describe('주소(한 줄)')
+  "address": zod.string().describe('주소(한 줄)'),
+  "roomCount": zod.int().describe('그 호텔의 객실 수(객실 상태와 관계없이 모두 셉니다). 0이면 객실이 없는 호텔이라 고를 수 없습니다.')
 });
 
 export type HotelAppResponse = zod.input<typeof HotelAppResponse>;
