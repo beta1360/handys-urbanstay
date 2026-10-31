@@ -6,8 +6,13 @@ import { RoomListLoadFailed } from "./room-list-load-failed";
 import { RoomListPagination } from "./room-list-pagination";
 import { RoomTable } from "./room-table";
 
-export function RoomList({ keyword, status, page }: RoomListCriteria) {
-  const state = useRoomList({ keyword, status, page });
+export function RoomList({
+  keyword,
+  status,
+  roomTypeId,
+  page,
+}: RoomListCriteria) {
+  const state = useRoomList({ keyword, status, roomTypeId, page });
 
   switch (state.status) {
     case "loading":

@@ -34,11 +34,24 @@ const GUEST = {
   version: 0,
 };
 
-const GUEST_WITH_EXTRA_FIELD = { ...GUEST, createdAt: "2026-10-31T00:00:00Z" };
+const GUEST_DETAIL = {
+  ...GUEST,
+  currentStay: {
+    id: 11,
+    room: { id: 2, name: "101", roomType: { id: 1, name: "스탠다드" } },
+    checkInDate: "2026-10-30",
+    checkOutDate: "2026-11-02",
+  },
+};
+
+const GUEST_WITH_EXTRA_FIELD = {
+  ...GUEST_DETAIL,
+  createdAt: "2026-10-31T00:00:00Z",
+};
 
 const GUEST_RESPONSE = {
   success: true,
-  data: GUEST,
+  data: GUEST_DETAIL,
   message: null,
   error: null,
 };
@@ -180,7 +193,7 @@ describe("쿼리 키", () => {
     const detailKey = guestQueryKey(GUEST_ID);
     queryClient.setQueryData(firstPageKey, GUEST_PAGE);
     queryClient.setQueryData(searchedKey, GUEST_PAGE);
-    queryClient.setQueryData(detailKey, GUEST);
+    queryClient.setQueryData(detailKey, GUEST_DETAIL);
 
     await queryClient.invalidateQueries({ queryKey: guestListQueryKey() });
 
@@ -197,7 +210,9 @@ describe("fetchGuest", () => {
     vi.mocked(generated.getGuest).mockResolvedValue(GUEST_RESPONSE);
     const { signal } = new AbortController();
 
-    await expect(fetchGuest(GUEST_ID, { signal })).resolves.toEqual(GUEST);
+    await expect(fetchGuest(GUEST_ID, { signal })).resolves.toEqual(
+      GUEST_DETAIL,
+    );
     expect(generated.getGuest).toHaveBeenCalledWith(
       GUEST_ID,
       undefined,
@@ -216,7 +231,7 @@ describe("updateGuest", () => {
     const bodyWithExtraField = { ...UPDATE_BODY, extra: true };
 
     await expect(updateGuest(GUEST_ID, bodyWithExtraField)).resolves.toEqual({
-      data: GUEST,
+      data: GUEST_DETAIL,
       message: UPDATE_MESSAGE,
     });
     expect(generated.updateGuest).toHaveBeenCalledWith(GUEST_ID, UPDATE_BODY);
@@ -250,7 +265,10 @@ describe.each(GUEST_OPERATIONS)(
   ({ message, mockResponse, run }) => {
     it.each([
       ...UNSUCCESSFUL_RESPONSE_OVERRIDES,
-      ["타입이 틀리면", { data: { ...GUEST, id: String(GUEST_ID) } }] as const,
+      [
+        "타입이 틀리면",
+        { data: { ...GUEST_DETAIL, id: String(GUEST_ID) } },
+      ] as const,
     ])("응답의 %s 응답 검증 오류를 던진다", async (_, override) => {
       mockResponse({ ...GUEST_RESPONSE, message, ...override });
 
@@ -264,7 +282,7 @@ describe.each(GUEST_OPERATIONS)(
         data: GUEST_WITH_EXTRA_FIELD,
       });
 
-      await expect(run()).resolves.toEqual(toResult(message, GUEST));
+      await expect(run()).resolves.toEqual(toResult(message, GUEST_DETAIL));
     });
   },
 );

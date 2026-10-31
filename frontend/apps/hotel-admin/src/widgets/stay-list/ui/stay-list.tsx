@@ -6,8 +6,8 @@ import { StayListLoadFailed } from "./stay-list-load-failed";
 import { StayListPagination } from "./stay-list-pagination";
 import { StayTable } from "./stay-table";
 
-export function StayList({ roomId, guestId, canceled, page }: StayListCriteria) {
-  const state = useStayList({ roomId, guestId, canceled, page });
+export function StayList(criteria: StayListCriteria) {
+  const state = useStayList(criteria);
 
   switch (state.status) {
     case "loading":

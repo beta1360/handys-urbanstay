@@ -10,6 +10,7 @@ import {
   UpdateGuestResponse,
 } from "./generated/zod";
 import {
+  GuestDetailHotelAdminResponse,
   GuestHotelAdminResponse,
   GuestUpdateHotelAdminRequest,
   PageResponseGuestHotelAdminResponse,
@@ -25,13 +26,17 @@ export type UpdateGuestBody = z.input<typeof GuestUpdateHotelAdminRequest>;
 
 export type Guest = z.output<typeof GuestHotelAdminResponse>;
 
+export type GuestDetail = z.output<typeof GuestDetailHotelAdminResponse>;
+
+export type GuestCurrentStay = NonNullable<GuestDetail["currentStay"]>;
+
 export type GuestPage = z.output<typeof PageResponseGuestHotelAdminResponse>;
 
 export type GuestListParams = z.input<typeof GetGuestsQueryParams>;
 
-const GUEST_SUCCESS_SHAPE = {
+const GUEST_DETAIL_SUCCESS_SHAPE = {
   success: z.literal(true),
-  data: GuestHotelAdminResponse,
+  data: GuestDetailHotelAdminResponse,
 };
 
 const GetGuestsSuccessResponse = GetGuestsResponse.extend({
@@ -39,10 +44,12 @@ const GetGuestsSuccessResponse = GetGuestsResponse.extend({
   data: PageResponseGuestHotelAdminResponse,
 });
 
-const GetGuestSuccessResponse = GetGuestResponse.extend(GUEST_SUCCESS_SHAPE);
+const GetGuestSuccessResponse = GetGuestResponse.extend(
+  GUEST_DETAIL_SUCCESS_SHAPE,
+);
 
 const GUEST_CHANGE_SUCCESS_SHAPE = {
-  ...GUEST_SUCCESS_SHAPE,
+  ...GUEST_DETAIL_SUCCESS_SHAPE,
   message: z.string(),
 };
 

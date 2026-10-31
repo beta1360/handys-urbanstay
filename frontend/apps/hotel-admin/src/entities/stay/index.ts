@@ -11,9 +11,16 @@ export {
 } from "./config/messages";
 export { isStayCancelable } from "./lib/stay-cancelable";
 export {
+  hasStayListFilter,
+  isStayCheckInRangeValid,
   normalizeStayCanceled,
+  normalizeStayCheckInDate,
   normalizeStayFilterId,
+  normalizeStayKeyword,
+  STAY_KEYWORD_MAX_LENGTH,
+  toStayListParams,
 } from "./lib/stay-filter";
+export type { StayListFilter } from "./lib/stay-filter";
 export {
   getLastPage,
   isBeyondLastPage,

@@ -26,8 +26,12 @@ import type {
 
 import type {
   ApiResponsePageResponseStayHotelAdminResponse,
+  ApiResponsePageResponseStaySettlementStayHotelAdminResponse,
   ApiResponseStayHotelAdminResponse,
+  ApiResponseStaySettlementHotelAdminResponse,
   ErrorApiResponse,
+  GetSettlementParams,
+  GetSettlementStaysParams,
   GetStaysParams,
   StayCancelHotelAdminRequest
 } from '../schemas';
@@ -125,7 +129,7 @@ export const useCancelStay = <TError = ErrorType<ErrorApiResponse>,
       return useMutation(getCancelStayMutationOptions(options), queryClient);
     }
     /**
- * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 이용 목록을 체크인 날짜 내림차순(같으면 이용 id 내림차순)으로 페이지로 나눠 조회합니다. 다른 호텔의 이용은 나오지 않고, 취소한 이용도 함께 나옵니다. roomId를 보내면 그 객실의 이용만, guestId를 보내면 그 이용객의 이용만, canceled를 보내면 취소 여부가 맞는 이용만 조회하고, 함께 보내면 모두 맞는 이용만 조회합니다. 없는 id나 다른 호텔의 id로 거르면 빈 목록입니다. 객실 이름과 이용객의 이름·전화번호는 조회하는 시점의 값입니다. canceled가 true, false가 아니면(대문자, 빈 값 등) 400 INVALID_INPUT으로 응답하고 fieldErrors에 canceled를 담습니다.
+ * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 이용 목록을 체크인 날짜 내림차순(같으면 이용 id 내림차순)으로 페이지로 나눠 조회합니다. 다른 호텔의 이용은 나오지 않고, 취소한 이용도 함께 나옵니다. roomId를 보내면 그 객실의 이용만, guestId를 보내면 그 이용객의 이용만, canceled를 보내면 취소 여부가 맞는 이용만 조회합니다. keyword를 보내면 이용객 이름(대소문자 구분 없이)이나 전화번호(저장된 번호와 keyword 양쪽의 하이픈을 빼고)에 keyword가 들어 있는 이용만 찾고, %, _, \ 같은 문자도 글자 그대로 찾습니다. 하이픈만 있는 keyword는 전화번호로는 찾지 않습니다. checkInFrom·checkInTo를 보내면 체크인 날짜가 그 사이(양 끝 포함)인 이용만 조회하고, 하나만 보내도 됩니다. 모든 조건은 함께 보내면 모두 맞는 이용만 조회합니다. 없는 id나 다른 호텔의 id로 거르면 빈 목록입니다. 객실 이름과 이용객의 이름·전화번호는 조회하는 시점의 값입니다. canceled가 true, false가 아니면(대문자, 빈 값 등) 400 INVALID_INPUT으로 응답하고 fieldErrors에 canceled를 담습니다. 날짜가 YYYY-MM-DD 형식이 아니면 그 파라미터를, checkInFrom이 checkInTo보다 늦으면 checkInTo를 fieldErrors에 담아 400 INVALID_INPUT으로 응답합니다.
  * @summary 이용 목록 조회
  */
 export const getStays = (
@@ -300,6 +304,194 @@ export function useGetStay<TData = Awaited<ReturnType<typeof getStay>>, TError =
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetStayQueryOptions(stayId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 로그인한 마스터의 호텔에서 체크인 날짜가 그 달(한국 날짜 기준 1일~말일)인 이용을 모아 정산합니다. totalAmount는 취소하지 않은 이용의 최종 금액 합계(원), stayCount는 취소하지 않은 이용 건수, canceledCount는 취소한 이용 건수입니다. 이용이 없는 달이면 모두 0입니다. 다른 호텔의 이용은 들어가지 않습니다. month는 필수이고 "YYYY-MM" 형식(예: 2026-11)만 받습니다. 빠지면 400 INVALID_INPUT(fieldErrors에 month, 필수), 형식이 틀리면(예: 2026-13, 2026-1, 2026-11-01) 400 INVALID_INPUT(fieldErrors에 month, 타입)으로 응답합니다. 마스터만 쓰고 운영자 계정은 403 FORBIDDEN입니다.
+ * @summary 월별 정산 조회(마스터 전용)
+ */
+export const getSettlement = (
+    params: GetSettlementParams,
+ options?: SecondParameter<typeof http>,signal?: AbortSignal
+) => {
+
+
+      return http<ApiResponseStaySettlementHotelAdminResponse>(
+      {url: `/api/v1/hotel-admin/settlements`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetSettlementQueryKey = (params?: GetSettlementParams,) => {
+    return [
+    `/api/v1/hotel-admin/settlements`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetSettlementQueryOptions = <TData = Awaited<ReturnType<typeof getSettlement>>, TError = ErrorType<ErrorApiResponse>>(params: GetSettlementParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSettlement>>, TError, TData>>, request?: SecondParameter<typeof http>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSettlementQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSettlement>>> = ({ signal }) => getSettlement(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSettlement>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetSettlementQueryResult = NonNullable<Awaited<ReturnType<typeof getSettlement>>>
+export type GetSettlementQueryError = ErrorType<ErrorApiResponse>
+
+
+export function useGetSettlement<TData = Awaited<ReturnType<typeof getSettlement>>, TError = ErrorType<ErrorApiResponse>>(
+ params: GetSettlementParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSettlement>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSettlement>>,
+          TError,
+          Awaited<ReturnType<typeof getSettlement>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSettlement<TData = Awaited<ReturnType<typeof getSettlement>>, TError = ErrorType<ErrorApiResponse>>(
+ params: GetSettlementParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSettlement>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSettlement>>,
+          TError,
+          Awaited<ReturnType<typeof getSettlement>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSettlement<TData = Awaited<ReturnType<typeof getSettlement>>, TError = ErrorType<ErrorApiResponse>>(
+ params: GetSettlementParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSettlement>>, TError, TData>>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 월별 정산 조회(마스터 전용)
+ */
+
+export function useGetSettlement<TData = Awaited<ReturnType<typeof getSettlement>>, TError = ErrorType<ErrorApiResponse>>(
+ params: GetSettlementParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSettlement>>, TError, TData>>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetSettlementQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 로그인한 마스터의 호텔에서 체크인 날짜가 그 달(1일~말일)인 이용을 취소한 이용까지 체크인 날짜 오름차순(같으면 이용 id 오름차순)으로 페이지로 나눠 조회합니다. 월별 정산에 들어간 이용과 같은 범위입니다. 취소한 이용은 canceledAt에 취소 시각이 담기고, 금액은 취소해도 그대로 담깁니다. 객실 이름, 객실 유형, 이용객 이름은 조회하는 시점의 값입니다(객실 유형은 지금 그 객실의 유형). 다른 호텔의 이용은 나오지 않습니다. month 규칙은 월별 정산 조회와 같습니다. page는 0~99(기본 0), size는 1~100(기본 10)이고, 범위를 벗어나면 400 INVALID_INPUT으로 응답하고 fieldErrors에 파라미터 이름을 담습니다. 마스터만 쓰고 운영자 계정은 403 FORBIDDEN입니다.
+ * @summary 월별 이용 로그 조회(마스터 전용)
+ */
+export const getSettlementStays = (
+    params: GetSettlementStaysParams,
+ options?: SecondParameter<typeof http>,signal?: AbortSignal
+) => {
+
+
+      return http<ApiResponsePageResponseStaySettlementStayHotelAdminResponse>(
+      {url: `/api/v1/hotel-admin/settlements/stays`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetSettlementStaysQueryKey = (params?: GetSettlementStaysParams,) => {
+    return [
+    `/api/v1/hotel-admin/settlements/stays`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetSettlementStaysQueryOptions = <TData = Awaited<ReturnType<typeof getSettlementStays>>, TError = ErrorType<ErrorApiResponse>>(params: GetSettlementStaysParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSettlementStays>>, TError, TData>>, request?: SecondParameter<typeof http>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSettlementStaysQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSettlementStays>>> = ({ signal }) => getSettlementStays(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSettlementStays>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetSettlementStaysQueryResult = NonNullable<Awaited<ReturnType<typeof getSettlementStays>>>
+export type GetSettlementStaysQueryError = ErrorType<ErrorApiResponse>
+
+
+export function useGetSettlementStays<TData = Awaited<ReturnType<typeof getSettlementStays>>, TError = ErrorType<ErrorApiResponse>>(
+ params: GetSettlementStaysParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSettlementStays>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSettlementStays>>,
+          TError,
+          Awaited<ReturnType<typeof getSettlementStays>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSettlementStays<TData = Awaited<ReturnType<typeof getSettlementStays>>, TError = ErrorType<ErrorApiResponse>>(
+ params: GetSettlementStaysParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSettlementStays>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSettlementStays>>,
+          TError,
+          Awaited<ReturnType<typeof getSettlementStays>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSettlementStays<TData = Awaited<ReturnType<typeof getSettlementStays>>, TError = ErrorType<ErrorApiResponse>>(
+ params: GetSettlementStaysParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSettlementStays>>, TError, TData>>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 월별 이용 로그 조회(마스터 전용)
+ */
+
+export function useGetSettlementStays<TData = Awaited<ReturnType<typeof getSettlementStays>>, TError = ErrorType<ErrorApiResponse>>(
+ params: GetSettlementStaysParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSettlementStays>>, TError, TData>>, request?: SecondParameter<typeof http>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetSettlementStaysQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

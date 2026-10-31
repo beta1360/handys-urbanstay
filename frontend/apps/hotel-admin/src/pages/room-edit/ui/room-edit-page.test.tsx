@@ -26,6 +26,7 @@ import {
   stringifyRoomPathParams,
 } from "@/entities/room";
 import type { RoomInfoField } from "@/entities/room";
+import { ROOM_TYPE_OPTION_MESSAGES } from "@/entities/room-type";
 import { API_ERROR_CODES, roomQueryKey, updateRoom } from "@/shared/api";
 import type { Room, RoomType } from "@/shared/api";
 import { ACCESS_MESSAGES, COMMON_MESSAGES } from "@/shared/config";
@@ -283,6 +284,24 @@ describe("RoomEditPage 불러오기", () => {
       ROOM.id,
       { ...bodyOf(ROOM), roomTypeId: ROOM_TYPES[1].id },
     ]);
+  });
+
+  it("유형 목록을 불러오지 못해도 지금 유형을 선택지에 두어 유형 칸에 보여주고 불러오기 실패 안내를 보여준다", async () => {
+    fetchRoomTypes.mockRejectedValue(new Error("network"));
+    renderRoomEditPage();
+
+    await screen.findByRole("group", { name: ROOM_INFO_MESSAGES.legend });
+    await vi.waitFor(() => {
+      expect(getFields().roomTypeId).toHaveAccessibleDescription(
+        ROOM_TYPE_OPTION_MESSAGES.loadFailed,
+      );
+    });
+    expect(
+      within(getFields().roomTypeId)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual([ROOM_TYPE_OPTION_MESSAGES.placeholder, ROOM.roomType.name]);
+    expect(getFields().roomTypeId).toHaveDisplayValue(ROOM.roomType.name);
   });
 
   it("id가 잘못되면 조회하지 않고 찾을 수 없음을 보여준다", async () => {

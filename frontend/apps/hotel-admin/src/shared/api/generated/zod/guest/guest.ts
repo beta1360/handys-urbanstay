@@ -8,24 +8,24 @@
 import * as zod from 'zod';
 
 import {
-  ApiResponseGuestHotelAdminResponse,
+  ApiResponseGuestDetailHotelAdminResponse,
   ApiResponsePageResponseGuestHotelAdminResponse,
   GuestUpdateHotelAdminRequest
 } from '../schemas';
 
 
 /**
- * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 이용객 하나를 조회합니다. 수정 요청에 보낼 version이 함께 옵니다. 없는 id와 다른 호텔의 이용객 id는 모두 404 GUEST_NOT_FOUND로 응답합니다.
+ * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 이용객 하나를 조회합니다. 수정 요청에 보낼 version이 함께 옵니다. 지금 이용(currentStay)은 오늘(한국 시간)이 체크인 날짜부터 체크아웃 전날 사이에 있는 취소하지 않은 이용이고, 여러 객실을 함께 이용 중이면 체크인 날짜가 이른 이용(같으면 이용 id가 작은 이용) 하나이며, 없으면 null입니다. 없는 id와 다른 호텔의 이용객 id는 모두 404 GUEST_NOT_FOUND로 응답합니다.
  * @summary 이용객 조회
  */
 export const GetGuestParams = zod.object({
   "guestId": zod.int()
 })
 
-export const GetGuestResponse = ApiResponseGuestHotelAdminResponse
+export const GetGuestResponse = ApiResponseGuestDetailHotelAdminResponse
 
 /**
- * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 이용객의 이름, 전화번호, 이메일을 요청 값으로 바꿉니다. 이름, 전화번호, 이메일은 앞뒤 공백을 지운 뒤 검사하고 저장하며, 최대 길이도 지운 값으로 셉니다. 공백만 있는 값은 빈 값으로 봅니다. 전화번호와 이메일은 앞뒤 공백만 지우고 입력한 모양 그대로(하이픈 위치, 대소문자 포함) 저장합니다. 다른 호텔의 이용객과는 전화번호가 같아도 되고, 이름과 이메일은 같은 호텔에서도 겹쳐도 됩니다. 조회할 때 받은 version을 함께 보냅니다. 그사이 다른 사용자가 먼저 수정해 version이 다르면 409 GUEST_MODIFIED로 응답하므로, 다시 조회한 뒤 수정합니다. 동시에 같은 version으로 수정하면 하나만 반영되고 나머지는 409 GUEST_MODIFIED입니다. 같은 호텔의 다른 이용객과 하이픈을 뺀 전화번호 숫자가 같아지면 409 GUEST_PHONE_DUPLICATED로 응답합니다. 자기 전화번호를 그대로 두거나 하이픈 모양만 바꾸는 수정은 됩니다. version이 다르면서 전화번호도 겹치면 GUEST_MODIFIED입니다. 성공하면 수정한 이용객을 최신 version과 함께 돌려주며, 바뀐 값이 없으면 version도 그대로입니다. 없는 id와 다른 호텔의 이용객 id는 모두 404 GUEST_NOT_FOUND로 응답합니다.
+ * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 이용객의 이름, 전화번호, 이메일을 요청 값으로 바꿉니다. 이름, 전화번호, 이메일은 앞뒤 공백을 지운 뒤 검사하고 저장하며, 최대 길이도 지운 값으로 셉니다. 공백만 있는 값은 빈 값으로 봅니다. 전화번호와 이메일은 앞뒤 공백만 지우고 입력한 모양 그대로(하이픈 위치, 대소문자 포함) 저장합니다. 다른 호텔의 이용객과는 전화번호가 같아도 되고, 이름과 이메일은 같은 호텔에서도 겹쳐도 됩니다. 조회할 때 받은 version을 함께 보냅니다. 그사이 다른 사용자가 먼저 수정해 version이 다르면 409 GUEST_MODIFIED로 응답하므로, 다시 조회한 뒤 수정합니다. 동시에 같은 version으로 수정하면 하나만 반영되고 나머지는 409 GUEST_MODIFIED입니다. 같은 호텔의 다른 이용객과 하이픈을 뺀 전화번호 숫자가 같아지면 409 GUEST_PHONE_DUPLICATED로 응답합니다. 자기 전화번호를 그대로 두거나 하이픈 모양만 바꾸는 수정은 됩니다. version이 다르면서 전화번호도 겹치면 GUEST_MODIFIED입니다. 성공하면 수정한 이용객을 최신 version과 지금 이용(currentStay, 이용객 조회와 같은 기준)과 함께 돌려주며, 바뀐 값이 없으면 version도 그대로입니다. 없는 id와 다른 호텔의 이용객 id는 모두 404 GUEST_NOT_FOUND로 응답합니다.
  * @summary 이용객 수정
  */
 export const UpdateGuestParams = zod.object({
@@ -34,7 +34,7 @@ export const UpdateGuestParams = zod.object({
 
 export const UpdateGuestBody = GuestUpdateHotelAdminRequest
 
-export const UpdateGuestResponse = ApiResponseGuestHotelAdminResponse
+export const UpdateGuestResponse = ApiResponseGuestDetailHotelAdminResponse
 
 /**
  * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 이용객 목록을 최근 등록 순(id 내림차순)으로 페이지로 나눠 조회합니다. 다른 호텔의 이용객은 나오지 않습니다. keyword를 보내면 이름에 keyword가 들어 있거나(대소문자 구분 없음) 전화번호에 keyword가 들어 있는(전화번호와 keyword 양쪽의 하이픈을 빼고 비교, 예: 01012345678로 010-1234-5678을 찾음) 이용객을 찾습니다. %, _,  같은 문자도 글자 그대로 찾습니다. 하이픈만 있는 keyword는 이름에서만 찾습니다. keyword는 앞뒤 공백을 지운 뒤 100자 이하이고, 없거나 비어 있거나 공백만 있으면 전체를 조회합니다. page는 0~99(기본 0), size는 1~100(기본 10)입니다. totalElements와 totalPages는 검색 결과 기준이며, totalPages가 100을 넘어도 page는 99까지만 받으므로 그 뒤의 이용객은 keyword로 좁혀 찾습니다. 범위를 벗어나면 400 INVALID_INPUT으로 응답하고 fieldErrors에 파라미터 이름을 담습니다.

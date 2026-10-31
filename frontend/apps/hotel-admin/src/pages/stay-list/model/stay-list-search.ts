@@ -2,7 +2,9 @@ import { z } from "zod";
 import {
   isRequestablePage,
   normalizeStayCanceled,
+  normalizeStayCheckInDate,
   normalizeStayFilterId,
+  normalizeStayKeyword,
   STAY_LIST_FIRST_PAGE,
 } from "@/entities/stay";
 
@@ -28,6 +30,12 @@ const filterIdSchema = z
   .catch(undefined)
   .transform(normalizeStayFilterId);
 
+const checkInDateSchema = z
+  .string()
+  .optional()
+  .catch(undefined)
+  .transform(normalizeStayCheckInDate);
+
 export const stayListSearchSchema = z.object({
   roomId: filterIdSchema,
   guestId: filterIdSchema,
@@ -36,6 +44,13 @@ export const stayListSearchSchema = z.object({
     .optional()
     .catch(undefined)
     .transform(normalizeStayCanceled),
+  keyword: z
+    .string()
+    .optional()
+    .catch(undefined)
+    .transform(normalizeStayKeyword),
+  checkInFrom: checkInDateSchema,
+  checkInTo: checkInDateSchema,
   page: z
     .union([z.string(), z.number()])
     .optional()

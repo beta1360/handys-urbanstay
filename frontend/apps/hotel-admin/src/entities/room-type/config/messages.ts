@@ -25,4 +25,6 @@ export const ROOM_TYPE_INFO_MESSAGES = {
 export const ROOM_TYPE_OPTION_MESSAGES = {
   placeholder: "유형 선택",
   loadFailed: "객실 유형을 불러오지 못했습니다.",
+  empty: "먼저 객실 유형을 생성해 주세요.",
+  create: "객실 유형 생성",
 } as const;

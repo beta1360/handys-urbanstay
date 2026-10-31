@@ -6,11 +6,11 @@
  * OpenAPI spec version: v1
  */
 import type { ErrorResponse } from './errorResponse.ts';
-import type { GuestHotelAdminResponse } from './guestHotelAdminResponse.ts';
+import type { StaySettlementHotelAdminResponse } from './staySettlementHotelAdminResponse.ts';
 
-export interface ApiResponseGuestHotelAdminResponse {
+export interface ApiResponseStaySettlementHotelAdminResponse {
   success: boolean;
-  data: GuestHotelAdminResponse | null;
+  data: StaySettlementHotelAdminResponse | null;
   /** @nullable */
   message: string | null;
   error: ErrorResponse | null;

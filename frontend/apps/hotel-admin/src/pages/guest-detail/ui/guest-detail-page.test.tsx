@@ -6,7 +6,7 @@ import {
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,9 +19,10 @@ import {
 } from "@/entities/guest";
 import { STAY_LINK_MESSAGES } from "@/entities/stay";
 import { API_ERROR_CODES } from "@/shared/api";
-import type { Guest } from "@/shared/api";
+import type { GuestDetail } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
+import { GUEST_CURRENT_STAY_MESSAGES } from "@/widgets/guest-detail";
 import { GuestDetailPage } from "./guest-detail-page";
 
 const { fetchGuest } = vi.hoisted(() => ({ fetchGuest: vi.fn() }));
@@ -34,11 +35,12 @@ vi.mock("@/shared/api", async (importOriginal) => {
   };
 });
 
-const GUEST: Guest = {
+const GUEST: GuestDetail = {
   id: 3,
   name: "김이용",
   phone: "010-1234-5678",
   email: "kim@example.com",
+  currentStay: null,
   version: 1,
 };
 
@@ -89,6 +91,14 @@ function renderGuestDetailPage(guestId = String(GUEST.id)) {
           createRoute({ getParentRoute: () => guestRoute, path: "edit" }),
         ]),
         createRoute({ getParentRoute: () => layoutRoute, path: "stays/" }),
+        createRoute({
+          getParentRoute: () => layoutRoute,
+          path: "stays/$stayId",
+        }),
+        createRoute({
+          getParentRoute: () => layoutRoute,
+          path: "rooms/$roomId",
+        }),
       ]),
     ]),
     history: createMemoryHistory({ initialEntries: [`/guests/${guestId}`] }),
@@ -203,5 +213,60 @@ describe("GuestDetailPage", () => {
 
     expect(await screen.findByText(GUEST.email)).toBeInTheDocument();
     expect(fetchGuest).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("GuestDetailPage 지금 이용", () => {
+  async function findCurrentStayRegion() {
+    return screen.findByRole("region", {
+      name: GUEST_CURRENT_STAY_MESSAGES.title,
+    });
+  }
+
+  it("지금 이용이 있으면 호실(객실 상세 링크)·유형·기간과 이용 상세 링크를 보여준다", async () => {
+    fetchGuest.mockResolvedValue({
+      ...GUEST,
+      currentStay: {
+        id: 5,
+        room: { id: 2, name: "101", roomType: { id: 1, name: "스탠다드" } },
+        checkInDate: "2026-10-30",
+        checkOutDate: "2026-11-02",
+      },
+    });
+    renderGuestDetailPage();
+
+    const region = await findCurrentStayRegion();
+    expect(
+      within(region)
+        .getAllByRole("term")
+        .map((term) => term.textContent),
+    ).toEqual([
+      GUEST_CURRENT_STAY_MESSAGES.room,
+      GUEST_CURRENT_STAY_MESSAGES.roomType,
+      GUEST_CURRENT_STAY_MESSAGES.period,
+    ]);
+    expect(
+      within(region)
+        .getAllByRole("definition")
+        .map((value) => value.textContent),
+    ).toEqual(["101", "스탠다드", "2026-10-30 ~ 2026-11-02"]);
+    expect(within(region).getByRole("link", { name: "101" })).toHaveAttribute(
+      "href",
+      "/rooms/2",
+    );
+    expect(
+      within(region).getByRole("link", {
+        name: GUEST_CURRENT_STAY_MESSAGES.stayDetail,
+      }),
+    ).toHaveAttribute("href", "/stays/5");
+  });
+
+  it("지금 이용이 없으면 이용 중인 객실이 없다는 문구만 보여준다", async () => {
+    renderGuestDetailPage();
+
+    const region = await findCurrentStayRegion();
+    expect(region).toHaveTextContent(GUEST_CURRENT_STAY_MESSAGES.empty);
+    expect(within(region).queryByRole("link")).not.toBeInTheDocument();
+    expect(within(region).queryByRole("term")).not.toBeInTheDocument();
   });
 });

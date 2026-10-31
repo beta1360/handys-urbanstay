@@ -5,6 +5,7 @@ import {
   GuestNotFound,
   useGuest,
 } from "@/entities/guest";
+import { GuestCurrentStay } from "./guest-current-stay";
 import { GuestDetailActions } from "./guest-detail-actions";
 
 type GuestDetailProps = {
@@ -36,6 +37,7 @@ export function GuestDetail({ guestId }: GuestDetailProps) {
         <>
           <GuestDetailActions guestId={state.guest.id} />
           <GuestInformation guest={state.guest} />
+          <GuestCurrentStay currentStay={state.guest.currentStay} />
         </>
       );
   }

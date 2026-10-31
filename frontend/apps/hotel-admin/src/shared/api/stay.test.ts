@@ -75,6 +75,9 @@ const LIST_PARAMS = {
   roomId: 2,
   guestId: 3,
   canceled: false,
+  keyword: "010",
+  checkInFrom: "2026-11-01",
+  checkInTo: "2026-11-30",
   page: 1,
   size: 100,
 };
@@ -89,7 +92,7 @@ afterEach(() => {
 });
 
 describe("fetchStays", () => {
-  it("거르기 값·페이지와 signal을 넘겨 취소 정보가 담긴 목록 페이지를 돌려준다", async () => {
+  it("거르기 값(객실·이용객·취소 여부·이용객 검색어·체크인 기간)·페이지와 signal을 넘겨 취소 정보가 담긴 목록 페이지를 돌려준다", async () => {
     vi.mocked(generated.getStays).mockResolvedValue(STAY_PAGE_RESPONSE);
     const { signal } = new AbortController();
 
@@ -118,6 +121,9 @@ describe("fetchStays", () => {
   it.each([
     ["page가 범위를 넘으면", { page: 100 }],
     ["size가 범위를 넘으면", { size: 101 }],
+    ["이용객 검색어가 100자를 넘으면", { keyword: "a".repeat(101) }],
+    ["체크인 시작이 날짜 형식이 아니면", { checkInFrom: "2026/11/01" }],
+    ["체크인 끝이 없는 날짜면", { checkInTo: "2026-02-30" }],
   ])("%s 요청을 보내지 않고 요청 검증 오류를 던진다", async (_, params) => {
     await expect(fetchStays(params)).rejects.toBeInstanceOf(
       RequestValidationError,

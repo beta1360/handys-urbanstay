@@ -21,4 +21,9 @@ export const ADMIN_MENU_ITEMS: readonly AdminMenuItem[] = [
     label: ADMIN_LAYOUT_MESSAGES.operatorMenuLabel,
     masterOnly: true,
   },
+  {
+    to: "/settlements",
+    label: ADMIN_LAYOUT_MESSAGES.settlementMenuLabel,
+    masterOnly: true,
+  },
 ];

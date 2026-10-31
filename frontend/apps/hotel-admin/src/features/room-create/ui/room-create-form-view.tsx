@@ -5,12 +5,14 @@ import type { FormFieldProps } from "@repo/admin-kit/form";
 import { ButtonLink } from "@repo/admin-kit/link";
 import { RoomInfoFields } from "@/entities/room";
 import type { RoomInfoField } from "@/entities/room";
+import { RoomTypeEmptyGuide } from "@/entities/room-type";
 import { COMMON_MESSAGES } from "@/shared/config";
 
 type RoomCreateFormViewProps = {
   fields: Record<RoomInfoField, FormFieldProps & { value?: string }>;
   roomTypeOptions: readonly SelectFieldOption[];
   roomTypeHint: string | undefined;
+  isRoomTypeEmpty: boolean;
   isSubmitting: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
@@ -19,6 +21,7 @@ export function RoomCreateFormView({
   fields,
   roomTypeOptions,
   roomTypeHint,
+  isRoomTypeEmpty,
   isSubmitting,
   onSubmit,
 }: RoomCreateFormViewProps) {
@@ -31,7 +34,7 @@ export function RoomCreateFormView({
       <RoomInfoFields
         fields={fields}
         roomTypeOptions={roomTypeOptions}
-        roomTypeHint={roomTypeHint}
+        roomTypeHint={isRoomTypeEmpty ? <RoomTypeEmptyGuide /> : roomTypeHint}
       />
       <div className="flex gap-2">
         <Button type="submit" variant="primary" loading={isSubmitting}>

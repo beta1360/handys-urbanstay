@@ -9,10 +9,11 @@ import {
 } from "@tanstack/react-router";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { STAY_CANCELED_LABELS, STAY_FIELD_LABELS } from "@/entities/stay";
 import { STAY_SEARCH_FORM_MESSAGES } from "@/features/stay-search";
-import type { Guest, Room, Stay, StayPage } from "@/shared/api";
+import type { GuestDetail, Room, Stay, StayPage } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { formatWon } from "@/shared/lib/money";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
@@ -78,11 +79,12 @@ const ROOMS: Room[] = [
   },
 ];
 
-const GUEST: Guest = {
+const GUEST: GuestDetail = {
   id: 3,
   name: "김이용",
   phone: "010-1234-5678",
   email: "kim@example.com",
+  currentStay: null,
   version: 0,
 };
 
@@ -179,6 +181,39 @@ function getRoomSelect() {
 
 function getCanceledSelect() {
   return screen.getByRole("combobox", { name: STAY_FIELD_LABELS.canceled });
+}
+
+function getKeywordInput() {
+  return screen.getByRole("searchbox", { name: STAY_FIELD_LABELS.guest });
+}
+
+function getCheckInFromInput() {
+  return screen.getByLabelText(STAY_SEARCH_FORM_MESSAGES.checkInFrom);
+}
+
+function getCheckInToInput() {
+  return screen.getByLabelText(STAY_SEARCH_FORM_MESSAGES.checkInTo);
+}
+
+function createInvalidInputError(field: string, message: string) {
+  const config = { headers: new AxiosHeaders() };
+  const data = {
+    success: false,
+    data: null,
+    message: null,
+    error: {
+      code: "INVALID_INPUT",
+      message: "입력값을 확인해 주세요.",
+      fieldErrors: [{ field, message }],
+    },
+  };
+  return new AxiosError(
+    "Request failed",
+    AxiosError.ERR_BAD_REQUEST,
+    config,
+    undefined,
+    { data, status: 400, statusText: "", headers: {}, config },
+  );
 }
 
 function getOptionTexts(select: HTMLElement) {
@@ -323,9 +358,98 @@ describe("StayListPage 거르기", () => {
     });
   });
 
+  it("이용객 검색어와 체크인 기간을 입력해 검색하면 앞뒤 공백을 지운 값을 URL에 두고 1페이지를 조회한다", async () => {
+    fetchStays.mockResolvedValue(createStayPage({ totalPages: 3 }));
+    const { router, user } = renderStayListPage(staysPath({ page: "2" }));
+
+    await screen.findByRole("table");
+    await user.type(getKeywordInput(), "  김이용 ");
+    await user.type(getCheckInFromInput(), "2026-11-01");
+    await user.type(getCheckInToInput(), "2026-11-30");
+    await user.click(screen.getByRole("button", { name: COMMON_MESSAGES.search }));
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe(
+        staysPath({
+          keyword: "김이용",
+          checkInFrom: "2026-11-01",
+          checkInTo: "2026-11-30",
+        }),
+      );
+    });
+    expect(fetchStays).toHaveBeenLastCalledWith({
+      keyword: "김이용",
+      checkInFrom: "2026-11-01",
+      checkInTo: "2026-11-30",
+      page: 0,
+    });
+    expect(getKeywordInput()).toHaveValue("김이용");
+  });
+
+  it("URL의 이용객 검색어·체크인 기간으로 처음 조회하고 입력 칸에 보여준다", async () => {
+    renderStayListPage(
+      staysPath({
+        keyword: "010",
+        checkInFrom: "2026-11-01",
+        checkInTo: "2026-11-01",
+      }),
+    );
+
+    await screen.findByRole("table");
+    expect(getKeywordInput()).toHaveValue("010");
+    expect(getCheckInFromInput()).toHaveValue("2026-11-01");
+    expect(getCheckInToInput()).toHaveValue("2026-11-01");
+    expect(fetchStays).toHaveBeenCalledExactlyOnceWith({
+      keyword: "010",
+      checkInFrom: "2026-11-01",
+      checkInTo: "2026-11-01",
+      page: 0,
+    });
+  });
+
+  it("체크인 끝이 시작보다 이르면 끝 칸에 오류를 보여주고 이동·조회하지 않는다", async () => {
+    const { router, user } = renderStayListPage();
+
+    await screen.findByRole("table");
+    await user.type(getCheckInFromInput(), "2026-11-10");
+    await user.type(getCheckInToInput(), "2026-11-09");
+    await user.click(screen.getByRole("button", { name: COMMON_MESSAGES.search }));
+
+    expect(getCheckInToInput()).toHaveAccessibleDescription(
+      STAY_SEARCH_FORM_MESSAGES.checkInToBeforeFrom,
+    );
+    expect(router.state.location.href).toBe(staysPath());
+    expect(fetchStays).toHaveBeenCalledOnce();
+  });
+
+  it("서버가 체크인 끝 칸의 400 오류를 주면 그 문구를 끝 칸에 보여준다", async () => {
+    fetchStays.mockRejectedValue(
+      createInvalidInputError("checkInTo", "서버의 체크인 끝 문구"),
+    );
+    renderStayListPage(
+      staysPath({ checkInFrom: "2026-11-10", checkInTo: "2026-11-09" }),
+    );
+
+    await vi.waitFor(() => {
+      expect(getCheckInToInput()).toHaveAccessibleDescription(
+        "서버의 체크인 끝 문구",
+      );
+    });
+    expect(fetchStays).toHaveBeenCalledExactlyOnceWith({
+      checkInFrom: "2026-11-10",
+      checkInTo: "2026-11-09",
+      page: 0,
+    });
+  });
+
   it("이용객으로 걸렀으면 이용객 이름·전화번호와 다른 거르기는 두고 이용객 거르기만 푸는 링크를 보여준다", async () => {
     const { router, user } = renderStayListPage(
-      staysPath({ roomId: "2", guestId: "3", canceled: "false" }),
+      staysPath({
+        roomId: "2",
+        guestId: "3",
+        canceled: "false",
+        keyword: "김",
+      }),
     );
 
     expect(
@@ -339,7 +463,7 @@ describe("StayListPage 거르기", () => {
     });
     expect(clearLink).toHaveAttribute(
       "href",
-      staysPath({ roomId: "2", canceled: "false" }),
+      staysPath({ roomId: "2", canceled: "false", keyword: "김" }),
     );
 
     await user.click(clearLink);
@@ -348,11 +472,12 @@ describe("StayListPage 거르기", () => {
       expect(fetchStays).toHaveBeenLastCalledWith({
         roomId: 2,
         canceled: false,
+        keyword: "김",
         page: 0,
       });
     });
     expect(router.state.location.href).toBe(
-      staysPath({ roomId: "2", canceled: "false" }),
+      staysPath({ roomId: "2", canceled: "false", keyword: "김" }),
     );
     expect(
       screen.queryByRole("link", {
@@ -387,6 +512,11 @@ describe("StayListPage 빈 상태와 URL 정리", () => {
       { guestId: "3" },
       COMMON_MESSAGES.emptySearchResult,
     ],
+    [
+      "체크인 시작으로만 걸러도 검색 결과가 없다는",
+      { checkInFrom: "2026-11-01" },
+      COMMON_MESSAGES.emptySearchResult,
+    ],
   ])("항목이 없을 때 %s 문구를 보여준다", async (_, search, message) => {
     fetchStays.mockResolvedValue(
       createStayPage({ items: [], totalElements: 0, totalPages: 0 }),
@@ -402,6 +532,9 @@ describe("StayListPage 빈 상태와 URL 정리", () => {
     ["취소 여부가 비어 있으면", { canceled: "" }],
     ["객실 ID가 숫자가 아니면", { roomId: "abc" }],
     ["이용객 ID가 0이면", { guestId: "0" }],
+    ["이용객 검색어가 공백뿐이면", { keyword: "   " }],
+    ["체크인 시작이 날짜 형식이 아니면", { checkInFrom: "20261101" }],
+    ["체크인 끝이 없는 날짜면", { checkInTo: "2026-02-30" }],
   ])("%s 그 값 없이 조회하고 URL에서 지운다", async (_, search) => {
     const { router } = renderStayListPage(staysPath(search));
 

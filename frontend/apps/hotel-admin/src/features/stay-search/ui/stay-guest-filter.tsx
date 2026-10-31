@@ -1,20 +1,25 @@
+import type { StayListFilter } from "@/entities/stay";
 import { useStayGuestFilter } from "../model/use-stay-guest-filter";
 import { StayGuestFilterView } from "./stay-guest-filter-view";
 
-type StayGuestFilterProps = {
+type StayGuestFilterProps = StayListFilter & {
   guestId: number;
-  roomId: number | undefined;
-  canceled: boolean | undefined;
 };
 
 export function StayGuestFilter({
   guestId,
   roomId,
   canceled,
+  keyword,
+  checkInFrom,
+  checkInTo,
 }: StayGuestFilterProps) {
   const guest = useStayGuestFilter(guestId);
 
   return (
-    <StayGuestFilterView guest={guest} roomId={roomId} canceled={canceled} />
+    <StayGuestFilterView
+      guest={guest}
+      otherFilter={{ roomId, canceled, keyword, checkInFrom, checkInTo }}
+    />
   );
 }

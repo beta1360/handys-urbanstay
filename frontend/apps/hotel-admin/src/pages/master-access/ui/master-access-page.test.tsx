@@ -11,14 +11,42 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { ACCESS_MESSAGES } from "@/shared/config";
 import { OperatorList } from "@/widgets/operator-list";
+import { SettlementStayList } from "@/widgets/settlement-stay-list";
+import { SettlementSummary } from "@/widgets/settlement-summary";
 import { MasterAccessPage } from "./master-access-page";
 
-const { fetchOperators } = vi.hoisted(() => ({ fetchOperators: vi.fn() }));
+const { fetchOperators, fetchSettlement, fetchSettlementStays } = vi.hoisted(
+  () => ({
+    fetchOperators: vi.fn(),
+    fetchSettlement: vi.fn(),
+    fetchSettlementStays: vi.fn(),
+  }),
+);
 
 vi.mock("@/shared/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/shared/api")>()),
   fetchOperators,
+  fetchSettlement,
+  fetchSettlementStays,
 }));
+
+const MASTER_ONLY_SECTIONS = {
+  operators: {
+    path: "operators",
+    component: () => (
+      <OperatorList keyword={undefined} active={undefined} page={1} />
+    ),
+  },
+  settlements: {
+    path: "settlements",
+    component: () => (
+      <>
+        <SettlementSummary month="2026-11" />
+        <SettlementStayList month="2026-11" page={1} />
+      </>
+    ),
+  },
+} as const;
 
 const OPERATOR = {
   id: 3,
@@ -28,7 +56,11 @@ const OPERATOR = {
   version: 0,
 };
 
-function renderMasterAccessPage(isMaster: boolean) {
+function renderMasterAccessPage(
+  isMaster: boolean,
+  section: keyof typeof MASTER_ONLY_SECTIONS = "operators",
+) {
+  const { path, component } = MASTER_ONLY_SECTIONS[section];
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -37,28 +69,26 @@ function renderMasterAccessPage(isMaster: boolean) {
     getParentRoute: () => rootRoute,
     id: "_authenticated",
   });
-  const operatorsRoute = createRoute({
+  const sectionRoute = createRoute({
     getParentRoute: () => layoutRoute,
-    path: "operators",
+    path,
     beforeLoad: () => ({ isMaster }),
     component: MasterAccessPage,
   });
   const router = createRouter({
     routeTree: rootRoute.addChildren([
       layoutRoute.addChildren([
-        operatorsRoute.addChildren([
+        sectionRoute.addChildren([
           createRoute({
-            getParentRoute: () => operatorsRoute,
+            getParentRoute: () => sectionRoute,
             path: "/",
-            component: () => (
-              <OperatorList keyword={undefined} active={undefined} page={1} />
-            ),
+            component,
           }),
         ]),
         createRoute({ getParentRoute: () => layoutRoute, path: "rooms" }),
       ]),
     ]),
-    history: createMemoryHistory({ initialEntries: ["/operators"] }),
+    history: createMemoryHistory({ initialEntries: [`/${path}`] }),
     parseSearch,
     stringifySearch,
   });
@@ -75,18 +105,26 @@ afterEach(() => {
 });
 
 describe("MasterAccessPage", () => {
-  it("마스터가 아니면 요청 없이 권한이 없다는 문구와 객실 목록 버튼만 보여준다", async () => {
-    renderMasterAccessPage(false);
+  it.each([
+    ["operators", [fetchOperators]],
+    ["settlements", [fetchSettlement, fetchSettlementStays]],
+  ] as const)(
+    "/%s에서 마스터가 아니면 요청 없이 권한이 없다는 문구와 객실 목록 버튼만 보여준다",
+    async (section, requests) => {
+      renderMasterAccessPage(false, section);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      ACCESS_MESSAGES.forbidden,
-    );
-    expect(
-      screen.getByRole("link", { name: ACCESS_MESSAGES.backToRooms }),
-    ).toHaveAttribute("href", "/rooms");
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(fetchOperators).not.toHaveBeenCalled();
-  });
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        ACCESS_MESSAGES.forbidden,
+      );
+      expect(
+        screen.getByRole("link", { name: ACCESS_MESSAGES.backToRooms }),
+      ).toHaveAttribute("href", "/rooms");
+      expect(screen.queryByRole("table")).not.toBeInTheDocument();
+      for (const request of requests) {
+        expect(request).not.toHaveBeenCalled();
+      }
+    },
+  );
 
   it("마스터면 하위 화면을 그린다", async () => {
     fetchOperators.mockResolvedValue({

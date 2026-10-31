@@ -1,6 +1,7 @@
 export { useRoomListQuery } from "./api/room-list-query";
 export {
   cacheSavedRoom,
+  invalidateRooms,
   refreshRoomStatus,
   useRefetchRoom,
 } from "./api/room-query";
@@ -25,6 +26,7 @@ export {
   ROOM_LIST_FIRST_PAGE,
   toApiPage,
 } from "./lib/room-page";
+export { normalizeRoomTypeFilterId } from "./lib/room-type-filter";
 export {
   normalizeRoomStatus,
   ROOM_STATUS_TRANSITIONS,

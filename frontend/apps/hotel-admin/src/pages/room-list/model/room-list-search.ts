@@ -3,6 +3,7 @@ import {
   isRequestablePage,
   normalizeRoomKeyword,
   normalizeRoomStatus,
+  normalizeRoomTypeFilterId,
   ROOM_LIST_FIRST_PAGE,
 } from "@/entities/room";
 
@@ -33,6 +34,11 @@ export const roomListSearchSchema = z.object({
     .optional()
     .catch(undefined)
     .transform(normalizeRoomStatus),
+  roomTypeId: z
+    .union([z.string(), z.number()])
+    .optional()
+    .catch(undefined)
+    .transform(normalizeRoomTypeFilterId),
   page: z
     .union([z.string(), z.number()])
     .optional()

@@ -22,7 +22,8 @@ export function useRoomCreateForm() {
   const { create } = useCreateRoom();
   const navigate = useNavigate();
   const errorToast = useFormErrorToast();
-  const { roomTypeOptions, roomTypeHint } = useRoomTypeOptions();
+  const { roomTypeOptions, roomTypeHint, isRoomTypeEmpty } =
+    useRoomTypeOptions();
   const form = useForm({
     ...SUBMIT_ONLY_VALIDATION,
     resolver: zodResolver(roomCreateFormSchema),
@@ -78,6 +79,7 @@ export function useRoomCreateForm() {
     },
     roomTypeOptions,
     roomTypeHint,
+    isRoomTypeEmpty,
     isSubmitting,
     handleSubmit,
   };

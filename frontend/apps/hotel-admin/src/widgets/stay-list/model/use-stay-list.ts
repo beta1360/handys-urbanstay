@@ -2,18 +2,17 @@ import { useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   getLastPage,
+  hasStayListFilter,
   isBeyondLastPage,
   isRequestablePage,
   STAY_LIST_FIRST_PAGE,
-  toApiPage,
+  toStayListParams,
   useStayListQuery,
 } from "@/entities/stay";
+import type { StayListFilter } from "@/entities/stay";
 import type { Stay } from "@/shared/api";
 
-export type StayListCriteria = {
-  roomId: number | undefined;
-  guestId: number | undefined;
-  canceled: boolean | undefined;
+export type StayListCriteria = StayListFilter & {
   page: number;
 };
 
@@ -41,15 +40,16 @@ export function useStayList({
   roomId,
   guestId,
   canceled,
+  keyword,
+  checkInFrom,
+  checkInTo,
   page,
 }: StayListCriteria): StayListState {
   const navigate = useNavigate();
-  const { data, isError, isPlaceholderData, refetch } = useStayListQuery({
-    roomId,
-    guestId,
-    canceled,
-    page: toApiPage(page),
-  });
+  const filter = { roomId, guestId, canceled, keyword, checkInFrom, checkInTo };
+  const { data, isError, isPlaceholderData, refetch } = useStayListQuery(
+    toStayListParams(filter, page),
+  );
   const isOverflow = data !== undefined && isBeyondLastPage(data);
   const totalPages = data?.totalPages ?? 0;
   const lastPage = getLastPage(totalPages);
@@ -58,17 +58,32 @@ export function useStayList({
     if (isOverflow) {
       void navigate({
         to: "/stays",
-        search: { roomId, guestId, canceled, page: lastPage },
+        search: {
+          roomId,
+          guestId,
+          canceled,
+          keyword,
+          checkInFrom,
+          checkInTo,
+          page: lastPage,
+        },
         replace: true,
       });
     }
-  }, [isOverflow, roomId, guestId, canceled, lastPage, navigate]);
+  }, [
+    isOverflow,
+    roomId,
+    guestId,
+    canceled,
+    keyword,
+    checkInFrom,
+    checkInTo,
+    lastPage,
+    navigate,
+  ]);
 
   function moveTo(nextPage: number) {
-    void navigate({
-      to: "/stays",
-      search: { roomId, guestId, canceled, page: nextPage },
-    });
+    void navigate({ to: "/stays", search: { ...filter, page: nextPage } });
   }
 
   if (data === undefined || isOverflow) {
@@ -77,11 +92,7 @@ export function useStayList({
       : { status: "loading" };
   }
   if (data.items.length === 0) {
-    return {
-      status: "empty",
-      isFiltered:
-        roomId !== undefined || guestId !== undefined || canceled !== undefined,
-    };
+    return { status: "empty", isFiltered: hasStayListFilter(filter) };
   }
   return {
     status: "ready",

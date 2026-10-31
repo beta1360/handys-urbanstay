@@ -19,6 +19,10 @@ keyword?: string;
  */
 status?: GetRoomsStatus;
 /**
+ * 객실 유형 ID(선택). 그 유형의 객실만 조회합니다. 없거나 다른 호텔의 유형 id면 빈 목록입니다.
+ */
+roomTypeId?: number;
+/**
  * 페이지 번호. 0~99, 기본 0
  * @minimum 0
  * @maximum 99
