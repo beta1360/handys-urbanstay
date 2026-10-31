@@ -383,8 +383,13 @@ urbanstay/
     - 네이티브 INSERT는 JPA Auditing과 엔티티 정규화를 거치지 않으므로 서비스가 회원 엔티티의 값(이미 앞뒤 공백을 지운 값)과 `Instant.now(clock)`을 넘기고 version은 0이다.
     - 알려진 경합: 찾은 뒤 그 이용객의 전화번호가 hotel-admin 수정으로 바뀌어 커밋되면 다시 찾기가 비어 500이 된다. 드물어 다루지 않았다.
   - 응답은 `{ id, hotel: { id, name }, roomType: { id, name }, checkInDate, checkOutDate, guestCount, roomRate, nights, baseAmount, discountAmount, totalAmount, guest: { name } }`이다. 배정한 객실(호수)은 싣지 않는다. 객실은 `findByIdIn`이 호텔과 함께 읽어 트랜잭션 밖에서 응답을 만든다.
-- 내 이용(`GET ApiPaths.APP + "/me/stays"`, `StayService.getMemberStays`)은 로그인한 회원과 연결된 이용객(모든 호텔)의 이용을 취소 포함 체크인 날짜 내림차순, 같으면 id 내림차순으로 준다(`StayRepository.findByGuestMemberId`, `@EntityGraph`로 객실의 호텔과 유형). 항목은 `{ id, hotel: { id, name }, roomType: { id, name }, checkInDate, checkOutDate, guestCount, roomRate, nights, baseAmount, discountAmount, totalAmount, canceledAt }`(`StayMyAppResponse`)이다. 유형 이름은 조회 시점의 값이고 금액은 예약할 때 저장한 값이다.
-- 테스트는 조회 API를 로그인·CSRF 토큰 없이 요청하고 세션·쿠키가 생기지 않는지 확인한다. 예약·내 이용은 `with(user(MemberPrincipal.from(member)))`로 요청한다(`StayAppControllerTest`). 지운 두 API가 404 `NOT_FOUND`이고 문서에 없는 것도 확인한다. 호텔 목록은 다른 테스트의 호텔이 있을 수 있어 `size=100`으로 받아 자기 호텔만 골라 순서를 본다(`HotelAppControllerTest`).
+- 내 이용(`GET ApiPaths.APP + "/me/stays"`, `StayService.getMemberStays`)은 로그인한 회원과 연결된 이용객(모든 호텔)의 이용을 취소 포함해 페이지로 준다. 선택 파라미터 `period`(`StayPeriod`)로 화면의 두 묶음을 나눠 받는다. 오늘은 `Clock`(Asia/Seoul)의 날짜다.
+  - `UPCOMING`(지금·앞으로): 체크아웃 날짜가 오늘보다 뒤인 이용, 체크인 날짜 오름차순, 같으면 id 오름차순(`findByGuestMemberIdAndCheckOutDateAfter`).
+  - `PAST`(지난 이용): 체크아웃 날짜가 오늘이거나 지난 이용, 체크인 날짜 내림차순, 같으면 id 내림차순(`findByGuestMemberIdAndCheckOutDateLessThanEqual`). 체크아웃이 오늘인 이용은 끝난 이용이라 여기에 든다(취소 절의 '끝난 이용'과 같은 경계).
+  - 없거나 비었거나 공백만 있으면 모든 이용을 체크인 날짜 내림차순, 같으면 id 내림차순으로 준다(`findByGuestMemberId`, 기간을 나누기 전과 같다). 없는 이름(소문자 포함)은 400 `validation.type`(`period`)이다(응답과 예외 절).
+  - 화면은 `size=10`으로 `UPCOMING`을 마지막 페이지까지 받은 뒤 `PAST`를 `page=0`부터 이어서 받는다(무한 스크롤). 전체 어드민의 회원 이용 기록은 `period` 없이 같은 서비스를 쓴다.
+  - 세 쿼리 모두 `@EntityGraph`로 객실의 호텔과 유형을 함께 읽는다. 항목은 `{ id, hotel: { id, name }, roomType: { id, name }, checkInDate, checkOutDate, guestCount, roomRate, nights, baseAmount, discountAmount, totalAmount, canceledAt }`(`StayMyAppResponse`)이다. 유형 이름은 조회 시점의 값이고 금액은 예약할 때 저장한 값이다.
+- 테스트는 조회 API를 로그인·CSRF 토큰 없이 요청하고 세션·쿠키가 생기지 않는지 확인한다. 예약·내 이용은 `with(user(MemberPrincipal.from(member)))`로 요청한다(`StayAppControllerTest`). 내 이용의 `period`는 `FixedClockConfiguration`으로 경계(체크아웃이 오늘이면 `PAST`, 지금 이용 중이면 `UPCOMING`), 정렬, `size=10`의 두 번째 페이지, 취소 포함, 다른 회원 제외, 잘못된 값과 빈 값을 확인한다. 지운 두 API가 404 `NOT_FOUND`이고 문서에 없는 것도 확인한다. 호텔 목록은 다른 테스트의 호텔이 있을 수 있어 `size=100`으로 받아 자기 호텔만 골라 순서를 본다(`HotelAppControllerTest`).
 
 ## 상수
 
