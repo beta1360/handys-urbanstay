@@ -1,14 +1,20 @@
 package com.marco.assignment.handys.urbanstay.stay.controller.app
 
 import com.marco.assignment.handys.urbanstay.common.ApiPaths
+import com.marco.assignment.handys.urbanstay.common.request.PageParams
 import com.marco.assignment.handys.urbanstay.common.response.ApiResponse
+import com.marco.assignment.handys.urbanstay.common.response.PageResponse
 import com.marco.assignment.handys.urbanstay.common.response.SuccessMessage
+import com.marco.assignment.handys.urbanstay.guest.exception.GuestApiErrors
+import com.marco.assignment.handys.urbanstay.guest.exception.GuestErrorCode
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelApiErrors
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelErrorCode
+import com.marco.assignment.handys.urbanstay.member.service.MemberPrincipal
 import com.marco.assignment.handys.urbanstay.room.exception.RoomApiErrors
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import com.marco.assignment.handys.urbanstay.stay.dto.app.StayAppResponse
 import com.marco.assignment.handys.urbanstay.stay.dto.app.StayCreateAppRequest
+import com.marco.assignment.handys.urbanstay.stay.dto.app.StayMyAppResponse
 import com.marco.assignment.handys.urbanstay.stay.dto.app.StayRoomTypeAppResponse
 import com.marco.assignment.handys.urbanstay.stay.entity.Stay
 import com.marco.assignment.handys.urbanstay.stay.exception.StayApiErrors
@@ -18,8 +24,10 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import org.springframework.http.HttpStatus
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -57,21 +65,40 @@ class StayAppController(
 
 	@Operation(summary = "openapi.app.operation.createStay.summary", description = "openapi.app.operation.createStay.description")
 	@RoomApiErrors(RoomErrorCode.ROOM_TYPE_NOT_FOUND, RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
+	@GuestApiErrors(GuestErrorCode.GUEST_LINKED_TO_OTHER_MEMBER)
 	@StayApiErrors(StayErrorCode.STAY_PERIOD_OVERLAPPED)
 	@SuccessMessage("success.stay.reserved")
 	@PostMapping("/stays")
 	@ResponseStatus(HttpStatus.CREATED)
-	fun createStay(@Valid @RequestBody request: StayCreateAppRequest): ApiResponse<StayAppResponse> {
+	fun createStay(
+		@AuthenticationPrincipal principal: MemberPrincipal,
+		@Valid @RequestBody request: StayCreateAppRequest,
+	): ApiResponse<StayAppResponse> {
 		val stay = stayService.reserve(
+			memberId = principal.id,
 			hotelId = request.hotelId,
 			roomTypeId = request.roomTypeId,
 			checkInDate = request.checkInDate,
 			checkOutDate = request.checkOutDate,
 			guestCount = request.guestCount,
-			guestName = request.guest.name,
-			guestPhone = request.guest.phone,
-			guestEmail = request.guest.email,
 		)
 		return ApiResponse.success(StayAppResponse.from(stay))
 	}
+
+	@Operation(summary = "openapi.app.operation.getMyStays.summary", description = "openapi.app.operation.getMyStays.description")
+	@GetMapping("/me/stays")
+	fun getMyStays(
+		@AuthenticationPrincipal principal: MemberPrincipal,
+		@RequestParam(defaultValue = PageParams.DEFAULT_PAGE)
+		@Min(value = PageParams.MIN_PAGE, message = "{validation.min}")
+		@Max(value = PageParams.MAX_PAGE, message = "{validation.max}")
+		@Parameter(description = "openapi.app.operation.getMyStays.parameter.page")
+		page: Int,
+		@RequestParam(defaultValue = PageParams.DEFAULT_SIZE)
+		@Min(value = PageParams.MIN_SIZE, message = "{validation.min}")
+		@Max(value = PageParams.MAX_SIZE, message = "{validation.max}")
+		@Parameter(description = "openapi.app.operation.getMyStays.parameter.size")
+		size: Int,
+	): ApiResponse<PageResponse<StayMyAppResponse>> =
+		ApiResponse.success(PageResponse.from(stayService.getMemberStays(principal.id, page, size).map(StayMyAppResponse::from)))
 }

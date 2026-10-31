@@ -2,7 +2,6 @@ package com.marco.assignment.handys.urbanstay.stay.dto.app
 
 import com.marco.assignment.handys.urbanstay.stay.entity.Stay
 import io.swagger.v3.oas.annotations.media.Schema
-import jakarta.validation.Valid
 import jakarta.validation.constraints.Min
 import java.time.LocalDate
 
@@ -18,7 +17,4 @@ data class StayCreateAppRequest(
 	@Min(value = Stay.MIN_GUEST_COUNT, message = "{validation.min}")
 	@Schema(description = "openapi.schema.StayCreateAppRequest.guestCount", example = "2")
 	val guestCount: Int,
-	@Valid
-	@Schema(description = "openapi.schema.StayCreateAppRequest.guest")
-	val guest: StayGuestCreateAppRequest,
 )

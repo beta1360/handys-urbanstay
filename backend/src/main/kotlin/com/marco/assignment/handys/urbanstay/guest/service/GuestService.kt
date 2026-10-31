@@ -6,6 +6,7 @@ import com.marco.assignment.handys.urbanstay.guest.entity.Guest
 import com.marco.assignment.handys.urbanstay.guest.exception.GuestErrorCode
 import com.marco.assignment.handys.urbanstay.guest.repository.GuestRepository
 import com.marco.assignment.handys.urbanstay.guest.repository.GuestSpecifications
+import com.marco.assignment.handys.urbanstay.member.entity.Member
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.OptimisticLockingFailureException
 import org.springframework.data.domain.Page
@@ -23,10 +24,16 @@ class GuestService(
 ) {
 
 	@Transactional
-	fun getOrCreate(hotelId: Long, name: String, phone: String, email: String): Guest {
-		findSamePhone(hotelId, phone)?.let { return it }
-		guestRepository.insertIfPhoneAbsent(hotelId, Guest.normalize(name), Guest.normalize(phone), Guest.normalize(email), Instant.now(clock))
-		return checkNotNull(findSamePhone(hotelId, phone))
+	fun getOrCreate(hotelId: Long, member: Member): Guest {
+		val memberId = checkNotNull(member.id)
+		val guest = findSamePhone(hotelId, member.phone) ?: run {
+			guestRepository.insertIfPhoneAbsent(hotelId, memberId, member.name, member.phone, member.email, Instant.now(clock))
+			checkNotNull(findSamePhone(hotelId, member.phone))
+		}
+		if (guest.member?.id != memberId && guestRepository.linkMember(checkNotNull(guest.id), memberId, Instant.now(clock)) == 0) {
+			throw BusinessException(GuestErrorCode.GUEST_LINKED_TO_OTHER_MEMBER)
+		}
+		return guest
 	}
 
 	@Transactional(readOnly = true)

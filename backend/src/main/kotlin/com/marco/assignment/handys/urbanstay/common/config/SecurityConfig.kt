@@ -114,6 +114,8 @@ class SecurityConfig(
 		val MEMBER_APIS = listOf(
 			Endpoint(HttpMethod.GET, ApiPaths.APP + ApiPaths.AUTH + "/me"),
 			Endpoint(HttpMethod.POST, ApiPaths.APP + ApiPaths.AUTH + "/logout"),
+			Endpoint(HttpMethod.POST, ApiPaths.APP + "/stays"),
+			Endpoint(HttpMethod.GET, ApiPaths.APP + "/me/stays"),
 		)
 		private const val MEMBER_SECURITY_CONTEXT_KEY = "URBANSTAY_MEMBER_SECURITY_CONTEXT"
 		private const val APP_PATTERN = "${ApiPaths.APP}/**"

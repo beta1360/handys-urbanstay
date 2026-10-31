@@ -6,6 +6,7 @@ import com.marco.assignment.handys.urbanstay.common.exception.CommonErrorCode
 import com.marco.assignment.handys.urbanstay.common.exception.InvalidField
 import com.marco.assignment.handys.urbanstay.common.exception.violates
 import com.marco.assignment.handys.urbanstay.guest.service.GuestService
+import com.marco.assignment.handys.urbanstay.member.service.MemberService
 import com.marco.assignment.handys.urbanstay.room.entity.Room
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import com.marco.assignment.handys.urbanstay.room.service.RoomService
@@ -32,28 +33,31 @@ class StayService(
 	private val roomTypeService: RoomTypeService,
 	private val guestService: GuestService,
 	private val hotelAdminService: HotelAdminService,
+	private val memberService: MemberService,
 	private val clock: Clock,
 ) {
 
 	@Transactional
 	fun reserve(
+		memberId: Long,
 		hotelId: Long,
 		roomTypeId: Long,
 		checkInDate: LocalDate,
 		checkOutDate: LocalDate,
 		guestCount: Int,
-		guestName: String,
-		guestPhone: String,
-		guestEmail: String,
 	): Stay {
 		checkPeriod(checkInDate, checkOutDate)
 		val roomType = roomTypeService.getRoomType(hotelId, roomTypeId)
 		val rooms = roomService.lockRoomsByType(roomTypeId)
 		val room = availableRooms(rooms, checkInDate, checkOutDate, guestCount).firstOrNull()
 			?: throw BusinessException(RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
-		val guest = guestService.getOrCreate(hotelId, guestName, guestPhone, guestEmail)
+		val guest = guestService.getOrCreate(hotelId, memberService.getMember(memberId))
 		return translateConflicts { stayRepository.saveAndFlush(Stay(room, guest, checkInDate, checkOutDate, guestCount, roomType.roomRate)) }
 	}
+
+	@Transactional(readOnly = true)
+	fun getMemberStays(memberId: Long, page: Int, size: Int): Page<Stay> =
+		stayRepository.findByGuestMemberId(memberId, PageRequest.of(page, size, LATEST_CHECK_IN_FIRST))
 
 	@Transactional(readOnly = true)
 	fun getRoomTypes(hotelId: Long, checkInDate: LocalDate, checkOutDate: LocalDate, guestCount: Int): List<RoomTypeAvailability> {
