@@ -142,12 +142,11 @@ class RoomHotelAdminControllerTest {
 		hotelRepository.deleteAllByIdInBatch(createdHotelIds)
 	}
 
-	@ParameterizedTest
-	@EnumSource(HotelAdminRole::class)
-	fun `마스터와 운영자 모두 자기 호텔에 고른 유형으로 객실을 등록하고 문자열은 앞뒤 공백을 지우고 공백만 있는 소개는 null로 저장해 201로 응답한다`(role: HotelAdminRole) {
+	@Test
+	fun `마스터가 자기 호텔에 고른 유형으로 객실을 생성하면 문자열은 앞뒤 공백을 지우고 공백만 있는 소개는 null로 저장해 201로 응답한다`() {
 		val body = createBody("name" to " 101\t", "roomTypeId" to deluxe.id, "floor" to -1, "description" to " 　 ")
 
-		val data = create(body, principals.getValue(role)).andExpectSuccess(HttpStatus.CREATED)
+		val data = create(body).andExpectSuccess(HttpStatus.CREATED)
 
 		val id = data["id"].longValue()
 		assertThat(data).isEqualTo(roomJson(id, "101", deluxe, -1, null, 0))
@@ -157,13 +156,25 @@ class RoomHotelAdminControllerTest {
 			.containsExactly("101", deluxe.id, null, RoomStatus.VACANT, 0L)
 	}
 
-	@ParameterizedTest
-	@EnumSource(HotelAdminRole::class)
-	fun `객실을 등록하면 상태는 VACANT이고 등록한 계정의 id와 이름으로 이전 상태 없는 VACANT 이력을 한 줄 남긴다`(role: HotelAdminRole) {
-		val data = create(createBody(), principals.getValue(role)).andExpectSuccess(HttpStatus.CREATED)
+	@Test
+	fun `객실을 생성하면 상태는 VACANT이고 생성한 계정의 id와 이름으로 이전 상태 없는 VACANT 이력을 한 줄 남긴다`() {
+		val data = create(createBody()).andExpectSuccess(HttpStatus.CREATED)
 
 		assertThat(data["status"].stringValue()).isEqualTo(RoomStatus.VACANT.name)
-		assertThat(histories(data["id"].longValue())).containsExactly(history(null, RoomStatus.VACANT, role))
+		assertThat(histories(data["id"].longValue())).containsExactly(history(null, RoomStatus.VACANT, HotelAdminRole.MASTER))
+	}
+
+	@Test
+	fun `운영자는 객실을 생성하거나 수정할 수 없어 403 FORBIDDEN으로 응답하고 바꾸지 않는다`() {
+		val room = saveRoom(hotel, NAME)
+		val operator = principals.getValue(HotelAdminRole.OPERATOR)
+
+		create(createBody("name" to OTHER_NAME), operator).andExpectError(CommonErrorCode.FORBIDDEN)
+		update(room.id!!, updateBody(0, "roomTypeId" to deluxe.id), operator).andExpectError(CommonErrorCode.FORBIDDEN)
+
+		assertThat(roomNames(hotel)).containsExactly(NAME)
+		assertUnchanged(room)
+		assertThat(historyCount()).isZero()
 	}
 
 	@ParameterizedTest
@@ -313,17 +324,14 @@ class RoomHotelAdminControllerTest {
 		val otherRoom = saveRoom(otherHotel, NAME)
 
 		listOf(MISSING_ID, checkNotNull(otherRoom.id)).forEach { id ->
-			HotelAdminRole.entries.forEach { role ->
-				getRoom(id, principals.getValue(role)).andExpectError(RoomErrorCode.ROOM_NOT_FOUND)
-				update(id, updateBody(0, "roomTypeId" to deluxe.id), principals.getValue(role)).andExpectError(RoomErrorCode.ROOM_NOT_FOUND)
-			}
+			HotelAdminRole.entries.forEach { role -> getRoom(id, principals.getValue(role)).andExpectError(RoomErrorCode.ROOM_NOT_FOUND) }
+			update(id, updateBody(0, "roomTypeId" to deluxe.id)).andExpectError(RoomErrorCode.ROOM_NOT_FOUND)
 		}
 		assertUnchanged(otherRoom)
 	}
 
-	@ParameterizedTest
-	@EnumSource(HotelAdminRole::class)
-	fun `마스터와 운영자 모두 조회한 version으로 수정하면 모든 항목을 앞뒤 공백을 지운 값으로 바꾸고 version을 올려 200으로 응답한다`(role: HotelAdminRole) {
+	@Test
+	fun `마스터가 조회한 version으로 수정하면 모든 항목을 앞뒤 공백을 지운 값으로 바꾸고 version을 올려 200으로 응답한다`() {
 		val room = saveRoom(hotel, NAME, description = DESCRIPTION)
 		val body = updateBody(
 			0,
@@ -333,7 +341,7 @@ class RoomHotelAdminControllerTest {
 			"description" to " 새 소개 ",
 		)
 
-		val data = update(room.id!!, body, principals.getValue(role)).andExpectSuccess(HttpStatus.OK)
+		val data = update(room.id!!, body).andExpectSuccess(HttpStatus.OK)
 
 		assertThat(data).isEqualTo(roomJson(room.id!!, "스위트 A", deluxe, -10, "새 소개", 1))
 		assertThat(roomJson(reload(room))).isEqualTo(data)

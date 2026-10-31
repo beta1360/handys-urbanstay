@@ -83,6 +83,8 @@ class SecurityConfig(
 		private val HOTEL_MASTER_APIS = listOf(
 			AdminApi(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOM_TYPES),
 			AdminApi(HttpMethod.PUT, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOM_TYPES + "/*"),
+			AdminApi(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOMS),
+			AdminApi(HttpMethod.PUT, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOMS + "/*"),
 		)
 		private const val APP_PATTERN = "${ApiPaths.APP}/**"
 		private const val APP_ADMIN_PATTERN = "${ApiPaths.APP_ADMIN}/**"
