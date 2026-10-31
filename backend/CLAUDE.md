@@ -105,6 +105,7 @@ urbanstay/
     - 경로 규칙(`HOTEL_MASTER_PATTERN`)으로 막는다. 지금은 운영자 관리(`ApiPaths.HOTEL_ADMIN + ApiPaths.OPERATORS` 아래 전부)다. `HOTEL_ADMIN_PATTERN` 규칙보다 먼저 둔다(먼저 맞는 규칙을 쓴다). `/operators/**`는 `/operators`도 포함한다.
     - 조회는 둘 다 쓰고 변경만 마스터가 쓰는 API는 메서드와 경로를 함께 적는 `SecurityConfig.HOTEL_MASTER_APIS`(`Endpoint(HTTP 메서드, 경로)`)로 막는다. 지금은 객실 유형 생성·수정(`POST /room-types`, `PUT /room-types/*`)과 객실 생성·수정(`POST /rooms`, `PUT /rooms/*`)이다. `*`는 경로 한 칸이라 객실 상태 변경(`PUT /rooms/{roomId}/status`)은 마스터·운영자 모두 쓴다.
     - 마스터만 쓰는 조회도 이 목록에 메서드와 경로로 적는다. 지금은 월별 정산(`GET /settlements`, `GET /settlements/stays`, 월별 정산 절)이다.
+    - 조회와 변경을 모두 마스터만 쓰는 한 경로도 메서드마다 이 목록에 적는다. 지금은 자기 호텔 정보(`GET /hotel`, `PUT /hotel`, 호텔 절)다.
     - 운영자 계정과 전체 어드민 계정은 403 `FORBIDDEN`, 로그인하지 않으면 401 `UNAUTHORIZED`다. 어드민 그룹 문서에 자동으로 붙는 401·403과 같으므로 문서에 따로 적을 에러는 없고, operation 설명에 마스터 전용임을 적는다.
   - 로그인 없이 여는 어드민 API는 `SecurityConfig.PUBLIC_ADMIN_APIS`(HTTP 메서드 + 경로)에만 적는다. 접근 규칙(permitAll)과 API 문서(401·403 자동 에러 제외)가 이 목록 하나를 함께 쓴다. 지금은 전체 어드민 로그인과 호텔 운영자 로그인이다. 열린 API에도 CSRF는 걸린다.
   - Swagger UI와 API 문서(`/swagger-ui.html`, `/swagger-ui/**`, `/v3/api-docs/**`): 로그인 없이 연다.
@@ -148,6 +149,15 @@ urbanstay/
   - 로그인: 세션이 이미 있으면 세션 ID를 바꾸고(`ChangeSessionIdAuthenticationStrategy`), CSRF 토큰을 새로 만들어 응답에 새 `XSRF-TOKEN` 쿠키를 싣고(`CsrfAuthenticationStrategy`), SecurityContext를 세션에 저장한다.
   - 로그아웃: CSRF 쿠키를 지우고(`CsrfLogoutHandler`), 세션 쿠키를 만료시키고(`CookieClearingLogoutHandler`, 이름은 `server.servlet.session.cookie.name`), 세션을 무효화하고 SecurityContext를 비운다(`SecurityContextLogoutHandler`).
   - CSRF 토큰 저장소는 쿠키다. 서버는 토큰을 기억하지 않으므로, 로그인 후 이전 토큰이 거절되는 것은 쿠키가 새 값으로 바뀌어 이전 헤더 값과 맞지 않기 때문이다.
+
+## 호텔
+
+- 호텔은 `hotel` 도메인의 `hotel` 테이블(`Hotel`, `V2__create_hotel.sql`)에 저장한다. 등록·수정은 `HotelService`(`create`, `update`)가 하고, 이름·주소 중복(`hotel_name_address_key`, 409 `HOTEL_DUPLICATED`)과 동시 수정(`version`, 409 `HOTEL_MODIFIED`)은 동시성과 충돌 절을 따른다. 전체 어드민의 호텔 관리는 `HotelAppAdminController`, 게스트 앱 호텔 목록은 게스트 앱 API 절에 있다.
+- 마스터의 자기 호텔 정보(`ApiPaths.HOTEL_ADMIN + ApiPaths.HOTEL`의 `GET`·`PUT`, `HotelHotelAdminController`, operationId `getHotel`·`updateHotel`)는 조회도 마스터만 쓴다(운영자·전체 어드민 403, `HOTEL_MASTER_APIS`, 보안 절). 대상 호텔은 `HotelAdminPrincipal.hotelId`이고 경로·본문으로 호텔 id를 받지 않는다.
+  - 조회는 `HotelService.getHotel`, 수정은 전체 어드민의 호텔 수정과 같은 `HotelService.update`를 그대로 쓴다. 판단 순서는 version 확인(409 `HOTEL_MODIFIED`) → 이름·주소 중복 확인(409 `HOTEL_DUPLICATED`) → 엔티티 변경 → `saveAndFlush`다. 성공 문구는 `success.hotel.updated`('호텔 정보를 수정했습니다.')를 함께 쓴다.
+  - 요청(`HotelUpdateHotelAdminRequest`, `{ name, address, phone, description, version }`)과 응답(`HotelHotelAdminResponse`, `{ id, name, address, phone, description, version }`)은 app-admin DTO와 모양이 같지만 앱별로 나눈다(패키지 구조 절).
+  - 호텔 삭제가 없어 세션의 호텔은 늘 있으므로 404 `HOTEL_NOT_FOUND`는 문서에 적지 않는다.
+- 테스트(`HotelHotelAdminControllerTest`): 마스터 조회·수정(앞뒤 공백 정리, version 증가), 운영자·전체 어드민 403과 바뀌지 않음, 필드별 400, 409 `HOTEL_DUPLICATED`, 409 `HOTEL_MODIFIED`와 둘이 겹칠 때 version 충돌이 먼저.
 
 ## 계정
 
@@ -365,7 +375,9 @@ urbanstay/
 - 게스트 앱 API(`ApiPaths.APP`)는 CSRF가 없고, 호텔·객실 유형 조회는 로그인과 세션 없이 쓴다. 예약·내 이용·내 정보·로그아웃은 회원 로그인이 필요하다(`SecurityConfig.MEMBER_APIS`, 보안 절, 회원 절). 컨트롤러는 도메인마다 `controller/app`(`HotelAppController`, `StayAppController`, `MemberAppController`), DTO는 `dto/app`에 둔다. 문서는 `app` 그룹이고 `MEMBER_APIS`의 operation에만 401 자동 에러가 붙는다(403은 없다).
 - 예약 흐름은 호텔 → 날짜·인원 → 객실 유형 → 예약(로그인한 회원)이고 이용객 정보는 입력하지 않는다. 게스트는 객실(호수)을 고르지 않는다. 객실 유형은 마스터가 만든 그 호텔의 유형(객실 유형 절)이다. 게스트 앱의 객실 목록·예약된 기간 API는 없앴다.
 - 예약할 수 있는 객실은 그 유형이고, 유형의 최대 인원이 인원 이상이고, 그 기간에 취소하지 않은 이용과 겹치지 않는 객실이다(객실 상태 무관). 유형 목록과 예약이 같은 계산(`StayService.availableRooms`)을 쓴다. 겹치는 객실은 `StayRepository.findOverlappedRoomIds`(후보 객실 id 안에서 취소하지 않았고 `check_in_date < 체크아웃 and check_out_date > 체크인`인 이용의 객실 id)로 한 번에 찾는다.
-- 호텔 목록(`GET ApiPaths.APP + "/hotels"`, `HotelService.getHotelsByName`)은 모든 호텔의 `{ id, name, address }`를 이름 오름차순, 같으면 id 오름차순으로 준다. 검색은 없다.
+- 호텔 목록(`GET ApiPaths.APP + "/hotels"`, `HotelService.getHotelsWithRoomCount`)은 모든 호텔의 `{ id, name, address, roomCount }`를 준다. `roomCount`는 그 호텔의 객실 수(객실 상태 무관)다. 객실이 있는 호텔을 먼저, 객실이 없는 호텔(`roomCount` 0)을 뒤에 두고, 각 묶음 안에서는 이름 오름차순, 같으면 id 오름차순이다. 검색은 없다. 화면은 `roomCount` 0인 호텔을 비활성으로 보여주고 고르지 못하게 한다.
+  - 정렬과 페이지는 DB에서 한다. `HotelRepository.findAllWithRoomCountOrderByRoomPresenceAndName`이 `Hotel left join Room ... group by h`로 객실 수를 세고 `order by case when count(r) > 0 then 0 else 1 end, h.name, h.id`로 정렬해 `HotelRoomCount(hotel, roomCount)`로 준다. 정렬이 쿼리에 있어 `PageRequest`에 Sort를 넣지 않고, 전체 수는 따로 둔 `countQuery`(`select count(h) from Hotel h`)로 센다. 메모리에서 정렬하면 페이지 경계가 어긋난다.
+  - 호텔 도메인이 `RoomService`를 쓰면 `RoomService → HotelService`와 순환하므로, 쿼리에서 `Room` 엔티티를 조인한다(객실 도메인의 Repository는 쓰지 않는다).
   - `hotel.name`은 `natural_sort`가 아니라 DB 기본 collation으로 정렬한다. 이름 속 숫자는 글자 순서로 비교해(`1001`이 `101`보다 앞) 객실 목록의 이름순과 다를 수 있고, operation 설명에 적는다. collation을 바꾸는 마이그레이션은 유일 제약·전체 어드민 검색까지 바뀌어 게스트 앱 정렬 하나로는 과하다고 보고 하지 않았다.
 - 객실 유형 목록(`GET ApiPaths.APP + "/hotels/{hotelId}/room-types?checkInDate=&checkOutDate=&guestCount="`, `StayService.getRoomTypes`)은 그 호텔 유형마다 `{ id, name, capacity, roomRate, checkInTime, checkOutTime, roomCount, availableCount }`를 유형 이름순(같으면 id, 목록 조회 절)으로 준다. 객실이 없는 유형도 `roomCount` 0, `availableCount` 0으로 나온다. `availableCount`는 그 기간·인원으로 예약할 수 있는 객실 수이고 0이면 화면이 '예약불가'로 보여준다. 페이지 없이 전부 준다(목록 조회 절).
   - 판단 순서는 파라미터(400: 세 파라미터 필수, 날짜 형식(응답과 예외 절), 인원 `@Min(1)`) → 기간(400, 이용 절의 날짜 규칙, `checkInDate`·`checkOutDate`를 모아 한 번에) → 호텔(`RoomTypeService.getRoomTypes`가 `HotelService.getHotel`로 확인, 404 `HOTEL_NOT_FOUND`)이다. 유형이 없는 호텔은 빈 목록이다.
@@ -389,7 +401,7 @@ urbanstay/
   - 없거나 비었거나 공백만 있으면 모든 이용을 체크인 날짜 내림차순, 같으면 id 내림차순으로 준다(`findByGuestMemberId`, 기간을 나누기 전과 같다). 없는 이름(소문자 포함)은 400 `validation.type`(`period`)이다(응답과 예외 절).
   - 화면은 `size=10`으로 `UPCOMING`을 마지막 페이지까지 받은 뒤 `PAST`를 `page=0`부터 이어서 받는다(무한 스크롤). 전체 어드민의 회원 이용 기록은 `period` 없이 같은 서비스를 쓴다.
   - 세 쿼리 모두 `@EntityGraph`로 객실의 호텔과 유형을 함께 읽는다. 항목은 `{ id, hotel: { id, name }, roomType: { id, name }, checkInDate, checkOutDate, guestCount, roomRate, nights, baseAmount, discountAmount, totalAmount, canceledAt }`(`StayMyAppResponse`)이다. 유형 이름은 조회 시점의 값이고 금액은 예약할 때 저장한 값이다.
-- 테스트는 조회 API를 로그인·CSRF 토큰 없이 요청하고 세션·쿠키가 생기지 않는지 확인한다. 예약·내 이용은 `with(user(MemberPrincipal.from(member)))`로 요청한다(`StayAppControllerTest`). 내 이용의 `period`는 `FixedClockConfiguration`으로 경계(체크아웃이 오늘이면 `PAST`, 지금 이용 중이면 `UPCOMING`), 정렬, `size=10`의 두 번째 페이지, 취소 포함, 다른 회원 제외, 잘못된 값과 빈 값을 확인한다. 지운 두 API가 404 `NOT_FOUND`이고 문서에 없는 것도 확인한다. 호텔 목록은 다른 테스트의 호텔이 있을 수 있어 `size=100`으로 받아 자기 호텔만 골라 순서를 본다(`HotelAppControllerTest`).
+- 테스트는 조회 API를 로그인·CSRF 토큰 없이 요청하고 세션·쿠키가 생기지 않는지 확인한다. 예약·내 이용은 `with(user(MemberPrincipal.from(member)))`로 요청한다(`StayAppControllerTest`). 내 이용의 `period`는 `FixedClockConfiguration`으로 경계(체크아웃이 오늘이면 `PAST`, 지금 이용 중이면 `UPCOMING`), 정렬, `size=10`의 두 번째 페이지, 취소 포함, 다른 회원 제외, 잘못된 값과 빈 값을 확인한다. 지운 두 API가 404 `NOT_FOUND`이고 문서에 없는 것도 확인한다. 호텔 목록은 다른 테스트의 호텔이 있을 수 있어 `size=100`으로 받아 자기 호텔만 골라 순서를 본다(`HotelAppControllerTest`). 객실 유무 정렬은 모든 페이지를 작은 `size`로 이어 받아 중복·빠짐이 없고 객실이 있는 호텔이 모두 앞에 오는지, 자기 호텔의 순서와 `roomCount`를 본다.
 
 ## 상수
 
