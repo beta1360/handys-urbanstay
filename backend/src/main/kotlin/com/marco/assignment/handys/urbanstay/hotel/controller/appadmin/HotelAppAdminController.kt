@@ -11,7 +11,6 @@ import com.marco.assignment.handys.urbanstay.common.response.SuccessMessage
 import com.marco.assignment.handys.urbanstay.hotel.dto.appadmin.HotelAppAdminResponse
 import com.marco.assignment.handys.urbanstay.hotel.dto.appadmin.HotelCreateAppAdminRequest
 import com.marco.assignment.handys.urbanstay.hotel.dto.appadmin.HotelUpdateAppAdminRequest
-import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelApiErrors
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelErrorCode
 import com.marco.assignment.handys.urbanstay.hotel.service.HotelService
@@ -70,7 +69,7 @@ class HotelAppAdminController(
 	@GetMapping
 	fun getHotels(
 		@RequestParam(required = false)
-		@Size(max = Hotel.NAME_MAX_LENGTH, message = "{validation.max-length}")
+		@Size(max = KEYWORD_MAX_LENGTH, message = "{validation.max-length}")
 		@Parameter(description = "openapi.app-admin.operation.getHotels.parameter.keyword")
 		keyword: String?,
 		@RequestParam(defaultValue = PageParams.DEFAULT_PAGE)
@@ -102,5 +101,9 @@ class HotelAppAdminController(
 	): ApiResponse<HotelAppAdminResponse> {
 		val hotel = hotelService.update(hotelId, request.version, request.name, request.address, request.phone, request.description)
 		return ApiResponse.success(HotelAppAdminResponse.from(hotel))
+	}
+
+	companion object {
+		const val KEYWORD_MAX_LENGTH = 100
 	}
 }

@@ -75,8 +75,23 @@ class StayService(
 	}
 
 	@Transactional(readOnly = true)
-	fun getStays(hotelId: Long, roomId: Long?, guestId: Long?, canceled: Boolean?, page: Int, size: Int): Page<Stay> =
-		stayRepository.findAll(StaySpecifications.search(hotelId, roomId, guestId, canceled), PageRequest.of(page, size, LATEST_CHECK_IN_FIRST))
+	fun getStays(
+		hotelId: Long,
+		roomId: Long?,
+		guestId: Long?,
+		canceled: Boolean?,
+		keyword: String?,
+		checkInFrom: LocalDate?,
+		checkInTo: LocalDate?,
+		page: Int,
+		size: Int,
+	): Page<Stay> {
+		if (checkInFrom != null && checkInTo != null && checkInFrom > checkInTo) {
+			throw BusinessException(CommonErrorCode.INVALID_INPUT, listOf(InvalidField(CHECK_IN_TO, FROM_OR_LATER)))
+		}
+		val spec = StaySpecifications.search(hotelId, roomId, guestId, canceled, keyword?.trim()?.ifEmpty { null }, checkInFrom, checkInTo)
+		return stayRepository.findAll(spec, PageRequest.of(page, size, LATEST_CHECK_IN_FIRST))
+	}
 
 	@Transactional(readOnly = true)
 	fun getStay(hotelId: Long, stayId: Long): Stay = findStay(hotelId, stayId)
@@ -146,10 +161,18 @@ class StayService(
 			.associateBy { checkNotNull(it.room.id) }
 	}
 
+	@Transactional(readOnly = true)
+	fun getCurrentStayOfGuest(guestId: Long): Stay? {
+		val today = LocalDate.now(clock)
+		return stayRepository.findFirstByGuestIdAndCheckInDateLessThanEqualAndCheckOutDateAfterAndCanceledAtIsNullOrderByCheckInDateAscIdAsc(guestId, today, today)
+	}
+
 	companion object {
 		private val LATEST_CHECK_IN_FIRST = Sort.by(Sort.Order.desc(Stay::checkInDate.name), Sort.Order.desc(Stay::id.name))
 		private const val TODAY_OR_LATER = "validation.today-or-later"
 		private const val AFTER_CHECK_IN = "validation.after-check-in"
 		private const val MAX_NIGHTS = "validation.max-nights"
+		private const val FROM_OR_LATER = "validation.from-or-later"
+		private const val CHECK_IN_TO = "checkInTo"
 	}
 }

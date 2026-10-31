@@ -55,6 +55,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.random.Random
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -605,6 +606,29 @@ class HotelAppAdminControllerTest {
 	}
 
 	@Test
+	fun `검색어는 주소에서도 대소문자 구분 없이, 대표 전화번호에서는 양쪽 하이픈을 빼고 찾아 하나라도 맞는 호텔을 조회한다`() {
+		val digits = "%08d".format(Random.nextInt(100_000_000))
+		val byName = saveHotel("$suffix-Riverside", "부산 해운대구 $suffix", OTHER_PHONE)
+		val byAddress = saveHotel("마포 호텔 $suffix", "서울 마포구 $suffix-RIVERSIDE로 1", OTHER_PHONE)
+		val byPhone = saveHotel("전화 호텔 $suffix", "대구 $suffix", "070-${digits.take(4)}-${digits.drop(4)}")
+
+		assertThat(itemIds(searchHotels(" ${suffix.uppercase()}-riverside "))).containsExactly(byAddress, byName)
+		assertThat(itemIds(searchHotels("마포구 $suffix"))).containsExactly(byAddress)
+		assertThat(itemIds(searchHotels("070$digits"))).containsExactly(byPhone)
+		assertThat(itemIds(searchHotels("0-70${digits.take(2)}-${digits.drop(2)}"))).containsExactly(byPhone)
+	}
+
+	@Test
+	fun `하이픈만 있는 검색어는 전화번호로 찾지 않고 이름과 주소에서만 찾는다`() {
+		val hyphenName = saveHotel("$suffix-하이픈", "대전 $suffix", OTHER_PHONE)
+		val plain = saveHotel("하이픈 없음 $suffix", "광주 $suffix", OTHER_PHONE)
+
+		val found = itemIds(searchHotels("-", "size" to "100"))
+
+		assertThat(found).contains(hyphenName).doesNotContain(plain)
+	}
+
+	@Test
 	fun `검색어에 맞는 호텔이 없으면 빈 목록으로 응답한다`() {
 		saveHotel()
 
@@ -639,12 +663,13 @@ class HotelAppAdminControllerTest {
 
 	@Test
 	fun `검색어는 앞뒤 공백을 지운 길이로 세어 100자를 넘으면 최대 길이 메시지로 400 응답한다`() {
-		searchHotels(" ${"가".repeat(Hotel.NAME_MAX_LENGTH)} ")
+		val max = HotelAppAdminController.KEYWORD_MAX_LENGTH
+		searchHotels(" ${"가".repeat(max)} ")
 
 		mockMvc.get(HOTELS) {
 			loggedIn()
-			param("keyword", "가".repeat(Hotel.NAME_MAX_LENGTH + 1))
-		}.andExpectError(CommonErrorCode.INVALID_INPUT, "keyword" to maxLength(Hotel.NAME_MAX_LENGTH))
+			param("keyword", "가".repeat(max + 1))
+		}.andExpectError(CommonErrorCode.INVALID_INPUT, "keyword" to maxLength(max))
 	}
 
 	@Test
@@ -837,6 +862,8 @@ class HotelAppAdminControllerTest {
 	}
 
 	private fun saveHotel(name: String = this.name): Hotel = hotelRepository.save(Hotel(name, address, PHONE, DESCRIPTION))
+
+	private fun saveHotel(name: String, address: String, phone: String): Long = checkNotNull(hotelRepository.save(Hotel(name, address, phone, null)).id)
 
 	private fun saveHotels(count: Int): List<Long> = (1..count).map { checkNotNull(saveHotel("목록 $suffix $it").id) }
 

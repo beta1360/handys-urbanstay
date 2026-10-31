@@ -55,7 +55,7 @@ urbanstay/
     - 요청 파라미터의 enum(예: 객실 목록의 `status`)은 Spring 변환기가 앞뒤 공백을 지워 받고, 비었거나 공백만 있으면 null(선택 파라미터면 거르지 않음)이며, 없는 이름은 `validation.type`이고 필드는 파라미터 이름이다.
     - 문서 스키마에는 값 목록(`enum`)이 나온다. nullable enum 응답 필드는 `type: [string, null]`이고 `enum`에는 null이 없다(예: 객실 상태 이력의 `fromStatus`).
   - `LocalDate`, `LocalDateTime`, `OffsetDateTime`은 ISO 8601 문자열(예: `2026-10-29`, `2026-10-29T10:00:00`, `2026-10-29T10:00:00+09:00`)만 받는다. 숫자(타임스탬프), 배열, 숫자 문자열, 다른 형식은 `validation.type`이다(`JacksonConfig`의 `isoDateTimeModule`, `@JsonFormat` 패턴으로 바꿀 수 없다). `OffsetDateTime`은 UTC로 바꿔 읽는다. 다른 날짜·시간 타입(예: `Instant`)을 요청에 쓰려면 먼저 `isoDateTimeModule`에 등록한다.
-    - 요청 파라미터(쿼리·경로)의 `LocalDate`도 `YYYY-MM-DD`만 받는다. 모든 앱에 걸리는 전역 설정 `spring.mvc.format.date=iso`(`ISO_LOCAL_DATE`)가 지역 형식(`11/2/26`), 오프셋이 붙은 값(`2026-11-02+09:00`), `20261102`를 `validation.type`으로 막는다(`StayAppControllerTest`). 지금 날짜 파라미터는 게스트 앱 객실 유형 목록의 `checkInDate`·`checkOutDate`뿐이다.
+    - 요청 파라미터(쿼리·경로)의 `LocalDate`도 `YYYY-MM-DD`만 받는다. 모든 앱에 걸리는 전역 설정 `spring.mvc.format.date=iso`(`ISO_LOCAL_DATE`)가 지역 형식(`11/2/26`), 오프셋이 붙은 값(`2026-11-02+09:00`), `20261102`를 `validation.type`으로 막는다(`StayAppControllerTest`). 지금 날짜 파라미터는 게스트 앱 객실 유형 목록의 `checkInDate`·`checkOutDate`와 hotel-admin 이용 목록의 `checkInFrom`·`checkInTo`다.
   - `LocalTime`은 시와 분이 두 자리씩인 `HH:mm` 문자열(`00:00`~`23:59`, 예: `15:00`, `09:30`)만 받는다. 초가 붙은 값(`15:00:00`), 한 자리 시(`9:30`), `24:00`, 앞뒤 공백이 붙은 값, 숫자, 배열은 `validation.type`이다(`isoDateTimeModule`에 등록한 `ResolverStyle.STRICT`의 `HH:mm` 포매터). 응답도 같은 포매터의 `LocalTimeSerializer`(`isoDateTimeModule`에 등록)로 `HH:mm` 문자열이다. Jackson 기본 직렬화는 `15:00:00`이다.
     - 요청·응답의 `LocalTime` 필드에는 `@Schema(pattern = JacksonConfig.LOCAL_TIME_PATTERN, example = "15:00")`를 붙인다. springdoc 기본 스키마(`type: string`, `format: time-local`)에 pattern이 더해져 orval zod가 서버와 같은 규칙으로 검사한다.
     - DB 컬럼은 `time`이고 CHECK 제약(`extract(second from 컬럼) = 0`)으로 초가 있는 값을 막는다. 엔티티도 분 단위로 잘라 저장한다(예: `RoomType`).
@@ -93,6 +93,7 @@ urbanstay/
   - 이스케이프는 파생 쿼리와 같게 직접 한다. 검색어를 `EscapeCharacter.DEFAULT.escape`로 바꿔 `%검색어%`를 만들고, `like(..., EscapeCharacter.DEFAULT.escapeCharacter)`로 `escape '\'`를 붙인다.
   - 대소문자 구분 없는 비교는 파생 쿼리처럼 컬럼과 검색어 양쪽에 DB의 `upper`를 건다. 검색어만 Kotlin에서 대소문자를 바꾸면 DB의 `upper`와 결과가 달라지는 글자(예: `ß`)가 있을 수 있다.
   - 검색어는 `HibernateCriteriaBuilder.value(...)`로 넘겨 바인딩 파라미터로 만든다. `CriteriaBuilder.literal(...)`은 검색어를 SQL 문자열에 그대로 넣는다.
+  - 새 검색은 이 세 규칙을 담은 `common/repository/SearchPredicates`를 쓴다. `containsIgnoreCase`는 대소문자 구분 없는 부분 일치, `phoneContains`는 저장값과 검색어 양쪽의 하이픈을 뺀 부분 일치이고, 하이픈을 빼면 빈 검색어는 null(전화번호로 거르지 않음)이다. 예: `HotelSpecifications.search`(호텔 이름·주소·대표 전화번호), `StaySpecifications.search`(이용객 이름·전화번호). `GuestSpecifications`, `HotelAdminSpecifications`는 아직 자기 함수를 쓴다.
   - `%`, `_`, `\`가 글자 그대로 찾히는지 저장소 테스트와 API 테스트로 확인한다. 이스케이프를 빼면 실패하는지도 한 번 확인한다.
 
 ## 보안
@@ -231,6 +232,7 @@ urbanstay/
   - 목록은 같은 호텔의 객실을 이름 오름차순, 같으면 id 오름차순으로 준다(목록 조회 절). `keyword`(선택, 100자)는 이름에서 대소문자 구분 없이 찾고, `status`(선택, 하나)는 그 상태의 객실만, `roomTypeId`(선택)는 그 유형의 객실만 거른다. 함께 보내면 AND다(조합별 파생 쿼리, 목록 조회 절). 없거나 다른 호텔의 유형 id면 빈 목록이다(호텔 조건과 AND라 따로 확인하지 않는다). 상태 필터용 인덱스는 따로 두지 않는다(`hotel_id` 조건에 유일 제약의 인덱스를 쓴다).
   - 객실 응답(`RoomHotelAdminResponse`)에는 유형 `roomType: { id, name, capacity, roomRate, checkInTime, checkOutTime }`(조회 시점의 유형 값)을 담는다. 응답은 트랜잭션 밖에서 만들므로 객실 조회(`findByIdAndHotelId`, 목록의 파생 쿼리)는 `@EntityGraph`로 유형을 함께 읽는다.
   - 객실 응답에는 지금 이용 `currentStay: { id, checkInDate, checkOutDate, guest: { id, name, phone } }`를 담고, 없으면 null이다. 지금 이용은 오늘(`Clock`, Asia/Seoul)이 [체크인, 체크아웃) 안에 있는 취소하지 않은 이용이며, 배제 제약 때문에 객실마다 많아야 하나다. 컨트롤러가 `StayService.getCurrentStays(roomIds)`로 조회해 붙인다. 목록은 페이지의 객실을 한 번에 조회하고(이용객은 `@EntityGraph`, 인덱스는 `stay_room_id_check_in_date_id_idx`), 조회·수정·상태 변경은 그 객실 하나를 조회한다. 등록 응답은 항상 null이다. 서비스 방향은 `StayService → RoomService` 그대로이고 `RoomService`는 이용 도메인을 쓰지 않는다.
+- 전체 어드민의 호텔 객실 조회(`GET ApiPaths.APP_ADMIN + "/hotels/{hotelId}/rooms"`, `RoomAppAdminController`, `RoomService.getHotelRoomPage`)는 읽기 전용이다. `HotelService.getHotel`로 호텔을 확인하고(없으면 404 `HOTEL_NOT_FOUND`) 그 호텔의 객실을 hotel-admin 목록과 같은 이름순 페이지로 준다. 항목(`RoomAppAdminResponse`)은 `{ id, name, roomType: { id, name }, floor, status }`이고 유형은 `findByHotelId`의 `@EntityGraph`로 함께 읽는다. 검색·필터는 없다.
 - 테스트
   - 마스터와 운영자가 모두 쓰는 API는 두 역할의 principal로 정상 흐름을 확인한다(`@EnumSource(HotelAdminRole::class)`, `RoomHotelAdminControllerTest`). 마스터 전용 API는 운영자 principal로 403과 바뀌지 않음을 확인한다.
   - 객실이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔 객실의 `room_status_history`, 그다음 `room`, 그다음 `room_type`을 먼저 지운다. 테스트 객실은 저장한 유형으로 만든다(`RoomTypeRepository`). 이력은 바꾼 호텔 계정(`hotel_admin`)도 가리키므로, 여러 호텔을 지울 때는 모든 호텔의 이력을 먼저 지운 뒤 객실과 호텔 계정을 지운다.
@@ -301,6 +303,9 @@ urbanstay/
   - 수정은 PUT으로 모든 항목을 바꾼다. 순서는 이용객 조회 → version 확인(`GUEST_MODIFIED`) → 전화번호 중복 확인 → 엔티티 변경 → `saveAndFlush`이고, 유일 인덱스 위반과 `OptimisticLockingFailureException`을 함께 변환한다. version 충돌과 전화번호 중복이 겹치면 version 충돌이 먼저다.
   - 목록은 같은 호텔의 이용객을 최근 등록 순(id 내림차순)으로 준다. `keyword`(선택, 100자)는 이름 또는 전화번호에서 찾는다(`GuestSpecifications.search`, 이스케이프는 목록 조회 절). 이름은 대소문자 구분 없이, 전화번호는 저장값과 검색어 양쪽의 하이픈을 빼고 부분 일치로 찾는다(`01012345678`로 `010-1234-5678`을 찾는다).
   - 하이픈만 있는 검색어는 하이픈을 빼면 비어 모든 전화번호에 맞으므로 이름에서만 찾는다.
+  - 조회·수정 응답(`GuestDetailHotelAdminResponse`)에는 지금 이용 `currentStay: { id, room: { id, name, roomType: { id, name } }, checkInDate, checkOutDate }`(호실·유형·기간, 조회 시점의 값)를 담고, 없으면 null이다. 목록 항목(`GuestHotelAdminResponse`)에는 담지 않는다. 수정 응답에도 담는 것은 프론트엔드가 수정 응답으로 상세 캐시를 바꾸기 때문이다.
+    - 지금 이용은 객실의 지금 이용과 같은 기준(오늘(`Clock`)이 [체크인, 체크아웃) 안, 취소 제외)이다. 이용객은 여러 객실을 함께 쓸 수 있어 여러 개일 수 있는데, 하나만 체크인 날짜 오름차순(같으면 id 오름차순)으로 고른다(`StayService.getCurrentStayOfGuest`, 객실과 유형은 `@EntityGraph`, 인덱스는 `stay_guest_id_check_in_date_id_idx`).
+    - 컨트롤러가 `StayService`로 조회해 붙인다. 서비스 방향은 `StayService → GuestService` 그대로이고 `GuestService`는 이용 도메인을 쓰지 않는다.
 - 테스트
   - 수정이 사전 확인을 통과한 뒤 유일 인덱스(하이픈 모양만 다른 번호)와 JPA 버전 검사가 막는 경로는 순서를 고정해 확인한다(`GuestServiceTest`). 테스트 이용객은 저장소로 만든다(`GuestService.getOrCreate`는 회원이 필요하다).
   - 이용객이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔의 `guest`를 먼저 지운다.
@@ -328,7 +333,10 @@ urbanstay/
 - 회원의 이용은 회원과 연결된 이용객(모든 호텔)의 이용이다(`StayService.getMemberStays`, 없는 회원은 404 `MEMBER_NOT_FOUND`). 게스트 앱 내 이용과 전체 어드민의 회원 이용 기록(`ApiPaths.APP_ADMIN + "/members/{memberId}/stays"`, `StayAppAdminController`)이 함께 쓴다. 전체 어드민 응답은 호텔 `{ id, name }`, 객실 `{ id, name }`, 유형 `{ id, name }`(조회 시점의 값), 기간, 인원, 금액(예약할 때 저장한 값), `canceledAt`을 담는다(`StayAppAdminResponse`).
 - 이용 관리(`ApiPaths.HOTEL_ADMIN + "/stays"`의 목록·조회와 `/{stayId}/cancel` 취소, `StayHotelAdminController`)는 `StayService`가 한다. 호텔 계정 모두(마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 등록과 수정은 없다.
   - 조회할 이용은 객실의 호텔로 찾는다(`findByIdAndRoomHotelId`). 없는 id와 다른 호텔의 이용 id는 모두 404 `STAY_NOT_FOUND`다.
-  - 목록은 같은 호텔의 이용을 취소한 이용까지 체크인 날짜 내림차순, 같으면 id 내림차순으로 준다. `roomId`·`guestId`·`canceled`(선택)로 거르고 함께 보내면 AND다. 조합이 여덟 가지라 파생 쿼리 대신 `StaySpecifications.search`로 거른다(목록 조회 절). 없거나 다른 호텔의 id로 거르면 빈 목록이다.
+  - 목록은 같은 호텔의 이용을 취소한 이용까지 체크인 날짜 내림차순, 같으면 id 내림차순으로 준다. `roomId`·`guestId`·`canceled`·`keyword`·`checkInFrom`·`checkInTo`(모두 선택)로 거르고 함께 보내면 AND다. 조합이 많아 파생 쿼리 대신 `StaySpecifications.search`로 거른다(목록 조회 절). 없거나 다른 호텔의 id로 거르면 빈 목록이다.
+    - `keyword`(100자)는 이용객 목록 검색과 같은 방식으로 이용객 이름(대소문자 구분 없이)이나 전화번호(양쪽 하이픈을 빼고)에서 찾는다(`SearchPredicates`).
+    - `checkInFrom`·`checkInTo`(`LocalDate`)는 체크인 날짜가 그 사이(양 끝 포함)인 이용만 거르고 하나만 보내도 된다. `checkInFrom`이 `checkInTo`보다 늦으면 서비스가 400 `INVALID_INPUT`(`checkInTo`, `validation.from-or-later`)으로 던진다.
+    - 조합은 `StayHotelAdminControllerTest`의 parameterized 테스트로 확인한다.
   - 응답은 객실 `{ id, name }`, 이용객 `{ id, name, phone }`을 조회 시점의 값으로 담고, 저장한 금액(이용 절)과 취소 정보 `cancellation: { canceledAt, canceledBy: { id, name }, reason }`(취소하지 않았으면 null)을 담는다. 목록(`findAll(Specification, Pageable)`을 다시 선언)과 조회는 `@EntityGraph`로 객실과 이용객을 함께 읽는다.
 - 취소(`POST ApiPaths.HOTEL_ADMIN + "/stays/{stayId}/cancel"`, 본문 `{ reason? }`, `StayService.cancel`)는 되돌릴 수 없다. 성공하면 취소 정보가 담긴 이용 응답을 준다.
   - 판단 순서는 이용 조회(404 `STAY_NOT_FOUND`) → 이미 취소(409 `STAY_ALREADY_CANCELED`) → 끝난 이용(409 `STAY_ALREADY_ENDED`) → 조건부 UPDATE다. 끝나지 않은 이용은 체크아웃 날짜가 오늘(`Clock`, Asia/Seoul)보다 뒤인 이용이다. 이미 취소했으면서 끝난 이용은 `STAY_ALREADY_CANCELED`다.
@@ -389,8 +397,8 @@ urbanstay/
   - 상태를 바꾸는 핸들러에는 모두 붙이고 GET 핸들러에는 붙이지 않는다(GET의 `message`는 null). `SuccessMessageConventionTest`가 확인한다.
   - 실패 응답의 `message`는 null이다. 어노테이션이 붙은 핸들러가 예외를 던져도 예외 처리기의 응답에는 문구를 채우지 않는다.
 - 입력 검증 메시지는 제약마다 하나인 공용 키(`validation.{제약}`)를 `messages.properties`에 두고 어노테이션에서 `{키}`로 쓴다. 예: `@NotBlank(message = "{validation.required}")`
-  - 키 이름: `validation.required`(필수), `validation.email`(이메일 형식), `validation.max-length`(최대 길이, 문구에 `{max}`를 넣는다), `validation.min`·`validation.max`(숫자 범위, 문구에 `{value}`를 넣는다), `validation.phone`(전화번호 형식), `validation.password`(비밀번호 규칙), `validation.type`(타입이 틀린 값), `validation.unknown-field`(문서에 없는 필드), `validation.today-or-later`(오늘 이후 날짜), `validation.after-check-in`(체크인 뒤 날짜), `validation.max-nights`(최대 숙박 수, 문구에 `{max}`를 넣는다)
-  - `validation.type`, `validation.unknown-field`는 어노테이션이 아니라 `GlobalExceptionHandler`가 본문·파라미터 오류에 쓴다. `validation.today-or-later`, `validation.after-check-in`, `validation.max-nights`는 서비스가 쓴다(이용 절).
+  - 키 이름: `validation.required`(필수), `validation.email`(이메일 형식), `validation.max-length`(최대 길이, 문구에 `{max}`를 넣는다), `validation.min`·`validation.max`(숫자 범위, 문구에 `{value}`를 넣는다), `validation.phone`(전화번호 형식), `validation.password`(비밀번호 규칙), `validation.type`(타입이 틀린 값), `validation.unknown-field`(문서에 없는 필드), `validation.today-or-later`(오늘 이후 날짜), `validation.after-check-in`(체크인 뒤 날짜), `validation.max-nights`(최대 숙박 수, 문구에 `{max}`를 넣는다), `validation.from-or-later`(기간의 시작과 같거나 뒤 날짜)
+  - `validation.type`, `validation.unknown-field`는 어노테이션이 아니라 `GlobalExceptionHandler`가 본문·파라미터 오류에 쓴다. `validation.today-or-later`, `validation.after-check-in`, `validation.max-nights`, `validation.from-or-later`는 서비스가 쓴다(이용 절).
   - Spring Boot의 MessageSource 기반 interpolator가 키를 풀고, `{max}` 같은 제약 속성은 Hibernate Validator가 채운다. 응답의 `fieldErrors[].message`에 풀린 문구가 들어간다.
   - 실제로 쓰는 키만 추가한다.
 - 설정값은 `application.properties`에 둔다.

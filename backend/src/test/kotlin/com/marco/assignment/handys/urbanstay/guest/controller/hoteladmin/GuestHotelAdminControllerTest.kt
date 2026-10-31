@@ -129,7 +129,7 @@ class GuestHotelAdminControllerTest {
 
 		val data = getGuest(checkNotNull(guest.id), principals.getValue(role)).andExpectSuccess(HttpStatus.OK)
 
-		assertThat(data).isEqualTo(guestJson(guest.id!!, NAME, PHONE, EMAIL, 0))
+		assertThat(data).isEqualTo(detailJson(guestJson(guest.id!!, NAME, PHONE, EMAIL, 0)))
 	}
 
 	@ParameterizedTest
@@ -140,8 +140,8 @@ class GuestHotelAdminControllerTest {
 
 		val data = update(guest.id!!, body, principals.getValue(role)).andExpectSuccess(HttpStatus.OK)
 
-		assertThat(data).isEqualTo(guestJson(guest.id!!, "김철수", "02-987-6543", "Kim@Example.com", 1))
-		assertThat(guestJson(reload(guest.id!!))).isEqualTo(data)
+		assertThat(data).isEqualTo(detailJson(guestJson(guest.id!!, "김철수", "02-987-6543", "Kim@Example.com", 1)))
+		assertThat(detailJson(guestJson(reload(guest.id!!)))).isEqualTo(data)
 	}
 
 	@Test
@@ -487,6 +487,8 @@ class GuestHotelAdminControllerTest {
 		json(jsonMapper.writeValueAsString(linkedMapOf("id" to id, "name" to name, "phone" to phone, "email" to email, "version" to version)))
 
 	private fun guestJson(guest: Guest): JsonNode = guestJson(checkNotNull(guest.id), guest.name, guest.phone, guest.email, guest.version)
+
+	private fun detailJson(guest: JsonNode): JsonNode = (guest as ObjectNode).putNull("currentStay")
 
 	private fun itemIds(data: JsonNode): List<Long> = data["items"].values().map { it["id"].longValue() }
 

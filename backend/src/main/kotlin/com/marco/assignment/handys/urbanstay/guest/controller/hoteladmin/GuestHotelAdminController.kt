@@ -7,11 +7,14 @@ import com.marco.assignment.handys.urbanstay.common.request.TrimmedStringEditor
 import com.marco.assignment.handys.urbanstay.common.response.ApiResponse
 import com.marco.assignment.handys.urbanstay.common.response.PageResponse
 import com.marco.assignment.handys.urbanstay.common.response.SuccessMessage
+import com.marco.assignment.handys.urbanstay.guest.dto.hoteladmin.GuestDetailHotelAdminResponse
 import com.marco.assignment.handys.urbanstay.guest.dto.hoteladmin.GuestHotelAdminResponse
 import com.marco.assignment.handys.urbanstay.guest.dto.hoteladmin.GuestUpdateHotelAdminRequest
+import com.marco.assignment.handys.urbanstay.guest.entity.Guest
 import com.marco.assignment.handys.urbanstay.guest.exception.GuestApiErrors
 import com.marco.assignment.handys.urbanstay.guest.exception.GuestErrorCode
 import com.marco.assignment.handys.urbanstay.guest.service.GuestService
+import com.marco.assignment.handys.urbanstay.stay.service.StayService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -35,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping(ApiPaths.HOTEL_ADMIN + "/guests")
 class GuestHotelAdminController(
 	private val guestService: GuestService,
+	private val stayService: StayService,
 ) {
 
 	@InitBinder
@@ -69,8 +73,8 @@ class GuestHotelAdminController(
 	fun getGuest(
 		@AuthenticationPrincipal hotelAdmin: HotelAdminPrincipal,
 		@PathVariable guestId: Long,
-	): ApiResponse<GuestHotelAdminResponse> =
-		ApiResponse.success(GuestHotelAdminResponse.from(guestService.getGuest(hotelAdmin.hotelId, guestId)))
+	): ApiResponse<GuestDetailHotelAdminResponse> =
+		ApiResponse.success(withCurrentStay(guestService.getGuest(hotelAdmin.hotelId, guestId)))
 
 	@Operation(summary = "openapi.hotel-admin.operation.updateGuest.summary", description = "openapi.hotel-admin.operation.updateGuest.description")
 	@GuestApiErrors(GuestErrorCode.GUEST_NOT_FOUND, GuestErrorCode.GUEST_PHONE_DUPLICATED, GuestErrorCode.GUEST_MODIFIED)
@@ -80,7 +84,7 @@ class GuestHotelAdminController(
 		@AuthenticationPrincipal hotelAdmin: HotelAdminPrincipal,
 		@PathVariable guestId: Long,
 		@Valid @RequestBody request: GuestUpdateHotelAdminRequest,
-	): ApiResponse<GuestHotelAdminResponse> {
+	): ApiResponse<GuestDetailHotelAdminResponse> {
 		val guest = guestService.update(
 			hotelId = hotelAdmin.hotelId,
 			guestId = guestId,
@@ -89,8 +93,11 @@ class GuestHotelAdminController(
 			phone = request.phone,
 			email = request.email,
 		)
-		return ApiResponse.success(GuestHotelAdminResponse.from(guest))
+		return ApiResponse.success(withCurrentStay(guest))
 	}
+
+	private fun withCurrentStay(guest: Guest): GuestDetailHotelAdminResponse =
+		GuestDetailHotelAdminResponse.from(guest, stayService.getCurrentStayOfGuest(checkNotNull(guest.id)))
 
 	companion object {
 		const val KEYWORD_MAX_LENGTH = 100
