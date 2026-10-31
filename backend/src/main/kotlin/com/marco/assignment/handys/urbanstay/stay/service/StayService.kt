@@ -77,7 +77,7 @@ class StayService(
 		}
 
 	private fun checkNotOverlapped(roomId: Long, checkInDate: LocalDate, checkOutDate: LocalDate) {
-		if (stayRepository.existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfter(roomId, checkOutDate, checkInDate)) {
+		if (stayRepository.existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfterAndCanceledAtIsNull(roomId, checkOutDate, checkInDate)) {
 			throw BusinessException(StayErrorCode.STAY_PERIOD_OVERLAPPED)
 		}
 	}
