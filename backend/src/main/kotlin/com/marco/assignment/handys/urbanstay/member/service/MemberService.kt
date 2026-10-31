@@ -6,7 +6,11 @@ import com.marco.assignment.handys.urbanstay.common.exception.violates
 import com.marco.assignment.handys.urbanstay.member.entity.Member
 import com.marco.assignment.handys.urbanstay.member.exception.MemberErrorCode
 import com.marco.assignment.handys.urbanstay.member.repository.MemberRepository
+import com.marco.assignment.handys.urbanstay.member.repository.MemberSpecifications
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
@@ -33,4 +37,12 @@ class MemberService(
 	@Transactional(readOnly = true)
 	fun getMember(memberId: Long): Member =
 		memberRepository.findByIdOrNull(memberId) ?: throw BusinessException(MemberErrorCode.MEMBER_NOT_FOUND)
+
+	@Transactional(readOnly = true)
+	fun getMembers(keyword: String?, page: Int, size: Int): Page<Member> =
+		memberRepository.findAll(MemberSpecifications.search(keyword?.trim()?.ifEmpty { null }), PageRequest.of(page, size, NEWEST_FIRST))
+
+	companion object {
+		private val NEWEST_FIRST = Sort.by(Sort.Direction.DESC, Member::id.name)
+	}
 }

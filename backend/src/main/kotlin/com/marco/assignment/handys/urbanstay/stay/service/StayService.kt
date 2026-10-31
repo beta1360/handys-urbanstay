@@ -56,8 +56,10 @@ class StayService(
 	}
 
 	@Transactional(readOnly = true)
-	fun getMemberStays(memberId: Long, page: Int, size: Int): Page<Stay> =
-		stayRepository.findByGuestMemberId(memberId, PageRequest.of(page, size, LATEST_CHECK_IN_FIRST))
+	fun getMemberStays(memberId: Long, page: Int, size: Int): Page<Stay> {
+		memberService.getMember(memberId)
+		return stayRepository.findByGuestMemberId(memberId, PageRequest.of(page, size, LATEST_CHECK_IN_FIRST))
+	}
 
 	@Transactional(readOnly = true)
 	fun getRoomTypes(hotelId: Long, checkInDate: LocalDate, checkOutDate: LocalDate, guestCount: Int): List<RoomTypeAvailability> {
