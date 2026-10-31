@@ -28,7 +28,7 @@ description: app-admin·hotel-admin에 목록·상세·등록·수정 화면을 
 
 ## 2. entities/<도메인> (조회·캐시·도메인 표시)
 
-예: `entities/room-type/`
+예: `entities/room-type/`(조회·캐시·폼 조각), `entities/guest/`(`lib/`까지 있는 예). 필요한 세그먼트만 둔다.
 
 - `api/`: `queryOptions`로 조회 설정, `use...Query`, 새로 조회(`refetch...`·`useRefetch...`, 진행 중 조회 취소 후 `staleTime: 0`), 캐시 규칙(`cacheSaved...`: 목록 무효화 + 상세 캐시에 넣기). 같은 데이터의 캐시 규칙은 여기에만 둔다.
 - `config/messages.ts`: 항목 이름(`..._FIELD_LABELS`), 불러오기·찾을 수 없음 문구. 여러 화면 공통 문구는 `shared/config`.
