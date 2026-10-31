@@ -78,3 +78,12 @@ export type {
   UpdateRoomBody,
   UpdateRoomStatusBody,
 } from "./room";
+export {
+  fetchStay,
+  fetchStays,
+  stayListParamsSchema,
+  stayListQueryKey,
+  stayParamsSchema,
+  stayQueryKey,
+} from "./stay";
+export type { Stay, StayListParams, StayPage } from "./stay";

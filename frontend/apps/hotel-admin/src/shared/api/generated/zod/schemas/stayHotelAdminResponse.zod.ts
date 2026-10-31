@@ -6,6 +6,7 @@
  * OpenAPI spec version: v1
  */
 import * as zod from 'zod';
+import { StayCancellationHotelAdminResponse } from './stayCancellationHotelAdminResponse.zod.ts';
 import { StayGuestHotelAdminResponse } from './stayGuestHotelAdminResponse.zod.ts';
 import { StayRoomHotelAdminResponse } from './stayRoomHotelAdminResponse.zod.ts';
 
@@ -15,7 +16,8 @@ export const StayHotelAdminResponse = zod.object({
   "guest": StayGuestHotelAdminResponse.describe('이용객(조회 시점의 이름과 전화번호)'),
   "checkInDate": zod.iso.date().describe('체크인 날짜("YYYY-MM-DD")'),
   "checkOutDate": zod.iso.date().describe('체크아웃 날짜("YYYY-MM-DD"). 이 날은 묵지 않습니다.'),
-  "guestCount": zod.int().describe('인원')
+  "guestCount": zod.int().describe('인원'),
+  "cancellation": zod.union([StayCancellationHotelAdminResponse,zod.null()]).describe('취소 정보. 취소하지 않은 이용이면 null')
 });
 
 export type StayHotelAdminResponse = zod.input<typeof StayHotelAdminResponse>;

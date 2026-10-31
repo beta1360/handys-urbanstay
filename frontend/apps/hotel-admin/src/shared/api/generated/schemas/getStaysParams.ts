@@ -16,6 +16,10 @@ roomId?: number;
  */
 guestId?: number;
 /**
+ * 취소 여부(선택). true면 취소한 이용만, false면 취소하지 않은 이용만 조회하고, 보내지 않으면 모두 조회합니다.
+ */
+canceled?: boolean;
+/**
  * 페이지 번호. 0~99, 기본 0
  * @minimum 0
  * @maximum 99

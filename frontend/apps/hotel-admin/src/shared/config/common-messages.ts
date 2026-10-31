@@ -4,6 +4,7 @@ export const COMMON_MESSAGES = {
   cancel: "취소",
   backToList: "목록으로",
   search: "검색",
+  all: "전체",
   emptySearchResult: "검색 결과가 없습니다.",
   paginationLabel: "페이지 이동",
   previousPage: "이전",

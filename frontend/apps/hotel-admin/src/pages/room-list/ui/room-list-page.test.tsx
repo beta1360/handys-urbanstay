@@ -270,7 +270,7 @@ describe("RoomListPage 검색과 상태 거르기", () => {
         .getAllByRole("option")
         .map((option) => option.textContent),
     ).toEqual([
-      ROOM_SEARCH_FORM_MESSAGES.allStatuses,
+      COMMON_MESSAGES.all,
       ROOM_STATUS_LABELS.VACANT,
       ROOM_STATUS_LABELS.RESERVED,
       ROOM_STATUS_LABELS.OCCUPIED,
@@ -318,7 +318,7 @@ describe("RoomListPage 검색과 상태 거르기", () => {
     await screen.findByRole("table");
     await user.selectOptions(
       getStatusSelect(),
-      ROOM_SEARCH_FORM_MESSAGES.allStatuses,
+      COMMON_MESSAGES.all,
     );
     await user.click(getSearchButton());
 

@@ -34,7 +34,7 @@ export function GuestDetail({ guestId }: GuestDetailProps) {
     case "ready":
       return (
         <>
-          <GuestDetailActions editGuestId={state.guest.id} />
+          <GuestDetailActions guestId={state.guest.id} />
           <GuestInformation guest={state.guest} />
         </>
       );

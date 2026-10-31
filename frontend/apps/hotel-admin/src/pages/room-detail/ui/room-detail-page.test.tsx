@@ -20,6 +20,7 @@ import {
   ROOM_STATUS_LABELS,
   stringifyRoomPathParams,
 } from "@/entities/room";
+import { STAY_LINK_MESSAGES } from "@/entities/stay";
 import { ROOM_STATUS_CHANGE_MESSAGES } from "@/features/room-status-change";
 import { API_ERROR_CODES, updateRoomStatus } from "@/shared/api";
 import type {
@@ -158,6 +159,7 @@ function renderRoomDetailPage(initialEntries = [roomPath(ROOM.id)]) {
             component: () => <p>{EDIT_PAGE_TEXT}</p>,
           }),
         ]),
+        createRoute({ getParentRoute: () => layoutRoute, path: "stays/" }),
       ]),
     ]),
     history: createMemoryHistory({
@@ -283,15 +285,20 @@ describe("RoomDetailPage 정보", () => {
 });
 
 describe("RoomDetailPage 수정 버튼", () => {
-  it("객실 정보를 보여줄 때 목록으로 링크 줄의 오른쪽 끝에 수정 버튼을 두고, 누르면 수정 화면으로 이동한다", async () => {
+  it("객실 정보를 보여줄 때 목록으로 링크 줄의 오른쪽 끝에 이용 보기 링크와 수정 버튼을 두고, 수정을 누르면 수정 화면으로 이동한다", async () => {
     const { router, user } = renderRoomDetailPage();
 
     const editLink = await screen.findByRole("link", {
       name: COMMON_MESSAGES.edit,
     });
     expect(editLink).toHaveAttribute("href", `${roomPath(ROOM.id)}/edit`);
-    expect(editLink.parentElement).toBe(getBackLink().parentElement);
-    expect(editLink.parentElement?.lastElementChild).toBe(editLink);
+    const actionRow = getBackLink().parentElement;
+    expect(actionRow?.lastElementChild?.lastElementChild).toBe(editLink);
+    const staysLink = screen.getByRole("link", {
+      name: STAY_LINK_MESSAGES.stays,
+    });
+    expect(staysLink).toHaveAttribute("href", `/stays?roomId=${ROOM.id}`);
+    expect(staysLink.nextElementSibling).toBe(editLink);
 
     await user.click(editLink);
 

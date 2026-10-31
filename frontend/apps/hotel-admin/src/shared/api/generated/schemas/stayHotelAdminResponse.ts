@@ -5,6 +5,7 @@
  * 숙박 운영(호텔·객실·이용) API
  * OpenAPI spec version: v1
  */
+import type { StayCancellationHotelAdminResponse } from './stayCancellationHotelAdminResponse.ts';
 import type { StayGuestHotelAdminResponse } from './stayGuestHotelAdminResponse.ts';
 import type { StayRoomHotelAdminResponse } from './stayRoomHotelAdminResponse.ts';
 
@@ -21,4 +22,6 @@ export interface StayHotelAdminResponse {
   checkOutDate: string;
   /** 인원 */
   guestCount: number;
+  /** 취소 정보. 취소하지 않은 이용이면 null */
+  cancellation: StayCancellationHotelAdminResponse | null;
 }
