@@ -82,6 +82,7 @@ function renderAdminDetailPage(initialPath = `/admins/${ADMIN.id}`) {
             path: "/",
             component: AdminDetailPage,
           }),
+          createRoute({ getParentRoute: () => adminRoute, path: "edit" }),
         ]),
       ]),
     ]),
@@ -107,7 +108,7 @@ afterEach(() => {
 });
 
 describe("AdminDetailPage", () => {
-  it("이름·아이디·만든 날(한국 날짜)과 목록으로 링크를 보여준다", async () => {
+  it("이름·아이디·만든 날(한국 날짜)과 목록으로 링크, 수정 버튼을 보여준다", async () => {
     renderAdminDetailPage();
 
     const createdAtTerm = await screen.findByText(ADMIN_FIELD_LABELS.createdAt);
@@ -121,6 +122,9 @@ describe("AdminDetailPage", () => {
     expect(
       screen.getByRole("link", { name: COMMON_MESSAGES.backToList }),
     ).toHaveAttribute("href", "/admins");
+    expect(
+      screen.getByRole("link", { name: COMMON_MESSAGES.edit }),
+    ).toHaveAttribute("href", `/admins/${ADMIN.id}/edit`);
     expect(fetchAdmin).toHaveBeenCalledExactlyOnceWith(ADMIN.id);
   });
 
@@ -152,6 +156,9 @@ describe("AdminDetailPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       ADMIN_LOAD_MESSAGES.loadFailed,
     );
+    expect(
+      screen.queryByRole("link", { name: COMMON_MESSAGES.edit }),
+    ).not.toBeInTheDocument();
     await user.click(
       screen.getByRole("button", { name: COMMON_MESSAGES.retry }),
     );

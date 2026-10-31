@@ -34,7 +34,7 @@ export function AdminDetail({ adminId }: AdminDetailProps) {
     case "ready":
       return (
         <>
-          <AdminDetailActions />
+          <AdminDetailActions editAdminId={state.admin.id} />
           <AdminInformation admin={state.admin} />
         </>
       );

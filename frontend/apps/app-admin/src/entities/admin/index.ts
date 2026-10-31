@@ -1,5 +1,5 @@
 export { useAdminListQuery } from "./api/admin-list-query";
-export { cacheSavedAdmin } from "./api/admin-query";
+export { cacheSavedAdmin, useRefetchAdmin } from "./api/admin-query";
 export {
   ADMIN_FIELD_LABELS,
   ADMIN_INFO_MESSAGES,

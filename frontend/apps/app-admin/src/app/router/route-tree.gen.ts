@@ -21,6 +21,7 @@ import { Route as AuthenticatedHotelsNewRouteImport } from "./../routes/_authent
 import { Route as AuthenticatedMembersIndexRouteImport } from "./../routes/_authenticated/members/index";
 import { Route as AuthenticatedMembersMemberIdRouteImport } from "./../routes/_authenticated/members/$memberId";
 import { Route as AuthenticatedAdminsAdminIdIndexRouteImport } from "./../routes/_authenticated/admins/$adminId/index";
+import { Route as AuthenticatedAdminsAdminIdEditRouteImport } from "./../routes/_authenticated/admins/$adminId/edit";
 import { Route as AuthenticatedHotelsHotelIdIndexRouteImport } from "./../routes/_authenticated/hotels/$hotelId/index";
 import { Route as AuthenticatedHotelsHotelIdEditRouteImport } from "./../routes/_authenticated/hotels/$hotelId/edit";
 import { Route as AuthenticatedHotelsHotelIdMasterEditRouteImport } from "./../routes/_authenticated/hotels/$hotelId/master/edit";
@@ -91,6 +92,12 @@ const AuthenticatedAdminsAdminIdIndexRoute =
     path: "/",
     getParentRoute: () => AuthenticatedAdminsAdminIdRouteRoute,
   } as any);
+const AuthenticatedAdminsAdminIdEditRoute =
+  AuthenticatedAdminsAdminIdEditRouteImport.update({
+    id: "/edit",
+    path: "/edit",
+    getParentRoute: () => AuthenticatedAdminsAdminIdRouteRoute,
+  } as any);
 const AuthenticatedHotelsHotelIdIndexRoute =
   AuthenticatedHotelsHotelIdIndexRouteImport.update({
     id: "/",
@@ -121,6 +128,7 @@ export interface FileRoutesByFullPath {
   "/admins/": typeof AuthenticatedAdminsIndexRoute;
   "/hotels/": typeof AuthenticatedHotelsIndexRoute;
   "/members/": typeof AuthenticatedMembersIndexRoute;
+  "/admins/$adminId/edit": typeof AuthenticatedAdminsAdminIdEditRoute;
   "/hotels/$hotelId/edit": typeof AuthenticatedHotelsHotelIdEditRoute;
   "/admins/$adminId/": typeof AuthenticatedAdminsAdminIdIndexRoute;
   "/hotels/$hotelId/": typeof AuthenticatedHotelsHotelIdIndexRoute;
@@ -135,6 +143,7 @@ export interface FileRoutesByTo {
   "/admins": typeof AuthenticatedAdminsIndexRoute;
   "/hotels": typeof AuthenticatedHotelsIndexRoute;
   "/members": typeof AuthenticatedMembersIndexRoute;
+  "/admins/$adminId/edit": typeof AuthenticatedAdminsAdminIdEditRoute;
   "/hotels/$hotelId/edit": typeof AuthenticatedHotelsHotelIdEditRoute;
   "/admins/$adminId": typeof AuthenticatedAdminsAdminIdIndexRoute;
   "/hotels/$hotelId": typeof AuthenticatedHotelsHotelIdIndexRoute;
@@ -153,6 +162,7 @@ export interface FileRoutesById {
   "/_authenticated/admins/": typeof AuthenticatedAdminsIndexRoute;
   "/_authenticated/hotels/": typeof AuthenticatedHotelsIndexRoute;
   "/_authenticated/members/": typeof AuthenticatedMembersIndexRoute;
+  "/_authenticated/admins/$adminId/edit": typeof AuthenticatedAdminsAdminIdEditRoute;
   "/_authenticated/hotels/$hotelId/edit": typeof AuthenticatedHotelsHotelIdEditRoute;
   "/_authenticated/admins/$adminId/": typeof AuthenticatedAdminsAdminIdIndexRoute;
   "/_authenticated/hotels/$hotelId/": typeof AuthenticatedHotelsHotelIdIndexRoute;
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | "/admins/"
     | "/hotels/"
     | "/members/"
+    | "/admins/$adminId/edit"
     | "/hotels/$hotelId/edit"
     | "/admins/$adminId/"
     | "/hotels/$hotelId/"
@@ -185,6 +196,7 @@ export interface FileRouteTypes {
     | "/admins"
     | "/hotels"
     | "/members"
+    | "/admins/$adminId/edit"
     | "/hotels/$hotelId/edit"
     | "/admins/$adminId"
     | "/hotels/$hotelId"
@@ -202,6 +214,7 @@ export interface FileRouteTypes {
     | "/_authenticated/admins/"
     | "/_authenticated/hotels/"
     | "/_authenticated/members/"
+    | "/_authenticated/admins/$adminId/edit"
     | "/_authenticated/hotels/$hotelId/edit"
     | "/_authenticated/admins/$adminId/"
     | "/_authenticated/hotels/$hotelId/"
@@ -299,6 +312,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthenticatedAdminsAdminIdIndexRouteImport;
       parentRoute: typeof AuthenticatedAdminsAdminIdRouteRoute;
     };
+    "/_authenticated/admins/$adminId/edit": {
+      id: "/_authenticated/admins/$adminId/edit";
+      path: "/edit";
+      fullPath: "/admins/$adminId/edit";
+      preLoaderRoute: typeof AuthenticatedAdminsAdminIdEditRouteImport;
+      parentRoute: typeof AuthenticatedAdminsAdminIdRouteRoute;
+    };
     "/_authenticated/hotels/$hotelId/": {
       id: "/_authenticated/hotels/$hotelId/";
       path: "/";
@@ -324,11 +344,13 @@ declare module "@tanstack/react-router" {
 }
 
 interface AuthenticatedAdminsAdminIdRouteRouteChildren {
+  AuthenticatedAdminsAdminIdEditRoute: typeof AuthenticatedAdminsAdminIdEditRoute;
   AuthenticatedAdminsAdminIdIndexRoute: typeof AuthenticatedAdminsAdminIdIndexRoute;
 }
 
 const AuthenticatedAdminsAdminIdRouteRouteChildren: AuthenticatedAdminsAdminIdRouteRouteChildren =
   {
+    AuthenticatedAdminsAdminIdEditRoute: AuthenticatedAdminsAdminIdEditRoute,
     AuthenticatedAdminsAdminIdIndexRoute: AuthenticatedAdminsAdminIdIndexRoute,
   };
 

@@ -49,3 +49,14 @@ export function forgetMe(queryClient: QueryClient) {
     exact: true,
   });
 }
+
+export async function refreshMeIfSelf(
+  queryClient: QueryClient,
+  accountId: number,
+) {
+  const { queryKey } = meQueryOptions();
+  if (queryClient.getQueryData(queryKey)?.id !== accountId) {
+    return;
+  }
+  await queryClient.invalidateQueries({ queryKey, exact: true });
+}
