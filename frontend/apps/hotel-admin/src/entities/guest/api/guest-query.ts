@@ -1,7 +1,7 @@
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import { fetchGuest, guestListQueryKey, guestQueryKey } from "@/shared/api";
-import type { Guest } from "@/shared/api";
+import type { GuestDetail } from "@/shared/api";
 
 function guestQueryOptions(guestId: number) {
   return queryOptions({
@@ -28,7 +28,7 @@ export function useRefetchGuest(guestId: number) {
   return () => refetchGuest(queryClient, guestId);
 }
 
-export function cacheSavedGuest(queryClient: QueryClient, guest: Guest) {
+export function cacheSavedGuest(queryClient: QueryClient, guest: GuestDetail) {
   void queryClient.invalidateQueries({ queryKey: guestListQueryKey() });
   queryClient.setQueryData(guestQueryOptions(guest.id).queryKey, guest);
 }

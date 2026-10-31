@@ -163,6 +163,10 @@ function renderRoomCreatePage(isMaster = true) {
           path: "rooms/$roomId",
           component: () => <p>{DETAIL_PAGE_TEXT}</p>,
         }),
+        createRoute({
+          getParentRoute: () => layoutRoute,
+          path: "room-types/new",
+        }),
       ]),
     ]),
     history: createMemoryHistory({
@@ -276,6 +280,29 @@ describe("RoomCreatePage 화면", () => {
         ROOM_TYPE_OPTION_MESSAGES.loadFailed,
       );
     });
+  });
+
+  it("유형이 하나도 없으면 유형 칸 아래에 먼저 유형을 생성하라는 안내와 객실 유형 생성 링크를 보여준다", async () => {
+    vi.mocked(fetchRoomTypes).mockResolvedValue([]);
+    renderRoomCreatePage();
+
+    await vi.waitFor(() => {
+      expect(getFields().roomTypeId).toHaveAccessibleDescription(
+        `${ROOM_TYPE_OPTION_MESSAGES.empty} ${ROOM_TYPE_OPTION_MESSAGES.create}`,
+      );
+    });
+    expect(
+      screen.getByRole("link", { name: ROOM_TYPE_OPTION_MESSAGES.create }),
+    ).toHaveAttribute("href", "/room-types/new");
+  });
+
+  it("유형이 있으면 유형 생성 안내를 보여주지 않는다", async () => {
+    await renderLoadedRoomCreatePage();
+
+    await screen.findByRole("option", { name: ROOM_TYPES[0].name });
+    expect(
+      screen.queryByRole("link", { name: ROOM_TYPE_OPTION_MESSAGES.create }),
+    ).not.toBeInTheDocument();
   });
 
   it("마스터가 아니면 폼 없이 권한이 없다는 문구만 보여주고 유형 목록을 요청하지 않는다", async () => {
@@ -432,6 +459,23 @@ describe("RoomCreatePage 서버 오류 처리", () => {
     expect(getFields().name).toHaveAccessibleDescription(DUPLICATED_MESSAGE);
     expect(getFields().name).toHaveFocus();
     expect(getInvalidFields()).toEqual([getFields().name]);
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it("유형이 없다는 응답이면 서버 문구를 유형 칸 오류로 보여준다", async () => {
+    const message = "객실 유형을 찾을 수 없습니다.";
+    vi.mocked(createRoom).mockRejectedValue(
+      createAxiosError(404, API_ERROR_CODES.roomTypeNotFound, message),
+    );
+    const { user } = await renderLoadedRoomCreatePage();
+
+    await submitValidForm(user);
+
+    await vi.waitFor(() => {
+      expect(getFields().roomTypeId).toHaveAttribute("aria-invalid", "true");
+    });
+    expect(getFields().roomTypeId).toHaveAccessibleDescription(message);
+    expect(getInvalidFields()).toEqual([getFields().roomTypeId]);
     expect(showToast).not.toHaveBeenCalled();
   });
 

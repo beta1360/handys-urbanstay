@@ -21,6 +21,7 @@ export {
 } from "./model/room-type-path-params";
 export { useRoomType } from "./model/use-room-type";
 export { useRoomTypeOptions } from "./model/use-room-type-options";
+export { RoomTypeEmptyGuide } from "./ui/room-type-empty-guide";
 export { RoomTypeInfoFields } from "./ui/room-type-info-fields";
 export type { RoomTypeInfoInputProps } from "./ui/room-type-info-fields";
 export { RoomTypeInformation } from "./ui/room-type-information";

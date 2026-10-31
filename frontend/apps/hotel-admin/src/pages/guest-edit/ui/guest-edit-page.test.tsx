@@ -27,7 +27,7 @@ import {
 } from "@/entities/guest";
 import type { GuestInfoField } from "@/entities/guest";
 import { API_ERROR_CODES, guestQueryKey, updateGuest } from "@/shared/api";
-import type { Guest } from "@/shared/api";
+import type { GuestDetail } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { GuestEditPage } from "./guest-edit-page";
@@ -57,15 +57,16 @@ const GUEST_MODIFIED_MESSAGE =
 
 const DETAIL_PAGE_TEXT = "이용객 상세 화면";
 
-const GUEST: Guest = {
+const GUEST: GuestDetail = {
   id: 3,
   name: "김이용",
   phone: "010-1234-5678",
   email: "kim@example.com",
+  currentStay: null,
   version: 2,
 };
 
-const LATEST_GUEST: Guest = {
+const LATEST_GUEST: GuestDetail = {
   ...GUEST,
   name: "김이용(변경)",
   email: "kim.new@example.com",
@@ -74,7 +75,7 @@ const LATEST_GUEST: Guest = {
 
 type FormValues = Record<GuestInfoField, string>;
 
-function valuesOf({ name, phone, email }: Guest): FormValues {
+function valuesOf({ name, phone, email }: GuestDetail): FormValues {
   return { name, phone, email };
 }
 

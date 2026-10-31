@@ -19,6 +19,8 @@ export {
 } from "./guest";
 export type {
   Guest,
+  GuestCurrentStay,
+  GuestDetail,
   GuestListParams,
   GuestPage,
   UpdateGuestBody,
@@ -53,6 +55,7 @@ export {
   fetchRoom,
   fetchRooms,
   fetchRoomStatusHistories,
+  isRoomQueryKey,
   roomListParamsSchema,
   roomListQueryKey,
   roomParamsSchema,

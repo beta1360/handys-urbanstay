@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 import { Button } from "@repo/ui/button";
 import { SelectField } from "@repo/ui/select-field";
+import type { SelectFieldOption } from "@repo/ui/select-field";
 import { TextField } from "@repo/ui/text-field";
 import type { FormFieldProps } from "@repo/admin-kit/form";
 import {
@@ -21,16 +22,27 @@ const STATUS_OPTIONS = [
 ];
 
 type RoomSearchFormViewProps = {
-  fields: Record<"keyword" | "status", FormFieldProps>;
+  fields: Record<
+    "keyword" | "status" | "roomTypeId",
+    FormFieldProps & { value?: string }
+  >;
+  roomTypeOptions: readonly SelectFieldOption[];
+  roomTypeHint: string | undefined;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
 export function RoomSearchFormView({
   fields,
+  roomTypeOptions,
+  roomTypeHint,
   onSubmit,
 }: RoomSearchFormViewProps) {
   return (
-    <form role="search" onSubmit={onSubmit} className="flex items-end gap-2">
+    <form
+      role="search"
+      onSubmit={onSubmit}
+      className="flex flex-wrap items-end gap-2"
+    >
       <TextField
         label={ROOM_SEARCH_FORM_MESSAGES.keywordLabel}
         type="search"
@@ -43,6 +55,13 @@ export function RoomSearchFormView({
         options={STATUS_OPTIONS}
         className="w-36"
         {...fields.status}
+      />
+      <SelectField
+        label={ROOM_FIELD_LABELS.roomType}
+        options={roomTypeOptions}
+        hint={roomTypeHint}
+        className="w-40"
+        {...fields.roomTypeId}
       />
       <Button type="submit" variant="secondary">
         {COMMON_MESSAGES.search}

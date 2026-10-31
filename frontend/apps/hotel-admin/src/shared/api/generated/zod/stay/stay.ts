@@ -9,7 +9,9 @@ import * as zod from 'zod';
 
 import {
   ApiResponsePageResponseStayHotelAdminResponse,
+  ApiResponsePageResponseStaySettlementStayHotelAdminResponse,
   ApiResponseStayHotelAdminResponse,
+  ApiResponseStaySettlementHotelAdminResponse,
   StayCancelHotelAdminRequest
 } from '../schemas';
 
@@ -27,9 +29,12 @@ export const CancelStayBody = StayCancelHotelAdminRequest
 export const CancelStayResponse = ApiResponseStayHotelAdminResponse
 
 /**
- * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 이용 목록을 체크인 날짜 내림차순(같으면 이용 id 내림차순)으로 페이지로 나눠 조회합니다. 다른 호텔의 이용은 나오지 않고, 취소한 이용도 함께 나옵니다. roomId를 보내면 그 객실의 이용만, guestId를 보내면 그 이용객의 이용만, canceled를 보내면 취소 여부가 맞는 이용만 조회하고, 함께 보내면 모두 맞는 이용만 조회합니다. 없는 id나 다른 호텔의 id로 거르면 빈 목록입니다. 객실 이름과 이용객의 이름·전화번호는 조회하는 시점의 값입니다. canceled가 true, false가 아니면(대문자, 빈 값 등) 400 INVALID_INPUT으로 응답하고 fieldErrors에 canceled를 담습니다.
+ * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 이용 목록을 체크인 날짜 내림차순(같으면 이용 id 내림차순)으로 페이지로 나눠 조회합니다. 다른 호텔의 이용은 나오지 않고, 취소한 이용도 함께 나옵니다. roomId를 보내면 그 객실의 이용만, guestId를 보내면 그 이용객의 이용만, canceled를 보내면 취소 여부가 맞는 이용만 조회합니다. keyword를 보내면 이용객 이름(대소문자 구분 없이)이나 전화번호(저장된 번호와 keyword 양쪽의 하이픈을 빼고)에 keyword가 들어 있는 이용만 찾고, %, _, \ 같은 문자도 글자 그대로 찾습니다. 하이픈만 있는 keyword는 전화번호로는 찾지 않습니다. checkInFrom·checkInTo를 보내면 체크인 날짜가 그 사이(양 끝 포함)인 이용만 조회하고, 하나만 보내도 됩니다. 모든 조건은 함께 보내면 모두 맞는 이용만 조회합니다. 없는 id나 다른 호텔의 id로 거르면 빈 목록입니다. 객실 이름과 이용객의 이름·전화번호는 조회하는 시점의 값입니다. canceled가 true, false가 아니면(대문자, 빈 값 등) 400 INVALID_INPUT으로 응답하고 fieldErrors에 canceled를 담습니다. 날짜가 YYYY-MM-DD 형식이 아니면 그 파라미터를, checkInFrom이 checkInTo보다 늦으면 checkInTo를 fieldErrors에 담아 400 INVALID_INPUT으로 응답합니다.
  * @summary 이용 목록 조회
  */
+export const getStaysQueryKeywordMin = 0;
+export const getStaysQueryKeywordMax = 100;
+
 export const getStaysQueryPageDefault = 0;
 export const getStaysQueryPageMin = 0;
 export const getStaysQueryPageMax = 99;
@@ -43,6 +48,9 @@ export const GetStaysQueryParams = zod.object({
   "roomId": zod.int().optional().describe('객실 ID(선택). 그 객실의 이용만 조회합니다.'),
   "guestId": zod.int().optional().describe('이용객 ID(선택). 그 이용객의 이용만 조회합니다.'),
   "canceled": zod.boolean().optional().describe('취소 여부(선택). true면 취소한 이용만, false면 취소하지 않은 이용만 조회하고, 보내지 않으면 모두 조회합니다.'),
+  "keyword": zod.string().min(getStaysQueryKeywordMin).max(getStaysQueryKeywordMax).optional().describe('이용객 검색어(선택). 이용객 이름(대소문자 구분 없이)이나 전화번호(양쪽 하이픈을 빼고)에 들어 있는 이용을 글자 그대로 찾습니다. 앞뒤 공백을 지운 뒤 100자 이하이고, 비어 있거나 공백만 있으면 거르지 않습니다.'),
+  "checkInFrom": zod.iso.date().optional().describe('체크인 기간의 시작 날짜(선택, "YYYY-MM-DD"). 체크인 날짜가 이 날이거나 뒤인 이용만 조회합니다.'),
+  "checkInTo": zod.iso.date().optional().describe('체크인 기간의 끝 날짜(선택, "YYYY-MM-DD"). 체크인 날짜가 이 날이거나 앞인 이용만 조회합니다. checkInFrom보다 이르면 400입니다.'),
   "page": zod.int().min(getStaysQueryPageMin).max(getStaysQueryPageMax).default(getStaysQueryPageDefault).describe('페이지 번호. 0~99, 기본 0'),
   "size": zod.int().min(1).max(getStaysQuerySizeMax).default(getStaysQuerySizeDefault).describe('페이지 크기. 1~100, 기본 10')
 })
@@ -58,4 +66,39 @@ export const GetStayParams = zod.object({
 })
 
 export const GetStayResponse = ApiResponseStayHotelAdminResponse
+
+/**
+ * 로그인한 마스터의 호텔에서 체크인 날짜가 그 달(한국 날짜 기준 1일~말일)인 이용을 모아 정산합니다. totalAmount는 취소하지 않은 이용의 최종 금액 합계(원), stayCount는 취소하지 않은 이용 건수, canceledCount는 취소한 이용 건수입니다. 이용이 없는 달이면 모두 0입니다. 다른 호텔의 이용은 들어가지 않습니다. month는 필수이고 "YYYY-MM" 형식(예: 2026-11)만 받습니다. 빠지면 400 INVALID_INPUT(fieldErrors에 month, 필수), 형식이 틀리면(예: 2026-13, 2026-1, 2026-11-01) 400 INVALID_INPUT(fieldErrors에 month, 타입)으로 응답합니다. 마스터만 쓰고 운영자 계정은 403 FORBIDDEN입니다.
+ * @summary 월별 정산 조회(마스터 전용)
+ */
+export const getSettlementQueryMonthRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])$');
+
+
+export const GetSettlementQueryParams = zod.object({
+  "month": zod.string().regex(getSettlementQueryMonthRegExp).describe('정산할 달("YYYY-MM", 예: 2026-11)')
+})
+
+export const GetSettlementResponse = ApiResponseStaySettlementHotelAdminResponse
+
+/**
+ * 로그인한 마스터의 호텔에서 체크인 날짜가 그 달(1일~말일)인 이용을 취소한 이용까지 체크인 날짜 오름차순(같으면 이용 id 오름차순)으로 페이지로 나눠 조회합니다. 월별 정산에 들어간 이용과 같은 범위입니다. 취소한 이용은 canceledAt에 취소 시각이 담기고, 금액은 취소해도 그대로 담깁니다. 객실 이름, 객실 유형, 이용객 이름은 조회하는 시점의 값입니다(객실 유형은 지금 그 객실의 유형). 다른 호텔의 이용은 나오지 않습니다. month 규칙은 월별 정산 조회와 같습니다. page는 0~99(기본 0), size는 1~100(기본 10)이고, 범위를 벗어나면 400 INVALID_INPUT으로 응답하고 fieldErrors에 파라미터 이름을 담습니다. 마스터만 쓰고 운영자 계정은 403 FORBIDDEN입니다.
+ * @summary 월별 이용 로그 조회(마스터 전용)
+ */
+export const getSettlementStaysQueryMonthRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])$');
+export const getSettlementStaysQueryPageDefault = 0;
+export const getSettlementStaysQueryPageMin = 0;
+export const getSettlementStaysQueryPageMax = 99;
+
+export const getSettlementStaysQuerySizeDefault = 10;
+export const getSettlementStaysQuerySizeMax = 100;
+
+
+
+export const GetSettlementStaysQueryParams = zod.object({
+  "month": zod.string().regex(getSettlementStaysQueryMonthRegExp).describe('조회할 달("YYYY-MM", 예: 2026-11)'),
+  "page": zod.int().min(getSettlementStaysQueryPageMin).max(getSettlementStaysQueryPageMax).default(getSettlementStaysQueryPageDefault).describe('페이지 번호. 0~99, 기본 0'),
+  "size": zod.int().min(1).max(getSettlementStaysQuerySizeMax).default(getSettlementStaysQuerySizeDefault).describe('페이지 크기. 1~100, 기본 10')
+})
+
+export const GetSettlementStaysResponse = ApiResponsePageResponseStaySettlementStayHotelAdminResponse
 

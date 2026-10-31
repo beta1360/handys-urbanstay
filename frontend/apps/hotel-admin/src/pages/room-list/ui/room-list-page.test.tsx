@@ -17,7 +17,7 @@ import {
 } from "@/entities/room";
 import { ROOM_TYPE_FIELD_LABELS } from "@/entities/room-type";
 import { ROOM_SEARCH_FORM_MESSAGES } from "@/features/room-search";
-import type { Room, RoomPage } from "@/shared/api";
+import type { Room, RoomPage, RoomType } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import {
@@ -31,7 +31,10 @@ import {
 } from "../model/room-list-search";
 import { RoomListPage } from "./room-list-page";
 
-const { fetchRooms } = vi.hoisted(() => ({ fetchRooms: vi.fn() }));
+const { fetchRooms, fetchRoomTypes } = vi.hoisted(() => ({
+  fetchRooms: vi.fn(),
+  fetchRoomTypes: vi.fn(),
+}));
 
 vi.mock("@/shared/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/api")>();
@@ -39,6 +42,7 @@ vi.mock("@/shared/api", async (importOriginal) => {
     ...actual,
     fetchRooms: (params: Parameters<typeof actual.fetchRooms>[0]) =>
       fetchRooms(params),
+    fetchRoomTypes: () => fetchRoomTypes(),
   };
 });
 
@@ -85,6 +89,11 @@ const ROOMS: Room[] = [
 ];
 
 const KEYWORD = "10";
+
+const ROOM_TYPES: RoomType[] = [
+  { ...ROOMS[1].roomType, version: 0 },
+  { ...ROOMS[0].roomType, version: 0 },
+];
 
 function createRoomPage(overrides: Partial<RoomPage> = {}): RoomPage {
   return {
@@ -163,6 +172,10 @@ function getStatusSelect() {
   });
 }
 
+function getRoomTypeSelect() {
+  return screen.getByRole("combobox", { name: ROOM_FIELD_LABELS.roomType });
+}
+
 function getSearchButton() {
   return screen.getByRole("button", { name: COMMON_MESSAGES.search });
 }
@@ -175,6 +188,7 @@ function getRowTexts(row: HTMLElement) {
 
 beforeEach(() => {
   fetchRooms.mockResolvedValue(createRoomPage());
+  fetchRoomTypes.mockResolvedValue(ROOM_TYPES);
 });
 
 afterEach(() => {
@@ -400,6 +414,61 @@ describe("RoomListPage 검색과 상태 거르기", () => {
   });
 });
 
+describe("RoomListPage 유형 거르기", () => {
+  it("유형 선택지는 전체와 그 호텔의 유형(서버 순서)이다", async () => {
+    renderRoomListPage();
+
+    await screen.findByRole("option", { name: ROOM_TYPES[1].name });
+    expect(
+      within(getRoomTypeSelect())
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual([COMMON_MESSAGES.all, ROOM_TYPES[0].name, ROOM_TYPES[1].name]);
+  });
+
+  it("유형을 고른 뒤 검색하면 URL에 유형을 두고 그 유형으로 1페이지를 조회한다", async () => {
+    fetchRooms.mockResolvedValue(createRoomPage({ totalPages: 3 }));
+    const { router, user } = renderRoomListPage(roomsPath({ page: "2" }));
+
+    await screen.findByRole("option", { name: ROOM_TYPES[0].name });
+    await user.selectOptions(getRoomTypeSelect(), ROOM_TYPES[0].name);
+    expect(fetchRooms).toHaveBeenCalledOnce();
+    await user.click(getSearchButton());
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe(
+        roomsPath({ roomTypeId: String(ROOM_TYPES[0].id) }),
+      );
+    });
+    expect(fetchRooms).toHaveBeenLastCalledWith({
+      roomTypeId: ROOM_TYPES[0].id,
+      page: 0,
+    });
+  });
+
+  it("URL의 유형으로 처음 조회하고 유형 선택에 보여준다", async () => {
+    renderRoomListPage(roomsPath({ roomTypeId: String(ROOM_TYPES[1].id) }));
+
+    await screen.findByRole("option", { name: ROOM_TYPES[1].name });
+    expect(getRoomTypeSelect()).toHaveValue(String(ROOM_TYPES[1].id));
+    expect(fetchRooms).toHaveBeenCalledExactlyOnceWith({
+      roomTypeId: ROOM_TYPES[1].id,
+      page: 0,
+    });
+  });
+
+  it.each([
+    ["숫자가 아니면", "abc"],
+    ["0이면", "0"],
+  ])("유형 ID가 %s 유형 없이 조회하고 URL에서 지운다", async (_, roomTypeId) => {
+    const { router } = renderRoomListPage(roomsPath({ roomTypeId }));
+
+    await screen.findByRole("table");
+    expect(router.state.location.href).toBe(roomsPath());
+    expect(fetchRooms).toHaveBeenCalledExactlyOnceWith({ page: 0 });
+  });
+});
+
 describe("RoomListPage 빈 상태", () => {
   it.each([
     ["검색어와 상태가 없으면 등록된 객실이 없다는", {}, ROOM_LIST_CONTENT_MESSAGES.empty],
@@ -411,6 +480,11 @@ describe("RoomListPage 빈 상태", () => {
     [
       "검색어가 있으면 검색 결과가 없다는",
       { keyword: KEYWORD },
+      COMMON_MESSAGES.emptySearchResult,
+    ],
+    [
+      "유형으로만 걸러도 검색 결과가 없다는",
+      { roomTypeId: "1" },
       COMMON_MESSAGES.emptySearchResult,
     ],
   ])("항목이 없을 때 %s 문구를 보여준다", async (_, search, message) => {

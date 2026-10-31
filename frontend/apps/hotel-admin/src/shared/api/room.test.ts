@@ -76,7 +76,13 @@ const ROOM_PAGE_RESPONSE = {
   error: null,
 };
 
-const LIST_PARAMS = { keyword: "10", status: "VACANT", page: 1, size: 10 } as const;
+const LIST_PARAMS = {
+  keyword: "10",
+  status: "VACANT",
+  roomTypeId: 1,
+  page: 1,
+  size: 10,
+} as const;
 
 const CREATE_BODY = {
   name: ROOM.name,
@@ -163,7 +169,7 @@ afterEach(() => {
 });
 
 describe("fetchRooms", () => {
-  it("검색어·상태·페이지와 signal을 넘겨 목록 페이지를 돌려준다", async () => {
+  it("검색어·상태·유형·페이지와 signal을 넘겨 목록 페이지를 돌려준다", async () => {
     vi.mocked(generated.getRooms).mockResolvedValue(ROOM_PAGE_RESPONSE);
     const { signal } = new AbortController();
 

@@ -1,12 +1,12 @@
 import { API_ERROR_CODES, getApiError } from "@/shared/api";
-import type { Guest } from "@/shared/api";
+import type { GuestDetail } from "@/shared/api";
 import { useGuestQuery } from "../api/guest-query";
 
 export type GuestState =
   | { status: "loading" }
   | { status: "failed"; retry: () => void }
   | { status: "notFound" }
-  | { status: "ready"; guest: Guest };
+  | { status: "ready"; guest: GuestDetail };
 
 export function useGuest(guestId: number): GuestState {
   const { data, error, refetch } = useGuestQuery(guestId);

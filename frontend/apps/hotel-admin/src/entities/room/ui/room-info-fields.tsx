@@ -27,7 +27,7 @@ export type RoomInfoInputProps = {
 type RoomInfoFieldsProps = {
   fields: Record<RoomInfoField, RoomInfoInputProps>;
   roomTypeOptions: readonly SelectFieldOption[];
-  roomTypeHint: string | undefined;
+  roomTypeHint: ReactNode;
 };
 
 function OptionalLabel({ children }: { children: ReactNode }) {

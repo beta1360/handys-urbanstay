@@ -13,6 +13,7 @@ import type { Room, RoomStatus } from "@/shared/api";
 export type RoomListCriteria = {
   keyword: string | undefined;
   status: RoomStatus | undefined;
+  roomTypeId: number | undefined;
   page: number;
 };
 
@@ -39,12 +40,14 @@ export type RoomListState =
 export function useRoomList({
   keyword,
   status,
+  roomTypeId,
   page,
 }: RoomListCriteria): RoomListState {
   const navigate = useNavigate();
   const { data, isError, isPlaceholderData, refetch } = useRoomListQuery({
     keyword,
     status,
+    roomTypeId,
     page: toApiPage(page),
   });
   const isOverflow = data !== undefined && isBeyondLastPage(data);
@@ -55,14 +58,17 @@ export function useRoomList({
     if (isOverflow) {
       void navigate({
         to: "/rooms",
-        search: { keyword, status, page: lastPage },
+        search: { keyword, status, roomTypeId, page: lastPage },
         replace: true,
       });
     }
-  }, [isOverflow, keyword, status, lastPage, navigate]);
+  }, [isOverflow, keyword, status, roomTypeId, lastPage, navigate]);
 
   function moveTo(nextPage: number) {
-    void navigate({ to: "/rooms", search: { keyword, status, page: nextPage } });
+    void navigate({
+      to: "/rooms",
+      search: { keyword, status, roomTypeId, page: nextPage },
+    });
   }
 
   if (data === undefined || isOverflow) {
@@ -73,7 +79,10 @@ export function useRoomList({
   if (data.items.length === 0) {
     return {
       status: "empty",
-      isFiltered: keyword !== undefined || status !== undefined,
+      isFiltered:
+        keyword !== undefined ||
+        status !== undefined ||
+        roomTypeId !== undefined,
     };
   }
   return {

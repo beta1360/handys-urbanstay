@@ -43,7 +43,12 @@ export function useRoomUpdateForm(roomId: number, initialRoom: Room) {
   const navigate = useNavigate();
   const errorToast = useFormErrorToast();
   const reloadButtonRef = useRef<HTMLButtonElement>(null);
-  const { roomTypeOptions, roomTypeHint } = useRoomTypeOptions();
+  const [currentRoomType, setCurrentRoomType] = useState(
+    initialRoom.roomType,
+  );
+  const { roomTypeOptions, roomTypeHint } = useRoomTypeOptions({
+    currentRoomType,
+  });
   const form = useForm({
     ...SUBMIT_ONLY_VALIDATION,
     resolver: zodResolver(roomUpdateFormSchema),
@@ -115,6 +120,7 @@ export function useRoomUpdateForm(roomId: number, initialRoom: Room) {
     try {
       const room = await refetchRoom();
       form.reset(toRoomUpdateFormValues(room), { keepFieldsRef: true });
+      setCurrentRoomType(room.roomType);
       setLoadState("idle");
       form.setFocus(ROOM_INFO_FIELDS[0]);
     } catch (error) {

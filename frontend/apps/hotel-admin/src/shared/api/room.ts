@@ -102,12 +102,28 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
+const ROOM_ID_PATTERN = /^\d+$/;
+
+const ROOM_QUERY_PATH_PREFIX = generated
+  .getGetRoomQueryKey(0)[0]
+  .replace(/0$/, "");
+
 export function roomListQueryKey(params?: RoomListParams) {
   return generated.getGetRoomsQueryKey(params);
 }
 
 export function roomQueryKey(roomId: number) {
   return generated.getGetRoomQueryKey(roomId);
+}
+
+export function isRoomQueryKey(queryKey: readonly unknown[]) {
+  const [path] = queryKey;
+  return (
+    queryKey.length === 1 &&
+    typeof path === "string" &&
+    path.startsWith(ROOM_QUERY_PATH_PREFIX) &&
+    ROOM_ID_PATTERN.test(path.slice(ROOM_QUERY_PATH_PREFIX.length))
+  );
 }
 
 export function roomStatusHistoriesQueryKey(

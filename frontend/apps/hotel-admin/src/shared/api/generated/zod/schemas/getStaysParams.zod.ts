@@ -7,6 +7,9 @@
  */
 import * as zod from 'zod';
 
+export const getStaysParamsKeywordMin = 0;
+export const getStaysParamsKeywordMax = 100;
+
 export const getStaysParamsPageDefault = 0;
 export const getStaysParamsPageMin = 0;
 export const getStaysParamsPageMax = 99;
@@ -19,6 +22,9 @@ export const GetStaysParams = zod.object({
   "roomId": zod.int().optional(),
   "guestId": zod.int().optional(),
   "canceled": zod.boolean().optional(),
+  "keyword": zod.string().min(getStaysParamsKeywordMin).max(getStaysParamsKeywordMax).optional(),
+  "checkInFrom": zod.iso.date().optional(),
+  "checkInTo": zod.iso.date().optional(),
   "page": zod.int().min(getStaysParamsPageMin).max(getStaysParamsPageMax).default(getStaysParamsPageDefault),
   "size": zod.int().min(1).max(getStaysParamsSizeMax).default(getStaysParamsSizeDefault)
 })

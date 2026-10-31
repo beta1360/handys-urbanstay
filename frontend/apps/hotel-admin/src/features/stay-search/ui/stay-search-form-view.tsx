@@ -2,9 +2,15 @@ import type { FormEvent } from "react";
 import { Button } from "@repo/ui/button";
 import { SelectField } from "@repo/ui/select-field";
 import type { SelectFieldOption } from "@repo/ui/select-field";
+import { TextField } from "@repo/ui/text-field";
 import type { FormFieldProps } from "@repo/admin-kit/form";
-import { STAY_CANCELED_LABELS, STAY_FIELD_LABELS } from "@/entities/stay";
+import {
+  STAY_CANCELED_LABELS,
+  STAY_FIELD_LABELS,
+  STAY_KEYWORD_MAX_LENGTH,
+} from "@/entities/stay";
 import { COMMON_MESSAGES } from "@/shared/config";
+import { STAY_SEARCH_FORM_MESSAGES } from "../config/messages";
 
 const ALL_OPTION = { value: "", label: COMMON_MESSAGES.all };
 
@@ -15,7 +21,10 @@ const CANCELED_OPTIONS = [
 ];
 
 type StaySearchFormViewProps = {
-  fields: Record<"roomId" | "canceled", FormFieldProps & { value?: string }>;
+  fields: Record<
+    "roomId" | "canceled" | "keyword" | "checkInFrom" | "checkInTo",
+    FormFieldProps & { value?: string }
+  >;
   roomOptions: readonly SelectFieldOption[];
   roomHint: string | undefined;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -28,7 +37,31 @@ export function StaySearchFormView({
   onSubmit,
 }: StaySearchFormViewProps) {
   return (
-    <form role="search" onSubmit={onSubmit} className="flex items-end gap-2">
+    <form
+      role="search"
+      onSubmit={onSubmit}
+      className="flex flex-wrap items-end gap-2"
+    >
+      <TextField
+        label={STAY_FIELD_LABELS.guest}
+        type="search"
+        placeholder={STAY_SEARCH_FORM_MESSAGES.keywordPlaceholder}
+        maxLength={STAY_KEYWORD_MAX_LENGTH}
+        className="w-56"
+        {...fields.keyword}
+      />
+      <TextField
+        label={STAY_SEARCH_FORM_MESSAGES.checkInFrom}
+        type="date"
+        className="w-40"
+        {...fields.checkInFrom}
+      />
+      <TextField
+        label={STAY_SEARCH_FORM_MESSAGES.checkInTo}
+        type="date"
+        className="w-40"
+        {...fields.checkInTo}
+      />
       <SelectField
         label={STAY_FIELD_LABELS.room}
         options={[ALL_OPTION, ...roomOptions]}

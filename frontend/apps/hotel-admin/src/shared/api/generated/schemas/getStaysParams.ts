@@ -20,6 +20,20 @@ guestId?: number;
  */
 canceled?: boolean;
 /**
+ * 이용객 검색어(선택). 이용객 이름(대소문자 구분 없이)이나 전화번호(양쪽 하이픈을 빼고)에 들어 있는 이용을 글자 그대로 찾습니다. 앞뒤 공백을 지운 뒤 100자 이하이고, 비어 있거나 공백만 있으면 거르지 않습니다.
+ * @minLength 0
+ * @maxLength 100
+ */
+keyword?: string;
+/**
+ * 체크인 기간의 시작 날짜(선택, "YYYY-MM-DD"). 체크인 날짜가 이 날이거나 뒤인 이용만 조회합니다.
+ */
+checkInFrom?: string;
+/**
+ * 체크인 기간의 끝 날짜(선택, "YYYY-MM-DD"). 체크인 날짜가 이 날이거나 앞인 이용만 조회합니다. checkInFrom보다 이르면 400입니다.
+ */
+checkInTo?: string;
+/**
  * 페이지 번호. 0~99, 기본 0
  * @minimum 0
  * @maximum 99

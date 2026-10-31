@@ -21,6 +21,7 @@ export const getRoomsParamsSizeMax = 100;
 export const GetRoomsParams = zod.object({
   "keyword": zod.string().min(getRoomsParamsKeywordMin).max(getRoomsParamsKeywordMax).optional(),
   "status": zod.enum(['VACANT', 'RESERVED', 'OCCUPIED', 'MAINTENANCE']).optional(),
+  "roomTypeId": zod.int().optional(),
   "page": zod.int().min(getRoomsParamsPageMin).max(getRoomsParamsPageMax).default(getRoomsParamsPageDefault),
   "size": zod.int().min(1).max(getRoomsParamsSizeMax).default(getRoomsParamsSizeDefault)
 })
