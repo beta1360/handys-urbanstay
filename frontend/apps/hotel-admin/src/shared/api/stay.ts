@@ -2,6 +2,8 @@ import { z } from "zod";
 import { parseRequest, parseResponseBody } from "@repo/admin-kit/api";
 import * as generated from "./generated";
 import {
+  CancelStayParams,
+  CancelStayResponse,
   GetStayParams,
   GetStayResponse,
   GetStaysQueryParams,
@@ -9,12 +11,17 @@ import {
 } from "./generated/zod";
 import {
   PageResponseStayHotelAdminResponse,
+  StayCancelHotelAdminRequest,
   StayHotelAdminResponse,
 } from "./generated/zod/schemas";
+
+export const cancelStayBodySchema = StayCancelHotelAdminRequest;
 
 export const stayListParamsSchema = GetStaysQueryParams;
 
 export const stayParamsSchema = GetStayParams;
+
+export type CancelStayBody = z.input<typeof StayCancelHotelAdminRequest>;
 
 export type Stay = z.output<typeof StayHotelAdminResponse>;
 
@@ -27,9 +34,16 @@ const GetStaysSuccessResponse = GetStaysResponse.extend({
   data: PageResponseStayHotelAdminResponse,
 });
 
-const GetStaySuccessResponse = GetStayResponse.extend({
+const STAY_SUCCESS_SHAPE = {
   success: z.literal(true),
   data: StayHotelAdminResponse,
+};
+
+const GetStaySuccessResponse = GetStayResponse.extend(STAY_SUCCESS_SHAPE);
+
+const CancelStaySuccessResponse = CancelStayResponse.extend({
+  ...STAY_SUCCESS_SHAPE,
+  message: z.string(),
 });
 
 type RequestOptions = {
@@ -64,4 +78,20 @@ export async function fetchStay(
     signal,
   );
   return parseResponseBody("getStay", GetStaySuccessResponse, response).data;
+}
+
+export async function cancelStay(stayId: number, body: CancelStayBody) {
+  const validParams = parseRequest("cancelStay", CancelStayParams, { stayId });
+  const validBody = parseRequest(
+    "cancelStay",
+    StayCancelHotelAdminRequest,
+    body,
+  );
+  const response = await generated.cancelStay(validParams.stayId, validBody);
+  const { data, message } = parseResponseBody(
+    "cancelStay",
+    CancelStaySuccessResponse,
+    response,
+  );
+  return { data, message };
 }

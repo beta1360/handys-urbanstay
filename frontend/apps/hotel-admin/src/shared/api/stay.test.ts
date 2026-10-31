@@ -9,6 +9,7 @@ import {
   getStaysQuerySizeDefault,
 } from "./generated/zod";
 import {
+  cancelStay,
   fetchStay,
   fetchStays,
   stayListQueryKey,
@@ -19,6 +20,7 @@ vi.mock("./generated", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./generated")>()),
   getStays: vi.fn(),
   getStay: vi.fn(),
+  cancelStay: vi.fn(),
 }));
 
 const STAY_ID = 5;
@@ -176,6 +178,48 @@ describe("쿼리 키", () => {
     );
     expect(stayQueryKey(STAY_ID)).toEqual(
       generated.getGetStayQueryKey(STAY_ID),
+    );
+  });
+});
+
+describe("cancelStay", () => {
+  const CANCEL_MESSAGE = "이용을 취소했습니다.";
+
+  it.each([
+    ["사유를 담은 본문", { reason: "고객 요청" }],
+    ["빈 본문", {}],
+  ])("이용 ID와 %s으로 취소하고 취소한 이용과 성공 문구를 돌려준다", async (_, body) => {
+    vi.mocked(generated.cancelStay).mockResolvedValue({
+      success: true,
+      data: CANCELED_STAY,
+      message: CANCEL_MESSAGE,
+      error: null,
+    });
+
+    await expect(cancelStay(STAY_ID, body)).resolves.toEqual({
+      data: CANCELED_STAY,
+      message: CANCEL_MESSAGE,
+    });
+    expect(generated.cancelStay).toHaveBeenCalledWith(STAY_ID, body);
+  });
+
+  it("사유가 200자를 넘으면 요청을 보내지 않고 요청 검증 오류를 던진다", async () => {
+    await expect(
+      cancelStay(STAY_ID, { reason: "가".repeat(201) }),
+    ).rejects.toBeInstanceOf(RequestValidationError);
+    expect(generated.cancelStay).not.toHaveBeenCalled();
+  });
+
+  it("성공 응답의 message가 null이면 응답 검증 오류를 던진다", async () => {
+    vi.mocked(generated.cancelStay).mockResolvedValue({
+      success: true,
+      data: CANCELED_STAY,
+      message: null,
+      error: null,
+    });
+
+    await expect(cancelStay(STAY_ID, {})).rejects.toBeInstanceOf(
+      ResponseValidationError,
     );
   });
 });

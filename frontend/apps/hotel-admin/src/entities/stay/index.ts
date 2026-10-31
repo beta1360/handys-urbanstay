@@ -1,4 +1,5 @@
 export { useStayListQuery } from "./api/stay-list-query";
+export { refreshStay } from "./api/stay-query";
 export {
   STAY_CANCELED_LABELS,
   STAY_CANCELLATION_LABELS,
@@ -8,6 +9,7 @@ export {
   STAY_NOT_FOUND_MESSAGES,
   STAY_ROOM_OPTION_MESSAGES,
 } from "./config/messages";
+export { isStayCancelable } from "./lib/stay-cancelable";
 export {
   normalizeStayCanceled,
   normalizeStayFilterId,

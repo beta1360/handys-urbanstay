@@ -6,6 +6,7 @@ import {
   StayNotFound,
   useStay,
 } from "@/entities/stay";
+import { StayCancel } from "@/features/stay-cancel";
 import { StayDetailActions } from "./stay-detail-actions";
 
 type StayDetailProps = {
@@ -37,6 +38,7 @@ export function StayDetail({ stayId }: StayDetailProps) {
         <>
           <StayDetailActions />
           <StayInformation stay={state.stay} />
+          <StayCancel key={state.stay.id} stay={state.stay} />
           {state.stay.cancellation === null ? null : (
             <StayCancellationInformation
               cancellation={state.stay.cancellation}
