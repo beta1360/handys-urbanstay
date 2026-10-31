@@ -53,4 +53,20 @@ interface StayRepository : JpaRepository<Stay, Long>, JpaSpecificationExecutor<S
 		""",
 	)
 	fun findOverlappedRoomIds(roomIds: Collection<Long>, checkInDate: LocalDate, checkOutDate: LocalDate): List<Long>
+
+	@Query(
+		"""
+		select new com.marco.assignment.handys.urbanstay.stay.repository.StaySettlementSummary(
+			coalesce(sum(s.totalAmount) filter (where s.canceledAt is null), 0L),
+			count(s) filter (where s.canceledAt is null),
+			count(s) filter (where s.canceledAt is not null)
+		)
+		from Stay s
+		where s.room.hotel.id = :hotelId and s.checkInDate between :startDate and :endDate
+		""",
+	)
+	fun summarize(hotelId: Long, startDate: LocalDate, endDate: LocalDate): StaySettlementSummary
+
+	@EntityGraph(attributePaths = [ROOM, "room.roomType", GUEST])
+	fun findByRoomHotelIdAndCheckInDateBetween(hotelId: Long, startDate: LocalDate, endDate: LocalDate, pageable: Pageable): Page<Stay>
 }
