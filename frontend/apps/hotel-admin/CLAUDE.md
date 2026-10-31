@@ -21,6 +21,13 @@
   - 상태 문구(`VACANT` '공실', `RESERVED` '예약됨', `OCCUPIED` '이용중', `MAINTENANCE` '정비중')는 `entities/room`의 `ROOM_STATUS_LABELS`다. 층이 없으면 '층 없음', 소개가 없으면 '소개 없음'을 회색으로 보여준다.
   - 등록·수정 폼의 최대 인원·층은 글자 입력창(`inputMode="numeric"`)이고 `@repo/admin-kit/form`의 정수 검사로 숫자로 바꿔 보낸다. 층이 비면 null이다. 체크인·체크아웃 시각은 브라우저 시간 입력(`type="time"`, 값 `HH:mm`)이다.
   - 같은 이름의 객실이 있다는 409(`ROOM_DUPLICATED`)는 이름 칸의 오류로 보여준다. 수정 충돌은 `ROOM_MODIFIED`, 대상 없음은 `ROOM_NOT_FOUND`다.
+- 객실 상태는 상세 화면에서 바꾼다(`docs/domain.md`의 '객실 상태'). 상세 내용 아래에 '상태 바꾸기' 묶음과 상태 이력을 차례로 둔다. 둘 다 내용을 보여줄 때만 그린다.
+  - 지금 상태는 상세 내용의 '상태' 항목이 보여준다. 버튼은 지금 상태에서 갈 수 있는 상태만 바뀔 상태 이름(`ROOM_STATUS_LABELS`)으로 둔다. 갈 수 있는 방향은 `entities/room`의 `ROOM_STATUS_TRANSITIONS`다(공실 → 예약됨·정비중, 예약됨 → 이용중·공실, 이용중 → 정비중, 정비중 → 공실).
+  - 누르면 확인 없이 화면에서 본 상태(`from`)와 바꿀 상태(`to`)를 보낸다. 요청이 끝나고 다시 불러올 때까지 모든 상태 버튼을 비활성화한다.
+  - 성공하면 객실 상세·상태 이력을 다시 불러오고 객실 목록을 무효화한 뒤 서버의 성공 문구를 토스트로 보여준다.
+  - 그사이 다른 사람이 바꿨다는 409(`ROOM_STATUS_CHANGED`)와 바꿀 수 없는 방향이라는 409(`ROOM_STATUS_TRANSITION_NOT_ALLOWED`)는 서버 문구를 오류 토스트로 보여주고, 성공과 같게 다시 불러온다. 그 밖의 실패는 등록·수정 폼의 폼 전체 오류처럼 오류 토스트로 보여주고(본문을 쓸 수 없으면 일반 오류 문구), 다시 누르면 그 토스트를 지운다. 401은 사용 중 로그인 만료 처리를 따른다.
+  - 상태 이력 표의 열은 바꾼 시각(한국 시간 `YYYY-MM-DD HH:mm`), 상태 변경(`이전 → 바뀐`, 객실 등록 이력의 이전 상태는 회색 '없음'), 바꾼 사람(그때의 이름)이다. 최신순은 서버가 정한다.
+  - 이력의 페이지는 URL에 두지 않고 화면 상태로 1페이지부터 센다. 상세 화면 안의 보조 목록이라 새로고침·주소 공유로 같은 페이지를 다시 볼 일이 적기 때문이다. 페이지 이동 중 이전 이력을 흐리게 보여주는 것, 불러오는 중·불러오기 실패('다시 시도')·빈 상태('상태 이력이 없습니다.')는 목록 화면과 같다.
 - 이용객은 목록(`/guests`), 등록(`/guests/new`), 상세(`/guests/$guestId`), 수정(`/guests/$guestId/edit`) 화면이다. 화면 동작은 `frontend/docs/admin-app.md`의 '목록 화면'·'상세 화면'·'등록·수정 화면'을 따른다.
   - 목록은 이름·전화번호·이메일 열이고, 검색어(이름 또는 전화번호)와 페이지를 URL search에 둔다. 정렬(최근 등록순)과 검색 기준은 서버가 정한다.
   - 같은 호텔의 전화번호 중복 409(`GUEST_PHONE_DUPLICATED`)는 등록·수정 모두 전화번호 칸 오류로 보여준다. 수정 충돌 409(`GUEST_MODIFIED`)는 '최신 내용 불러오기'와 함께 폼 안에 보여준다.
@@ -34,11 +41,11 @@
 - 라우터의 URL search 직렬화는 `src/shared/lib/search-params`의 `parseSearch`·`stringifySearch`를 쓴다(일반 쿼리 문자열). 테스트용 memory 라우터도 같은 함수를 넣는다.
 - 도메인과 무관한 폼 도우미, 토스트 상태, 화면 이동 링크, 요청·응답 검증과 서버와 같은 입력 검증 문구는 `@repo/admin-kit`의 것을 쓴다(`frontend/docs/admin-app.md`의 'packages/admin-kit를 쓰는 법').
 - 서버 상태는 `frontend/CLAUDE.md`의 '서버 상태'를 따른다.
-  - `shared/api`: 검증을 거친 요청 함수(`fetchMe`, 로그인·로그아웃, 객실 목록·조회·등록·수정, 이용객 목록·조회·등록·수정)와 쿼리 키 함수(`meQueryKey`, `roomListQueryKey`, `roomQueryKey`, `guestListQueryKey`, `guestQueryKey`), 서버 오류 정보 읽기(`getApiError`)와 오류 코드(`API_ERROR_CODES`)
+  - `shared/api`: 검증을 거친 요청 함수(`fetchMe`, 로그인·로그아웃, 객실 목록·조회·등록·수정·상태 변경, 객실 상태 이력 조회, 이용객 목록·조회·등록·수정)와 쿼리 키 함수(`meQueryKey`, `roomListQueryKey`, `roomQueryKey`, `roomStatusHistoriesQueryKey`, `guestListQueryKey`, `guestQueryKey`), 서버 오류 정보 읽기(`getApiError`)와 오류 코드(`API_ERROR_CODES`)
   - `entities/account/api`: 내 정보 조회(`useMe`, `ensureMe`)와 로그인 상태 캐시 규칙(`startSession`, `endSession`, `forgetMe`, `isPendingMeQuery`)
-  - `entities/room/api`: 객실 목록 조회(`useRoomListQuery`), 객실 조회(`useRoomQuery`)와 새로 조회(`useRefetchRoom`), 저장한 객실 캐시 규칙(`cacheSavedRoom`)
+  - `entities/room/api`: 객실 목록 조회(`useRoomListQuery`), 객실 조회(`useRoomQuery`)와 새로 조회(`useRefetchRoom`), 객실 상태 이력 조회(`useRoomStatusHistoryQuery`), 저장한 객실 캐시 규칙(`cacheSavedRoom`), 상태를 바꾼 뒤 다시 불러오기(`refreshRoomStatus`: 객실 상세·상태 이력을 다시 불러오고 목록을 무효화한다)
   - `entities/guest/api`: 이용객 목록 조회(`useGuestListQuery`), 이용객 조회(`useGuestQuery`)와 새로 조회(`useRefetchGuest`), 저장한 이용객 캐시 규칙(`cacheSavedGuest`)
-  - `features/<동작>/api`: `auth-login`(`useLogin`), `auth-logout`(`useLogout`), `room-create`(`useCreateRoom`), `room-update`(`useUpdateRoom`), `guest-create`(`useCreateGuest`), `guest-update`(`useUpdateGuest`)
+  - `features/<동작>/api`: `auth-login`(`useLogin`), `auth-logout`(`useLogout`), `room-create`(`useCreateRoom`), `room-update`(`useUpdateRoom`), `room-status-change`(`useChangeRoomStatus`: 성공과 상태 409 두 가지면 `refreshRoomStatus`가 끝날 때까지 요청 중으로 둔다), `guest-create`(`useCreateGuest`), `guest-update`(`useUpdateGuest`)
 - 라우트 트리는 `src/app/router/route-tree.gen.ts`에 생성된다. 직접 수정하지 않고 커밋한다.
 - 라우트 생성 설정은 `tsr.config.json`에만 둔다.
 
@@ -73,7 +80,7 @@ apps/hotel-admin/
    ├─ widgets/
    │  ├─ admin-layout/ # 사이드바 메뉴(config/menu.ts: 객실·이용객), 위쪽 영역. model: useAdminHeader(화면 제목·호텔 이름·계정 이름·역할 문구·로그아웃 상태). ui: AdminHeader(연결)·AdminHeaderBar(표현)
    │  ├─ room-list/    # 객실 목록. model: useRoomList(상태별 내용, 마지막 페이지를 넘으면 바꿔 이동, 페이지 이동). ui: RoomList(연결)·표·빈 상태·불러오기 실패·페이지 이동
-   │  ├─ room-detail/  # 객실 상세. 상태별 내용과 '목록으로'·'수정' 링크 줄
+   │  ├─ room-detail/  # 객실 상세. 상태별 내용과 '목록으로'·'수정' 링크 줄, 내용 아래의 상태 바꾸기·상태 이력. model: useRoomStatusHistory(불러오는 중·실패·빈 상태·내용, 화면 상태의 페이지 이동). ui: RoomDetail(연결)·RoomStatusHistory(이력 연결)·이력 표·빈 상태·불러오기 실패·페이지 이동
    │  ├─ guest-list/   # 이용객 목록. model: useGuestList(상태별 내용, 마지막 페이지를 넘으면 바꿔 이동, 페이지 이동). ui: GuestList(연결)·표·빈 상태·불러오기 실패·페이지 이동
    │  └─ guest-detail/ # 이용객 상세. 상태별 내용과 '목록으로'·'수정' 링크 줄
    ├─ features/
@@ -81,25 +88,27 @@ apps/hotel-admin/
    │  ├─ auth-logout/  # api: 로그아웃. 성공하거나 401이면 로그인 상태를 끝낸다
    │  ├─ room-search/  # 객실 목록 검색(이름 검색어·상태). model: useRoomSearchForm(제출하면 1페이지로 이동). ui: RoomSearchForm(연결)·RoomSearchFormView(표현)
    │  ├─ room-create/  # 객실 등록. api: useCreateRoom. model: 폼 스키마, useRoomCreateForm(이름 중복은 이름 칸 오류, 성공하면 상세로 이동). ui: 연결·표현
+   │  ├─ room-status-change/ # 객실 상태 바꾸기. api: useChangeRoomStatus. model: useRoomStatusChange(갈 수 있는 상태, 요청 중 막기, 성공·실패 토스트). ui: RoomStatusChange(연결)·RoomStatusChangeView(표현)
    │  ├─ room-update/  # 객실 수정. api: useUpdateRoom. model: 폼 스키마·값 채우기, useRoomUpdateForm(수정 충돌이면 최신 내용 불러오기). ui: RoomUpdate(불러오기 상태)·RoomUpdateForm(연결)·표현
    │  ├─ guest-search/ # 이용객 목록 검색(이름 또는 전화번호). model: useGuestSearchForm(제출하면 1페이지로 이동). ui: GuestSearchForm(연결)·GuestSearchFormView(표현)
    │  ├─ guest-create/ # 이용객 등록. api: useCreateGuest. model: 폼 스키마, useGuestCreateForm(전화번호 중복은 전화번호 칸 오류, 성공하면 상세로 이동). ui: 연결·표현
    │  └─ guest-update/ # 이용객 수정. api: useUpdateGuest. model: 폼 스키마·값 채우기, useGuestUpdateForm(수정 충돌이면 최신 내용 불러오기). ui: GuestUpdate(불러오기 상태)·GuestUpdateForm(연결)·표현
    ├─ entities/
    │  ├─ account/      # api: 내 정보 조회, 로그인 상태 캐시 규칙. config: 역할 문구(ACCOUNT_ROLE_LABELS)
-   │  ├─ room/         # api: 목록·상세 조회, 새로 조회, 캐시 규칙. config: 항목 이름·상태 문구(ROOM_STATUS_LABELS)·화면 문구. lib: 검색어·상태·페이지 검사. model: 경로 파라미터 검사, useRoom(불러오는 중·실패·찾을 수 없음·내용), 등록·수정이 함께 쓰는 폼 스키마 조각. ui: 객실 정보 입력 칸, 상세 내용, 층 표시, 상태별 카드
+   │  ├─ room/         # api: 목록·상세·상태 이력 조회, 새로 조회, 캐시 규칙. config: 항목 이름·상태 문구(ROOM_STATUS_LABELS)·화면 문구. lib: 검색어·상태·페이지 검사, 상태 전이 표(ROOM_STATUS_TRANSITIONS). model: 경로 파라미터 검사, useRoom(불러오는 중·실패·찾을 수 없음·내용), 등록·수정이 함께 쓰는 폼 스키마 조각. ui: 객실 정보 입력 칸, 상세 내용, 층 표시, 상태별 카드
    │  └─ guest/        # api: 목록·상세 조회, 새로 조회, 캐시 규칙. config: 항목 이름·화면 문구. lib: 검색어·페이지 검사. model: 경로 파라미터 검사, useGuest(불러오는 중·실패·찾을 수 없음·내용), 등록·수정이 함께 쓰는 폼 스키마 조각. ui: 이용객 정보 입력 칸, 상세 내용, 상태별 카드
    └─ shared/
       ├─ api/          # 검증된 API만 index.ts로 내보낸다. TanStack Query를 쓰지 않는다
       │  ├─ account.ts          # 내 정보 조회와 쿼리 키, 로그인, 로그아웃, 로그인 요청 스키마
-      │  ├─ room.ts             # 객실 목록·조회·등록·수정과 쿼리 키, 요청 스키마, 객실 타입
+      │  ├─ room.ts             # 객실 목록·조회·등록·수정·상태 변경, 상태 이력 조회와 쿼리 키, 요청 스키마, 객실·상태 이력 타입
       │  ├─ guest.ts            # 이용객 목록·조회·등록·수정과 쿼리 키, 요청 스키마, 이용객 타입
-      │  ├─ api-error.ts        # 서버 오류 정보 읽기 (getApiError), 오류 코드 (API_ERROR_CODES: 공통 코드와 ROOM_NOT_FOUND·ROOM_DUPLICATED·ROOM_MODIFIED·GUEST_NOT_FOUND·GUEST_PHONE_DUPLICATED·GUEST_MODIFIED)
+      │  ├─ api-error.ts        # 서버 오류 정보 읽기 (getApiError), 오류 코드 (API_ERROR_CODES: 공통 코드와 ROOM_NOT_FOUND·ROOM_DUPLICATED·ROOM_MODIFIED·ROOM_STATUS_CHANGED·ROOM_STATUS_TRANSITION_NOT_ALLOWED·GUEST_NOT_FOUND·GUEST_PHONE_DUPLICATED·GUEST_MODIFIED)
       │  ├─ http.ts             # orval mutator
       │  └─ generated/ # orval 생성 코드. 직접 수정하지 않고 shared/api 밖에서 import하지 않는다
       │     └─ zod/    # orval 생성 zod 스키마
       ├─ config/       # APP_INFO (앱 이름), COMMON_MESSAGES (여러 화면이 함께 쓰는 문구), TOAST_MESSAGES (토스트 영역·닫기 버튼 이름)
       └─ lib/
+         ├─ date-time/     # 서버의 UTC 시각을 한국 시간 `YYYY-MM-DD HH:mm`으로 보여주기(formatKoreanDateTime)
          └─ search-params/ # URL search 직렬화(일반 쿼리 문자열). 라우터와 테스트용 라우터가 쓴다
 ```
 
