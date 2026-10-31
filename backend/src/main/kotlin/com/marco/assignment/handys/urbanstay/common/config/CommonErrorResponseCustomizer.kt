@@ -64,7 +64,7 @@ class CommonErrorResponseCustomizer(
 
 	private fun errorCodes(path: String, method: PathItem.HttpMethod): List<ErrorCode> {
 		if (ADMIN_PATHS.none { path.startsWith("$it/") }) {
-			return COMMON_ERRORS
+			return if (SecurityConfig.isMemberApi(method.name, path)) COMMON_ERRORS + MEMBER_ERRORS else COMMON_ERRORS
 		}
 		val authErrors = if (SecurityConfig.isPublicAdminApi(method.name, path)) emptyList() else ADMIN_ERRORS
 		return COMMON_ERRORS + authErrors + if (method in CSRF_PROTECTED_METHODS) CSRF_ERRORS else emptyList()
@@ -124,6 +124,7 @@ class CommonErrorResponseCustomizer(
 		private val COMMON_ERRORS = listOf(CommonErrorCode.INVALID_INPUT, CommonErrorCode.INTERNAL_SERVER_ERROR)
 		private val ADMIN_PATHS = listOf(ApiPaths.APP_ADMIN, ApiPaths.HOTEL_ADMIN)
 		private val ADMIN_ERRORS = listOf(CommonErrorCode.UNAUTHORIZED, CommonErrorCode.FORBIDDEN)
+		private val MEMBER_ERRORS = listOf(CommonErrorCode.UNAUTHORIZED)
 		private val CSRF_ERRORS = listOf(CommonErrorCode.INVALID_CSRF_TOKEN)
 		private val CSRF_PROTECTED_METHODS = setOf(PathItem.HttpMethod.POST, PathItem.HttpMethod.PUT, PathItem.HttpMethod.PATCH, PathItem.HttpMethod.DELETE)
 	}

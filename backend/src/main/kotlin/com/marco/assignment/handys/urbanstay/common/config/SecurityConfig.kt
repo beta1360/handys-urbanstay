@@ -11,6 +11,7 @@ import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Primary
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
@@ -34,6 +35,11 @@ class SecurityConfig(
 		sessionAuthenticationVerifiers,
 	)
 
+	private val memberSecurityContextRepository = DelegatingSecurityContextRepository(
+		RequestAttributeSecurityContextRepository(),
+		HttpSessionSecurityContextRepository().apply { setSpringSecurityContextKey(MEMBER_SECURITY_CONTEXT_KEY) },
+	)
+
 	@Bean
 	@Order(1)
 	fun adminSecurityFilterChain(http: HttpSecurity): SecurityFilterChain =
@@ -52,10 +58,23 @@ class SecurityConfig(
 
 	@Bean
 	@Order(2)
+	fun appSecurityFilterChain(http: HttpSecurity): SecurityFilterChain =
+		http.securityMatcher(APP_PATTERN)
+			.authorizeHttpRequests { registry ->
+				MEMBER_APIS.forEach { registry.requestMatchers(it.method, it.path).hasRole(Role.MEMBER.name) }
+				registry.anyRequest().permitAll()
+			}
+			.csrf { it.disable() }
+			.securityContext { it.securityContextRepository(memberSecurityContextRepository) }
+			.applyCommonSettings()
+			.build()
+
+	@Bean
+	@Order(3)
 	fun defaultSecurityFilterChain(http: HttpSecurity): SecurityFilterChain =
 		http.authorizeHttpRequests {
 			it.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-				.requestMatchers(APP_PATTERN, *DOCS_PATTERNS).permitAll()
+				.requestMatchers(*DOCS_PATTERNS).permitAll()
 				.anyRequest().denyAll()
 		}
 			.csrf { it.disable() }
@@ -63,8 +82,13 @@ class SecurityConfig(
 			.build()
 
 	@Bean
+	@Primary
 	fun loginSessionHandler(@Value("\${server.servlet.session.cookie.name}") sessionCookieName: String): LoginSessionHandler =
 		LoginSessionHandler(adminCsrfTokenRepository, adminSecurityContextRepository, sessionCookieName)
+
+	@Bean(MEMBER_LOGIN_SESSION_HANDLER)
+	fun memberLoginSessionHandler(@Value("\${server.servlet.session.cookie.name}") sessionCookieName: String): LoginSessionHandler =
+		LoginSessionHandler(null, memberSecurityContextRepository, sessionCookieName)
 
 	private fun HttpSecurity.applyCommonSettings(): HttpSecurity =
 		formLogin { it.disable() }
@@ -73,26 +97,35 @@ class SecurityConfig(
 			.requestCache { it.requestCache(NullRequestCache()) }
 			.exceptionHandling { it.authenticationEntryPoint(securityErrorHandler).accessDeniedHandler(securityErrorHandler) }
 
-	data class AdminApi(val method: HttpMethod, val path: String)
+	data class Endpoint(val method: HttpMethod, val path: String)
 
 	companion object {
+		const val MEMBER_LOGIN_SESSION_HANDLER = "memberLoginSessionHandler"
 		val PUBLIC_ADMIN_APIS = listOf(
-			AdminApi(HttpMethod.POST, ApiPaths.APP_ADMIN + ApiPaths.AUTH + ApiPaths.LOGIN),
-			AdminApi(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.AUTH + ApiPaths.LOGIN),
+			Endpoint(HttpMethod.POST, ApiPaths.APP_ADMIN + ApiPaths.AUTH + ApiPaths.LOGIN),
+			Endpoint(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.AUTH + ApiPaths.LOGIN),
 		)
 		private val HOTEL_MASTER_APIS = listOf(
-			AdminApi(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOM_TYPES),
-			AdminApi(HttpMethod.PUT, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOM_TYPES + "/*"),
-			AdminApi(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOMS),
-			AdminApi(HttpMethod.PUT, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOMS + "/*"),
+			Endpoint(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOM_TYPES),
+			Endpoint(HttpMethod.PUT, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOM_TYPES + "/*"),
+			Endpoint(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOMS),
+			Endpoint(HttpMethod.PUT, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOMS + "/*"),
 		)
+		val MEMBER_APIS = listOf(
+			Endpoint(HttpMethod.GET, ApiPaths.APP + ApiPaths.AUTH + "/me"),
+			Endpoint(HttpMethod.POST, ApiPaths.APP + ApiPaths.AUTH + "/logout"),
+		)
+		private const val MEMBER_SECURITY_CONTEXT_KEY = "URBANSTAY_MEMBER_SECURITY_CONTEXT"
 		private const val APP_PATTERN = "${ApiPaths.APP}/**"
 		private const val APP_ADMIN_PATTERN = "${ApiPaths.APP_ADMIN}/**"
 		private const val HOTEL_ADMIN_PATTERN = "${ApiPaths.HOTEL_ADMIN}/**"
 		private const val HOTEL_MASTER_PATTERN = "${ApiPaths.HOTEL_ADMIN}${ApiPaths.OPERATORS}/**"
 		private val DOCS_PATTERNS = arrayOf("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**")
 
-		fun isPublicAdminApi(method: String, path: String): Boolean =
-			PUBLIC_ADMIN_APIS.any { it.method.matches(method) && it.path == path }
+		fun isPublicAdminApi(method: String, path: String): Boolean = PUBLIC_ADMIN_APIS.any { it.matches(method, path) }
+
+		fun isMemberApi(method: String, path: String): Boolean = MEMBER_APIS.any { it.matches(method, path) }
+
+		private fun Endpoint.matches(method: String, path: String): Boolean = this.method.matches(method) && this.path == path
 	}
 }
