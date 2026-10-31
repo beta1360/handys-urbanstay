@@ -10,6 +10,7 @@ import com.marco.assignment.handys.urbanstay.guest.exception.GuestApiErrors
 import com.marco.assignment.handys.urbanstay.guest.exception.GuestErrorCode
 import com.marco.assignment.handys.urbanstay.room.exception.RoomApiErrors
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
+import com.marco.assignment.handys.urbanstay.stay.dto.hoteladmin.StayCancelHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.stay.dto.hoteladmin.StayCreateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.stay.dto.hoteladmin.StayHotelAdminResponse
 import com.marco.assignment.handys.urbanstay.stay.exception.StayApiErrors
@@ -71,6 +72,9 @@ class StayHotelAdminController(
 		@RequestParam(required = false)
 		@Parameter(description = "openapi.hotel-admin.operation.getStays.parameter.guestId")
 		guestId: Long?,
+		@RequestParam(required = false)
+		@Parameter(description = "openapi.hotel-admin.operation.getStays.parameter.canceled")
+		canceled: Boolean?,
 		@RequestParam(defaultValue = PageParams.DEFAULT_PAGE)
 		@Min(value = PageParams.MIN_PAGE, message = "{validation.min}")
 		@Max(value = PageParams.MAX_PAGE, message = "{validation.max}")
@@ -82,7 +86,7 @@ class StayHotelAdminController(
 		@Parameter(description = "openapi.hotel-admin.operation.getStays.parameter.size")
 		size: Int,
 	): ApiResponse<PageResponse<StayHotelAdminResponse>> =
-		ApiResponse.success(PageResponse.from(stayService.getStays(hotelAdmin.hotelId, roomId, guestId, page, size).map(StayHotelAdminResponse::from)))
+		ApiResponse.success(PageResponse.from(stayService.getStays(hotelAdmin.hotelId, roomId, guestId, canceled, page, size).map(StayHotelAdminResponse::from)))
 
 	@Operation(summary = "openapi.hotel-admin.operation.getStay.summary", description = "openapi.hotel-admin.operation.getStay.description")
 	@StayApiErrors(StayErrorCode.STAY_NOT_FOUND)
@@ -92,4 +96,15 @@ class StayHotelAdminController(
 		@PathVariable stayId: Long,
 	): ApiResponse<StayHotelAdminResponse> =
 		ApiResponse.success(StayHotelAdminResponse.from(stayService.getStay(hotelAdmin.hotelId, stayId)))
+
+	@Operation(summary = "openapi.hotel-admin.operation.cancelStay.summary", description = "openapi.hotel-admin.operation.cancelStay.description")
+	@StayApiErrors(StayErrorCode.STAY_NOT_FOUND, StayErrorCode.STAY_ALREADY_CANCELED, StayErrorCode.STAY_ALREADY_ENDED)
+	@SuccessMessage("success.stay.canceled")
+	@PostMapping("/{stayId}/cancel")
+	fun cancelStay(
+		@AuthenticationPrincipal hotelAdmin: HotelAdminPrincipal,
+		@PathVariable stayId: Long,
+		@Valid @RequestBody request: StayCancelHotelAdminRequest,
+	): ApiResponse<StayHotelAdminResponse> =
+		ApiResponse.success(StayHotelAdminResponse.from(stayService.cancel(hotelAdmin.hotelId, stayId, hotelAdmin.id, request.reason)))
 }

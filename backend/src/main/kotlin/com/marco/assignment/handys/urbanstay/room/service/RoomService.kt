@@ -109,6 +109,15 @@ class RoomService(
 		return room
 	}
 
+	@Transactional
+	fun releaseReservation(hotelId: Long, roomId: Long, hotelAdminId: Long) {
+		if (roomRepository.updateStatus(roomId, hotelId, RoomStatus.RESERVED, RoomStatus.VACANT, Instant.now(clock)) == 0) {
+			return
+		}
+		val changedBy = hotelAdminService.getHotelAdmin(hotelAdminId)
+		roomStatusHistoryRepository.save(RoomStatusHistory(findRoom(hotelId, roomId), RoomStatus.RESERVED, RoomStatus.VACANT, changedBy))
+	}
+
 	@Transactional(readOnly = true)
 	fun getStatusHistories(hotelId: Long, roomId: Long, page: Int, size: Int): Page<RoomStatusHistory> {
 		findRoom(hotelId, roomId)

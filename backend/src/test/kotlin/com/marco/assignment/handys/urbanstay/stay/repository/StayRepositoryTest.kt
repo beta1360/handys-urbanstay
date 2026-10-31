@@ -1,6 +1,8 @@
 package com.marco.assignment.handys.urbanstay.stay.repository
 
 import com.marco.assignment.handys.urbanstay.TestcontainersConfiguration
+import com.marco.assignment.handys.urbanstay.account.entity.HotelAdmin
+import com.marco.assignment.handys.urbanstay.account.entity.HotelAdminRole
 import com.marco.assignment.handys.urbanstay.common.config.JpaAuditingConfig
 import com.marco.assignment.handys.urbanstay.common.exception.violates
 import com.marco.assignment.handys.urbanstay.guest.entity.Guest
@@ -19,6 +21,7 @@ import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.context.annotation.Import
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.jdbc.core.JdbcTemplate
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.util.UUID
@@ -46,12 +49,15 @@ class StayRepositoryTest {
 
 	private lateinit var guest: Guest
 
+	private lateinit var hotelAdmin: HotelAdmin
+
 	@BeforeEach
 	fun saveRoomsAndGuest() {
 		hotel = entityManager.persistAndFlush(Hotel("어반스테이 $suffix", "서울 $suffix", PHONE, null))
 		room = entityManager.persistAndFlush(room("101"))
 		otherRoom = entityManager.persistAndFlush(room("102"))
 		guest = entityManager.persistAndFlush(Guest(hotel, "홍길동", PHONE, "guest@example.com"))
+		hotelAdmin = entityManager.persistAndFlush(HotelAdmin(hotel, "master-$suffix@test.local", "password-hash", "마스터", HotelAdminRole.MASTER))
 	}
 
 	@Test
@@ -133,8 +139,58 @@ class StayRepositoryTest {
 		assertThat(stayRepository.findByIdAndRoomHotelId(stay.id!!, checkNotNull(otherHotel.id))).isNull()
 	}
 
+	@Test
+	fun `취소는 취소되지 않은 이용에만 취소 시각, 처리 계정과 이름, 사유를 한 번 기록하고 바뀐 행 수를 돌려준다`() {
+		val stayId = checkNotNull(stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2)).id)
+
+		assertThat(stayRepository.cancel(stayId, hotelAdmin, hotelAdmin.name, REASON, CANCELED_AT)).isEqualTo(1)
+		assertThat(stayRepository.cancel(stayId, hotelAdmin, "다른 이름", null, CANCELED_AT.plusSeconds(60))).isZero()
+
+		val found = stayRepository.findById(stayId).orElseThrow()
+		assertThat(listOf(found.canceledAt, found.canceledBy?.id, found.canceledByName, found.cancelReason, found.updatedAt))
+			.containsExactly(CANCELED_AT, hotelAdmin.id, hotelAdmin.name, REASON, CANCELED_AT)
+	}
+
+	@Test
+	fun `취소한 이용은 배제 제약과 겹침 확인에서 빠져 같은 기간을 다시 저장할 수 있다`() {
+		val canceledId = checkNotNull(stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2)).id)
+		stayRepository.cancel(canceledId, hotelAdmin, hotelAdmin.name, null, CANCELED_AT)
+
+		assertThat(overlaps(room, CHECK_IN, CHECK_OUT)).isFalse()
+		stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2))
+		assertThat(overlaps(room, CHECK_IN, CHECK_OUT)).isTrue()
+		assertThatThrownBy { stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2)) }
+			.isInstanceOfSatisfying(DataIntegrityViolationException::class.java) {
+				assertThat(it.violates(Stay.ROOM_PERIOD_EXCLUSION_CONSTRAINT)).isTrue()
+			}
+	}
+
+	@ParameterizedTest
+	@CsvSource(
+		delimiter = '|',
+		quoteCharacter = '"',
+		value = [
+			"canceled_at = now() | stay_cancellation_check",
+			"canceled_by_id = :admin, canceled_by_name = '마스터' | stay_cancellation_check",
+			"cancel_reason = '사유' | stay_cancellation_check",
+			"canceled_at = now(), canceled_by_id = :admin, canceled_by_name = ' 마스터' | stay_canceled_by_name_check",
+			"canceled_at = now(), canceled_by_id = :admin, canceled_by_name = '마스터', cancel_reason = '' | stay_cancel_reason_check",
+			"canceled_at = now(), canceled_by_id = :admin, canceled_by_name = '마스터', cancel_reason = '사유 ' | stay_cancel_reason_check",
+		],
+	)
+	fun `취소 시각·처리 계정·이름 중 일부만 있거나, 취소 없이 사유만 있거나, 이름·사유가 정리되지 않으면 DB CHECK 제약이 막는다`(
+		assignments: String,
+		constraint: String,
+	) {
+		val stayId = checkNotNull(stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2)).id)
+
+		assertThatThrownBy { jdbcTemplate.update("update stay set ${assignments.replace(":admin", hotelAdmin.id.toString())} where id = ?", stayId) }
+			.isInstanceOf(DataIntegrityViolationException::class.java)
+			.hasMessageContaining(constraint)
+	}
+
 	private fun overlaps(room: Room, checkIn: LocalDate, checkOut: LocalDate): Boolean =
-		stayRepository.existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfter(checkNotNull(room.id), checkOut, checkIn)
+		stayRepository.existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfterAndCanceledAtIsNull(checkNotNull(room.id), checkOut, checkIn)
 
 	private fun room(name: String): Room = Room(hotel, name, "스탠다드", 20, null, null, LocalTime.of(15, 0), LocalTime.of(11, 0))
 
@@ -142,6 +198,8 @@ class StayRepositoryTest {
 		private const val PHONE = "02-1234-5678"
 		private val CHECK_IN = LocalDate.of(2026, 11, 1)
 		private val CHECK_OUT = LocalDate.of(2026, 11, 3)
+		private val CANCELED_AT = Instant.parse("2026-10-31T01:00:00Z")
+		private const val REASON = "고객 요청"
 		private const val COUNT_STAYS = "select count(*) from stay where guest_id = ?"
 	}
 }

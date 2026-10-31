@@ -258,25 +258,32 @@ urbanstay/
 
 - 이용은 `stay` 도메인의 `stay` 테이블(`Stay`, `V9__create_stay.sql`)에 저장한다. 객실(`room_id`, `Room`)과 이용객(`guest_id`, `Guest`)을 JPA 연관관계로 가리키고 체크인 날짜, 체크아웃 날짜(`LocalDate`, `date`), 인원을 가진다.
   - 호텔 컬럼은 두지 않는다. 호텔은 객실로 정해지고(객실의 호텔은 바뀌지 않는다) 객실과 이용객이 같은 호텔인지는 서비스가 확인한다.
-  - 수정이 없어 `version`을 두지 않고 응답에도 싣지 않는다. 취소는 아직 없다.
+  - 수정이 없어 `version`을 두지 않고 응답에도 싣지 않는다. 취소는 같은 행의 취소 컬럼에 기록한다(취소 절).
 - 기간은 날짜 단위의 반열린 구간 [체크인, 체크아웃)이다. 체크아웃 날은 비어 있다고 보아 1일~3일과 3일~5일은 겹치지 않는다.
 - 값의 규칙. 어기면 400 `INVALID_INPUT`이고 틀린 항목을 모두 `fieldErrors`에 담는다(응답과 예외 절).
   - 체크인 날짜는 오늘(`Clock` 빈, Asia/Seoul)이거나 그 뒤다. `checkInDate`, `validation.today-or-later`
   - 체크아웃 날짜는 체크인 날짜보다 뒤이고(최소 1박) 최대 30박이다(`Stay.MAX_NIGHTS`). `checkOutDate`, `validation.after-check-in` 또는 `validation.max-nights`
   - 인원은 1 이상(요청의 `@Min`, `validation.min`)이고 객실의 최대 인원 이하다. `guestCount`, `validation.max`(`{value}`는 객실 최대 인원)
   - DB도 CHECK로 1~30박, 1~20명만 받는다. 오늘 규칙은 DB가 막지 않는다.
-- 같은 객실에 기간이 겹치는 이용은 둘 수 없다. 사전 확인(`existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfter`)과 배제 제약(`stay_room_id_period_excl`, `btree_gist`로 `room_id WITH =`, `daterange(check_in_date, check_out_date, '[)') WITH &&`)이 막고, 둘 다 409 `StayErrorCode.STAY_PERIOD_OVERLAPPED`다(동시성과 충돌 절).
-  - 취소가 생기면 같은 이름으로 제약을 다시 만들어 취소되지 않은 이용에만 건다.
-  - 객실별 조회는 배제 제약의 gist 인덱스를 쓰고, 이용객별 조회는 `stay_guest_id_check_in_date_id_idx`를 쓴다.
-- 이용 관리(`ApiPaths.HOTEL_ADMIN + "/stays"`의 등록·목록·조회, `StayHotelAdminController`)는 `StayService`가 한다. 호텔 계정 모두(마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 수정은 없다.
+- 같은 객실에 기간이 겹치는 취소하지 않은 이용은 둘 수 없다. 사전 확인(`existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfterAndCanceledAtIsNull`)과 배제 제약(`stay_room_id_period_excl`, `btree_gist`로 `room_id WITH =`, `daterange(check_in_date, check_out_date, '[)') WITH &&`, `where (canceled_at is null)`)이 막고, 둘 다 409 `StayErrorCode.STAY_PERIOD_OVERLAPPED`다(동시성과 충돌 절). 취소한 이용과는 겹쳐도 된다.
+  - 배제 제약은 `V10__add_stay_cancellation.sql`이 같은 이름으로 다시 만들어 취소하지 않은 이용에만 건다.
+  - 배제 제약의 gist 인덱스는 취소하지 않은 이용만 담아 취소를 포함한 목록에 쓰이지 않는다. 객실별 조회는 `stay_room_id_check_in_date_id_idx`, 이용객별 조회는 `stay_guest_id_check_in_date_id_idx`를 쓴다.
+- 이용 관리(`ApiPaths.HOTEL_ADMIN + "/stays"`의 등록·목록·조회와 `/{stayId}/cancel` 취소, `StayHotelAdminController`)는 `StayService`가 한다. 호텔 계정 모두(마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 수정은 없다.
   - 등록은 객실 조회(`RoomService.getRoom`, 404 `ROOM_NOT_FOUND`) → 이용객 조회(`GuestService.getGuest`, 404 `GUEST_NOT_FOUND`) → 기간·인원(400) → 겹침(409) 순으로 판단한다. 객실 상태와 관계없고 상태를 바꾸지 않는다.
   - 조회할 이용은 객실의 호텔로 찾는다(`findByIdAndRoomHotelId`). 없는 id와 다른 호텔의 이용 id는 모두 404 `STAY_NOT_FOUND`다.
-  - 목록은 같은 호텔의 이용을 체크인 날짜 내림차순, 같으면 id 내림차순으로 준다. `roomId`·`guestId`(선택)로 거르고 함께 보내면 AND다(조합별 파생 쿼리). 없거나 다른 호텔의 id로 거르면 빈 목록이다.
-  - 응답은 객실 `{ id, name }`, 이용객 `{ id, name, phone }`을 조회 시점의 값으로 담는다. 목록과 조회는 `@EntityGraph`로 객실과 이용객을 함께 읽는다.
+  - 목록은 같은 호텔의 이용을 취소한 이용까지 체크인 날짜 내림차순, 같으면 id 내림차순으로 준다. `roomId`·`guestId`·`canceled`(선택)로 거르고 함께 보내면 AND다. 조합이 여덟 가지라 파생 쿼리 대신 `StaySpecifications.search`로 거른다(목록 조회 절). 없거나 다른 호텔의 id로 거르면 빈 목록이다.
+  - 응답은 객실 `{ id, name }`, 이용객 `{ id, name, phone }`을 조회 시점의 값으로 담고, 취소 정보 `cancellation: { canceledAt, canceledBy: { id, name }, reason }`(취소하지 않았으면 null)을 담는다. 목록(`findAll(Specification, Pageable)`을 다시 선언)과 조회는 `@EntityGraph`로 객실과 이용객을 함께 읽는다.
+- 취소(`POST ApiPaths.HOTEL_ADMIN + "/stays/{stayId}/cancel"`, 본문 `{ reason? }`, `StayService.cancel`)는 되돌릴 수 없다. 성공하면 취소 정보가 담긴 이용 응답을 준다.
+  - 판단 순서는 이용 조회(404 `STAY_NOT_FOUND`) → 이미 취소(409 `STAY_ALREADY_CANCELED`) → 끝난 이용(409 `STAY_ALREADY_ENDED`) → 조건부 UPDATE다. 끝나지 않은 이용은 체크아웃 날짜가 오늘(`Clock`, Asia/Seoul)보다 뒤인 이용이다. 이미 취소했으면서 끝난 이용은 `STAY_ALREADY_CANCELED`다.
+  - 취소 시각(`canceled_at`), 처리한 호텔 계정(`canceled_by_id`)과 그때의 이름(`canceled_by_name`), 사유(`cancel_reason`)는 `StayRepository.cancel`이 `where id = :id and canceled_at is null`로 한 번에 쓴다. 바뀐 행이 없으면 409 `STAY_ALREADY_CANCELED`다. 동시에 두 번 취소하면 늦은 쪽은 먼저 커밋된 취소를 기다렸다가 0행이 되어 기록은 하나만 남는다. 벌크 UPDATE의 `updated_at`과 다시 읽기는 객실 상태 변경과 같다(객실 상태 절).
+  - 이름은 객실 상태 이력처럼 `HotelAdminService.getHotelAdmin`으로 읽은 지금 이름을 저장한다. 서비스 방향은 `StayService → HotelAdminService`다.
+  - 사유는 선택이고 앞뒤 공백을 지운 뒤 200자 이하다(`TrimmedStringDeserializer`, `@Size`). 비었거나 공백만 있으면 null로 저장한다(`Stay.normalizeCancelReason`). 본문은 필수라 사유 없이 취소할 때는 `{}`를 보낸다.
+  - 객실이 예약됨(`RESERVED`)이면 같은 트랜잭션에서 공실(`VACANT`)로 바꾸고 취소한 계정으로 상태 이력을 남긴다(`RoomService.releaseReservation`, `RESERVED → VACANT` 조건부 UPDATE). 이용중·정비중·공실이거나 그사이 상태가 바뀌어 0행이면 그대로 두고 취소는 성공한다.
+  - DB도 CHECK로 취소 시각·계정·이름이 함께 있거나 함께 없고, 사유는 취소한 이용에만 있으며(`stay_cancellation_check`), 이름(50자)·사유(200자)는 비지 않고 앞뒤 공백이 없는 값만 받는다. 처리한 계정은 외래 키로 가리킨다.
 - 테스트
-  - 사전 확인을 통과한 뒤 배제 제약이 막는 경로는 순서를 고정해 확인한다(`StayServiceTest`).
-  - 오늘 규칙은 UTC로는 전날인 한국 시각으로 고정한 Clock(`FixedClockConfiguration`)으로 확인한다.
-  - 이용이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔 객실의 `stay`를 먼저 지운다.
+  - 사전 확인을 통과한 뒤 배제 제약이 막는 경로와, 먼저 온 취소 때문에 늦은 취소의 조건부 UPDATE가 0행이 되는 경로는 순서를 고정해 확인한다(`StayServiceTest`).
+  - 오늘 규칙은 UTC로는 전날인 한국 시각으로 고정한 Clock(`FixedClockConfiguration`)으로 확인한다. 오늘 체크아웃하는 이용은 끝난 이용이다.
+  - 이용이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔 객실의 `stay`를 먼저 지운다. 취소가 객실 상태 이력을 남기므로 `room_status_history`도 객실과 호텔 계정보다 먼저 지운다.
 
 ## 상수
 
@@ -321,10 +328,11 @@ urbanstay/
   - 같은 version으로 동시에 들어온 수정은 flush 때 JPA가 막는다. flush를 서비스 안(`saveAndFlush`)에서 해 `OptimisticLockingFailureException`도 같은 도메인 409로 바꾼다. 커밋 때 터지면 서비스 밖이라 500이 된다.
   - 지금 낙관적 잠금을 쓰는 엔티티는 `Hotel`(`HOTEL_MODIFIED`), `HotelAdmin`(`HOTEL_ADMIN_MODIFIED`), `Room`(`ROOM_MODIFIED`), `Guest`(`GUEST_MODIFIED`)이다. version을 받지 않는 변경(예: 비밀번호 재설정, 활성 상태 변경)도 같은 엔티티를 바꾸면 같은 변환을 거친다.
 - version과 따로 움직여야 하는 값(예: 객실 상태)은 요청에 화면에서 본 값을 함께 받아 "지금 값이 그것일 때만" 바꾸는 조건부 UPDATE로 막는다. 바뀐 행이 없으면 도메인 409다(`ROOM_STATUS_CHANGED`, 객실 상태 절).
+- 한 번만 일어나야 하는 변경(예: 이용 취소)도 "아직 일어나지 않았을 때만" 바꾸는 조건부 UPDATE로 막는다. 바뀐 행이 없으면 도메인 409다(`STAY_ALREADY_CANCELED`, 이용 절).
 - 중복 확인 같은 조회는 엔티티를 바꾸기 전에 한다. 바뀐 엔티티가 있으면 조회 전 자동 flush로 제약 위반이 변환 범위 밖에서 난다.
 - 테스트는 두 경로를 모두 확인한다.
   - 동시 요청: 두 스레드를 `CountDownLatch`로 함께 출발시킨다.
-  - 사전 확인을 통과한 뒤 DB에서 막히는 경로: 먼저 온 트랜잭션을 열어 둔 채 다음 요청이 잠금을 기다리는지(`pg_stat_activity`) 확인하고 커밋한다(`HotelServiceTest`, `HotelMasterServiceTest`, `HotelOperatorServiceTest`, `RoomServiceTest`, `GuestServiceTest`, `StayServiceTest`). 조건부 UPDATE도 같은 방식으로 늦은 쪽이 0행이 되는 경로를 확인한다(객실 상태 절).
+  - 사전 확인을 통과한 뒤 DB에서 막히는 경로: 먼저 온 트랜잭션을 열어 둔 채 다음 요청이 잠금을 기다리는지(`pg_stat_activity`) 확인하고 커밋한다(`HotelServiceTest`, `HotelMasterServiceTest`, `HotelOperatorServiceTest`, `RoomServiceTest`, `GuestServiceTest`, `StayServiceTest`). 조건부 UPDATE도 같은 방식으로 늦은 쪽이 0행이 되는 경로를 확인한다(객실 상태 절, 이용 절).
   - 동시 요청 테스트는 실행마다 어느 경로를 탈지 정해지지 않는다. 변환 코드를 지켜 주는 것은 순서를 고정한 경로 테스트다.
 
 ## 테스트

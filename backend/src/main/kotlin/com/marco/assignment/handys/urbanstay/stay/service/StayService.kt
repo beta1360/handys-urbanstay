@@ -1,5 +1,6 @@
 package com.marco.assignment.handys.urbanstay.stay.service
 
+import com.marco.assignment.handys.urbanstay.account.service.HotelAdminService
 import com.marco.assignment.handys.urbanstay.common.exception.BusinessException
 import com.marco.assignment.handys.urbanstay.common.exception.CommonErrorCode
 import com.marco.assignment.handys.urbanstay.common.exception.InvalidField
@@ -10,6 +11,7 @@ import com.marco.assignment.handys.urbanstay.room.service.RoomService
 import com.marco.assignment.handys.urbanstay.stay.entity.Stay
 import com.marco.assignment.handys.urbanstay.stay.exception.StayErrorCode
 import com.marco.assignment.handys.urbanstay.stay.repository.StayRepository
+import com.marco.assignment.handys.urbanstay.stay.repository.StaySpecifications
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
@@ -17,6 +19,7 @@ import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -25,6 +28,7 @@ class StayService(
 	private val stayRepository: StayRepository,
 	private val roomService: RoomService,
 	private val guestService: GuestService,
+	private val hotelAdminService: HotelAdminService,
 	private val clock: Clock,
 ) {
 
@@ -38,23 +42,31 @@ class StayService(
 	}
 
 	@Transactional(readOnly = true)
-	fun getStays(hotelId: Long, roomId: Long?, guestId: Long?, page: Int, size: Int): Page<Stay> {
-		val pageable = PageRequest.of(page, size, LATEST_CHECK_IN_FIRST)
-		return if (roomId == null) {
-			if (guestId == null) {
-				stayRepository.findByRoomHotelId(hotelId, pageable)
-			} else {
-				stayRepository.findByGuestIdAndRoomHotelId(guestId, hotelId, pageable)
-			}
-		} else if (guestId == null) {
-			stayRepository.findByRoomIdAndRoomHotelId(roomId, hotelId, pageable)
-		} else {
-			stayRepository.findByRoomIdAndGuestIdAndRoomHotelId(roomId, guestId, hotelId, pageable)
-		}
-	}
+	fun getStays(hotelId: Long, roomId: Long?, guestId: Long?, canceled: Boolean?, page: Int, size: Int): Page<Stay> =
+		stayRepository.findAll(StaySpecifications.search(hotelId, roomId, guestId, canceled), PageRequest.of(page, size, LATEST_CHECK_IN_FIRST))
 
 	@Transactional(readOnly = true)
-	fun getStay(hotelId: Long, stayId: Long): Stay =
+	fun getStay(hotelId: Long, stayId: Long): Stay = findStay(hotelId, stayId)
+
+	@Transactional
+	fun cancel(hotelId: Long, stayId: Long, hotelAdminId: Long, reason: String?): Stay {
+		val stay = findStay(hotelId, stayId)
+		if (stay.canceledAt != null) {
+			throw BusinessException(StayErrorCode.STAY_ALREADY_CANCELED)
+		}
+		if (stay.checkOutDate <= LocalDate.now(clock)) {
+			throw BusinessException(StayErrorCode.STAY_ALREADY_ENDED)
+		}
+		val roomId = checkNotNull(stay.room.id)
+		val canceledBy = hotelAdminService.getHotelAdmin(hotelAdminId)
+		if (stayRepository.cancel(stayId, canceledBy, canceledBy.name, Stay.normalizeCancelReason(reason), Instant.now(clock)) == 0) {
+			throw BusinessException(StayErrorCode.STAY_ALREADY_CANCELED)
+		}
+		roomService.releaseReservation(hotelId, roomId, hotelAdminId)
+		return findStay(hotelId, stayId)
+	}
+
+	private fun findStay(hotelId: Long, stayId: Long): Stay =
 		stayRepository.findByIdAndRoomHotelId(stayId, hotelId) ?: throw BusinessException(StayErrorCode.STAY_NOT_FOUND)
 
 	private fun checkValid(room: Room, checkInDate: LocalDate, checkOutDate: LocalDate, guestCount: Int) {
@@ -77,7 +89,7 @@ class StayService(
 		}
 
 	private fun checkNotOverlapped(roomId: Long, checkInDate: LocalDate, checkOutDate: LocalDate) {
-		if (stayRepository.existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfter(roomId, checkOutDate, checkInDate)) {
+		if (stayRepository.existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfterAndCanceledAtIsNull(roomId, checkOutDate, checkInDate)) {
 			throw BusinessException(StayErrorCode.STAY_PERIOD_OVERLAPPED)
 		}
 	}
