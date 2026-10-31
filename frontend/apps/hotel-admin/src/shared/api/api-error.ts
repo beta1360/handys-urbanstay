@@ -18,7 +18,6 @@ export const API_ERROR_CODES = {
   operatorModified: "HOTEL_ADMIN_MODIFIED",
   loginIdDuplicated: "LOGIN_ID_DUPLICATED",
   stayNotFound: "STAY_NOT_FOUND",
-  stayPeriodOverlapped: "STAY_PERIOD_OVERLAPPED",
 } as const;
 
 export const getApiError = createApiErrorReader(ErrorApiResponse);

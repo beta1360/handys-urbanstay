@@ -9,7 +9,6 @@ import {
   getStaysQuerySizeDefault,
 } from "./generated/zod";
 import {
-  createStay,
   fetchStay,
   fetchStays,
   stayListQueryKey,
@@ -20,7 +19,6 @@ vi.mock("./generated", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./generated")>()),
   getStays: vi.fn(),
   getStay: vi.fn(),
-  createStay: vi.fn(),
 }));
 
 const STAY_ID = 5;
@@ -51,8 +49,6 @@ const STAY_RESPONSE = {
   error: null,
 };
 
-const CREATE_MESSAGE = "이용을 등록했습니다.";
-
 const STAY_PAGE = {
   items: [STAY, CANCELED_STAY],
   page: 0,
@@ -74,14 +70,6 @@ const LIST_PARAMS = {
   canceled: false,
   page: 1,
   size: 100,
-};
-
-const CREATE_BODY = {
-  roomId: STAY.room.id,
-  guestId: STAY.guest.id,
-  checkInDate: STAY.checkInDate,
-  checkOutDate: STAY.checkOutDate,
-  guestCount: STAY.guestCount,
 };
 
 beforeEach(() => {
@@ -178,39 +166,6 @@ describe("fetchStay", () => {
       CANCELED_STAY,
     );
     expect(generated.getStay).toHaveBeenCalledWith(STAY_ID, undefined, signal);
-  });
-});
-
-describe("createStay", () => {
-  it("스키마에 없는 필드를 버린 본문으로 등록하고 등록한 이용과 성공 문구를 돌려준다", async () => {
-    vi.mocked(generated.createStay).mockResolvedValue({
-      ...STAY_RESPONSE,
-      message: CREATE_MESSAGE,
-    });
-
-    await expect(createStay({ ...CREATE_BODY, extra: true } as never)).resolves.toEqual({
-      data: STAY,
-      message: CREATE_MESSAGE,
-    });
-    expect(generated.createStay).toHaveBeenCalledWith(CREATE_BODY);
-  });
-
-  it.each([
-    ["날짜 형식이 틀리면", { ...CREATE_BODY, checkInDate: "2026/11/02" }],
-    ["인원이 1보다 작으면", { ...CREATE_BODY, guestCount: 0 }],
-  ])("%s 요청을 보내지 않고 요청 검증 오류를 던진다", async (_, body) => {
-    await expect(createStay(body)).rejects.toBeInstanceOf(
-      RequestValidationError,
-    );
-    expect(generated.createStay).not.toHaveBeenCalled();
-  });
-
-  it("성공 응답의 message가 null이면 응답 검증 오류를 던진다", async () => {
-    vi.mocked(generated.createStay).mockResolvedValue(STAY_RESPONSE);
-
-    await expect(createStay(CREATE_BODY)).rejects.toBeInstanceOf(
-      ResponseValidationError,
-    );
   });
 });
 

@@ -2,7 +2,6 @@ import { z } from "zod";
 import { parseRequest, parseResponseBody } from "@repo/admin-kit/api";
 import * as generated from "./generated";
 import {
-  CreateStayResponse,
   GetStayParams,
   GetStayResponse,
   GetStaysQueryParams,
@@ -10,17 +9,12 @@ import {
 } from "./generated/zod";
 import {
   PageResponseStayHotelAdminResponse,
-  StayCreateHotelAdminRequest,
   StayHotelAdminResponse,
 } from "./generated/zod/schemas";
-
-export const createStayBodySchema = StayCreateHotelAdminRequest;
 
 export const stayListParamsSchema = GetStaysQueryParams;
 
 export const stayParamsSchema = GetStayParams;
-
-export type CreateStayBody = z.input<typeof StayCreateHotelAdminRequest>;
 
 export type Stay = z.output<typeof StayHotelAdminResponse>;
 
@@ -28,21 +22,14 @@ export type StayPage = z.output<typeof PageResponseStayHotelAdminResponse>;
 
 export type StayListParams = z.input<typeof GetStaysQueryParams>;
 
-const STAY_SUCCESS_SHAPE = {
-  success: z.literal(true),
-  data: StayHotelAdminResponse,
-};
-
 const GetStaysSuccessResponse = GetStaysResponse.extend({
   success: z.literal(true),
   data: PageResponseStayHotelAdminResponse,
 });
 
-const GetStaySuccessResponse = GetStayResponse.extend(STAY_SUCCESS_SHAPE);
-
-const CreateStaySuccessResponse = CreateStayResponse.extend({
-  ...STAY_SUCCESS_SHAPE,
-  message: z.string(),
+const GetStaySuccessResponse = GetStayResponse.extend({
+  success: z.literal(true),
+  data: StayHotelAdminResponse,
 });
 
 type RequestOptions = {
@@ -77,19 +64,4 @@ export async function fetchStay(
     signal,
   );
   return parseResponseBody("getStay", GetStaySuccessResponse, response).data;
-}
-
-export async function createStay(body: CreateStayBody) {
-  const validBody = parseRequest(
-    "createStay",
-    StayCreateHotelAdminRequest,
-    body,
-  );
-  const response = await generated.createStay(validBody);
-  const { data, message } = parseResponseBody(
-    "createStay",
-    CreateStaySuccessResponse,
-    response,
-  );
-  return { data, message };
 }
