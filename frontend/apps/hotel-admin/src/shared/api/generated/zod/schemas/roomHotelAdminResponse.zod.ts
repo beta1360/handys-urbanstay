@@ -6,6 +6,7 @@
  * OpenAPI spec version: v1
  */
 import * as zod from 'zod';
+import { RoomCurrentStayHotelAdminResponse } from './roomCurrentStayHotelAdminResponse.zod.ts';
 
 export const roomHotelAdminResponseCheckInTimeRegExp = new RegExp('^([01][0-9]|2[0-3]):[0-5][0-9]$');
 export const roomHotelAdminResponseCheckOutTimeRegExp = new RegExp('^([01][0-9]|2[0-3]):[0-5][0-9]$');
@@ -21,6 +22,7 @@ export const RoomHotelAdminResponse = zod.object({
   "checkInTime": zod.stringFormat('time-local', roomHotelAdminResponseCheckInTimeRegExp).describe('체크인 시각("HH:mm")'),
   "checkOutTime": zod.stringFormat('time-local', roomHotelAdminResponseCheckOutTimeRegExp).describe('체크아웃 시각("HH:mm")'),
   "status": zod.enum(['VACANT', 'RESERVED', 'OCCUPIED', 'MAINTENANCE']).describe('객실 상태. VACANT(공실), RESERVED(예약됨), OCCUPIED(이용중), MAINTENANCE(정비중). 새 객실은 VACANT이고 상태 변경 API로만 바뀝니다.'),
+  "currentStay": zod.union([RoomCurrentStayHotelAdminResponse,zod.null()]).describe('지금 이용. 오늘(한국 시간)이 체크인 날짜와 같거나 뒤이고 체크아웃 날짜보다 앞인, 취소하지 않은 이용과 그 이용객입니다. 체크아웃 날에는 그 이용이 지금 이용이 아닙니다. 없으면 null이고, 새로 등록한 객실은 항상 null입니다. 객실 상태와 따로 정해지며 상태를 바꾸지 않습니다.'),
   "version": zod.int().describe('버전. 객실 정보가 바뀌어 저장될 때마다 커집니다. 상태가 바뀌어도 그대로입니다. 수정 요청에 그대로 보냅니다.')
 });
 
