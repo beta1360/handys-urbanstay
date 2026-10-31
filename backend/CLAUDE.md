@@ -123,7 +123,7 @@ urbanstay/
   - 세션에서 SecurityContext를 처음 꺼낼 때(인가 전) `SessionAuthenticationVerifier` 빈이 모두 통과시켜야 그 인증을 쓴다. 하나라도 거절하면 세션을 무효화하고 로그인하지 않은 요청으로 처리해 401 `UNAUTHORIZED`로 응답한다. CSRF 검사는 그보다 먼저다.
   - 도메인은 자기 계정의 확인 규칙을 `SessionAuthenticationVerifier` 빈으로 둔다. 자기 principal이 아니면 통과시킨다.
   - 호텔 계정은 `HotelAdminSessionVerifier`가 DB에서 다시 읽어, 없거나 비활성이거나 `credential_version`이 세션 값과 다르면 거절한다. 이름 변경은 세션을 끊지 않는다.
-  - 전체 어드민 세션은 확인하지 않는다(어드민 계정을 바꾸는 API가 아직 없다).
+  - 전체 어드민 세션은 확인하지 않는다. 어드민 계정을 바꾸는 API는 이름 수정뿐이고 이름 변경은 세션을 끊지 않는다(계정 절).
 - 테스트
   - 로그인 사용자는 `with(user("tester").roles(Role.APP_ADMIN.name))`로 만든다. 호텔 계정 principal이 필요한 API(세션의 호텔로 범위를 정하는 API)는 저장한 계정으로 만든 principal을 넣는다. 예: `with(user(HotelAdminPrincipal.from(master)))`. 회원 API도 같다. 예: `with(user(MemberPrincipal.from(member)))`
   - `user(...)`는 SecurityContext를 직접 넣으므로 세션 속성 키 분리(어드민·회원)는 확인하지 못한다. 키 분리와 회원 세션은 `RANDOM_PORT` 서버에서 실제로 가입·로그인해 확인한다(`MemberAppControllerTest`).
@@ -173,6 +173,15 @@ urbanstay/
   - 빈 값·공백만 있는 값은 `validation.required` 하나, 규칙을 어기면 `validation.password` 하나다(`@Password`는 빈 값을 건너뛴다).
   - 문서는 `@Schema(minLength = Password.MIN_LENGTH, maxLength = Password.MAX_LENGTH, pattern = Password.PATTERN)`로 적는다.
   - 로그인 요청의 비밀번호는 규칙을 검사하지 않고 `@NotBlank`만 붙인다.
+- 전체 어드민(`app_admin`)
+  - 로그인 아이디, 비밀번호 해시, 이름, 낙관적 잠금 버전(`version`)을 가진다. 이름은 앞뒤 공백을 지워 저장한다(`AppAdmin.rename`).
+  - 로그인 아이디는 모든 전체 어드민 계정을 통틀어 유일하다(`app_admin_login_id_key`, `V1`의 컬럼 `unique`에 PostgreSQL이 붙인 이름, `AppAdmin.LOGIN_ID_UNIQUE_CONSTRAINT`). 사전 확인(`existsByLoginId`)과 함께 이 제약 위반도 `AccountErrorCode.LOGIN_ID_DUPLICATED`(409)로 바꾼다.
+  - `version`은 `V15__add_app_admin_version.sql`이 더했다(기존 행은 0, default는 지운다).
+  - 계정 관리(`ApiPaths.APP_ADMIN + ApiPaths.ADMINS`의 목록·상세·추가·이름 수정, `AccountAdminAppAdminController`)는 `AppAdminService`가 한다. 아이디·비밀번호 변경, 비활성화·삭제 API는 없다.
+    - 목록은 id 내림차순 페이지이고 검색은 없다. 목록 항목(`AccountAdminAppAdminResponse`)에는 version이 없고, 상세·추가·수정 응답(`AccountAdminDetailAppAdminResponse`)에는 있다. 없는 id는 404 `AccountErrorCode.APP_ADMIN_NOT_FOUND`다.
+    - 추가는 아이디 중복 확인 → `saveAndFlush`, 이름 수정은 조회 → version 확인 → `AppAdmin.rename` → `saveAndFlush` 순서다. version이 다르거나 `OptimisticLockingFailureException`이면 409 `AccountErrorCode.APP_ADMIN_MODIFIED`다. 바뀐 값이 없으면 version도 그대로다.
+    - 이름 변경은 세션을 끊지 않는다. 내 정보 조회는 DB에서 읽으므로 바뀐 이름을 준다.
+    - 첫 어드민 생성(`InitialAdminService`)은 어드민이 없을 때만 저장하므로 `AppAdminService`를 거치지 않는다.
 - 호텔 계정(`hotel_admin`)
   - 호텔(`hotel_id`)에 속하고 역할(`HotelAdminRole`: `MASTER`, `OPERATOR`), 활성 여부(`active`), 로그인 정보 버전(`credential_version`), 낙관적 잠금 버전(`version`)을 가진다. 이름은 앞뒤 공백을 지워 저장한다.
   - 로그인 아이디는 모든 호텔 계정을 통틀어 유일하다(`hotel_admin_login_id_key`). 사전 확인(수정은 자기 자신을 빼고 `existsByLoginIdAndIdNot`)과 함께 이 제약 위반도 `AccountErrorCode.LOGIN_ID_DUPLICATED`(409)로 바꾼다.
@@ -203,6 +212,7 @@ urbanstay/
 - 테스트
   - `@SpringBootTest` 컨텍스트가 뜰 때도 첫 어드민 생성이 실행되므로 테스트 DB에 어드민이 남아 있을 수 있다. 어드민이 없는 상태가 필요하면 테스트 트랜잭션 안에서 지우고 롤백한다.
   - 호텔 계정이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔의 `hotel_admin`을 먼저 지운다.
+  - 전체 어드민 계정 관리 API는 `AccountAdminAppAdminControllerTest`가 확인한다. 다른 어드민(첫 어드민 포함)이 있을 수 있으므로 테스트 아이디에 실행마다 다른 접미사를 넣어 그 접미사로 찾고 지운다. 목록은 테스트가 만든 계정이 가장 최근 순서로 앞에 오는지와 전체 수(`count()`)로 확인한다.
   - 세션 확인 규칙만 따로 볼 때의 비활성화와 `credential_version` 변경은 테스트에서 DB를 직접 바꿔 재현한다(`AccountHotelAdminControllerTest`). 그 밖의 테스트에서 비활성 계정이 필요하면 API나 `HotelAdmin.changeActive`로 만든다.
   - 마스터의 아이디 변경·비밀번호 재설정이 세션을 끊는지는 전체 어드민과 마스터가 각자 실제로 로그인한 `RANDOM_PORT` 서버에서 확인한다(`AccountHotelMasterAppAdminSessionTest`). 운영자의 아이디 변경·비밀번호 재설정·비활성화도 마스터와 운영자가 각자 실제로 로그인해 확인하고, 마스터 자신의 세션이 유지되는지도 함께 본다(`AccountHotelOperatorHotelAdminSessionTest`).
 
@@ -445,7 +455,7 @@ urbanstay/
 - 동시 수정은 낙관적 잠금으로 막는다. 엔티티에 `@Version var version: Long`(`version bigint not null`)을 두고 응답에 `version`을 싣고, 수정 요청은 `version`을 필수로 받는다.
   - 서비스는 읽은 엔티티의 version이 요청과 다르면 도메인 409를 던진다.
   - 같은 version으로 동시에 들어온 수정은 flush 때 JPA가 막는다. flush를 서비스 안(`saveAndFlush`)에서 해 `OptimisticLockingFailureException`도 같은 도메인 409로 바꾼다. 커밋 때 터지면 서비스 밖이라 500이 된다.
-  - 지금 낙관적 잠금을 쓰는 엔티티는 `Hotel`(`HOTEL_MODIFIED`), `HotelAdmin`(`HOTEL_ADMIN_MODIFIED`), `Room`(`ROOM_MODIFIED`), `RoomType`(`ROOM_TYPE_MODIFIED`), `Guest`(`GUEST_MODIFIED`)이다. version을 받지 않는 변경(예: 비밀번호 재설정, 활성 상태 변경)도 같은 엔티티를 바꾸면 같은 변환을 거친다.
+  - 지금 낙관적 잠금을 쓰는 엔티티는 `Hotel`(`HOTEL_MODIFIED`), `AppAdmin`(`APP_ADMIN_MODIFIED`), `HotelAdmin`(`HOTEL_ADMIN_MODIFIED`), `Room`(`ROOM_MODIFIED`), `RoomType`(`ROOM_TYPE_MODIFIED`), `Guest`(`GUEST_MODIFIED`)이다. version을 받지 않는 변경(예: 비밀번호 재설정, 활성 상태 변경)도 같은 엔티티를 바꾸면 같은 변환을 거친다.
 - version과 따로 움직여야 하는 값(예: 객실 상태)은 요청에 화면에서 본 값을 함께 받아 "지금 값이 그것일 때만" 바꾸는 조건부 UPDATE로 막는다. 바뀐 행이 없으면 도메인 409다(`ROOM_STATUS_CHANGED`, 객실 상태 절).
 - 한 번만 일어나야 하는 변경(예: 이용 취소)도 "아직 일어나지 않았을 때만" 바꾸는 조건부 UPDATE로 막는다. 바뀐 행이 없으면 도메인 409다(`STAY_ALREADY_CANCELED`, 이용 절).
 - 유일한 키로 "있으면 쓰고 없으면 만드는" 행(예: 예약의 이용객)은 `insert ... on conflict (유일 인덱스) do nothing` 뒤 다시 조회한다. 유일 제약 위반을 잡아 바꾸는 방식은 트랜잭션이 깨져 이어서 쓸 수 없다(게스트 앱 API 절).
