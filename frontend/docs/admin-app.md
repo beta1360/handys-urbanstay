@@ -43,7 +43,6 @@
   - 직렬화 함수는 `shared/lib/search-params`에 두고, 라우터 옵션 `parseSearch`·`stringifySearch`로 연결한다. 테스트용 memory 라우터에도 같은 함수를 넣는다.
   - 모든 값은 글자로 읽는다. 같은 이름이 여러 번 오면 마지막 값을 쓴다. 쓸 때는 `undefined`·`null`인 값을 뺀다.
   - 숫자 변환과 검사는 각 라우트의 search 스키마가 한다. 앱 안의 이동(`navigate`)은 검증된 값(숫자)을 다시 스키마에 넣으므로, 숫자 값의 스키마는 글자와 숫자를 함께 받는다.
-  - hotel-admin 라우터는 아직 바꾸지 않았다. 첫 search 파라미터(로그인 `redirect`)를 쓸 때 같은 규칙을 적용한다.
 
 ## 화면
 
@@ -65,7 +64,6 @@
   - `@repo/admin-kit/toast`는 모듈에 하나인 store다. 앱마다 따로 번들되므로 앱에 하나다. `showToast({ type, message })`·`dismissToast(id)`와 구독 훅(`useToasts`)을 둔다. 4초 타이머와 개수 제한도 store가 맡으므로 표현 컴포넌트는 상태가 없다.
   - `ToastProvider`는 라우터 바깥에서 영역을 그린다. 그래서 로그인 뒤 이동처럼 화면이 바뀌어도 토스트가 남는다.
   - `showToast`는 features·widgets의 `model`에서 성공·실패 뒤에 부른다. 폼 전체 오류는 `@repo/admin-kit/form`의 `showSubmitError`에 `onAlert`를 넘겨 `useFormErrorToast`로 띄운다.
-- hotel-admin은 API를 연결할 때 같은 구조로 붙인다.
 
 ### 목록 화면
 
@@ -286,7 +284,6 @@
   - 성공하거나 401이면 쿼리 캐시를 모두 비우고 `/login`으로 이동한다. 성공하면 서버의 성공 문구를 토스트로 보여준다. 401은 받은 문구가 없으므로 띄우지 않는다.
   - 그 밖의 실패는 화면을 그대로 두고 버튼 옆에 오류 문구(`role="alert"`)를 보여준다.
   - 로그아웃은 뮤테이션 캐시를 거치지 않고 직접 호출한다. 401을 로그아웃이 처리하므로 사용 중 만료 처리와 함께 이동하지 않는다.
-- hotel-admin의 로그인은 호텔 계정(백엔드)이 생긴 뒤 연결한다.
 
 ## foundation
 
