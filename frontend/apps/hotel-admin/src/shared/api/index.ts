@@ -8,6 +8,13 @@ export {
 export type { Account, LoginAccountBody } from "./account";
 export { API_ERROR_CODES, getApiError } from "./api-error";
 export {
+  fetchHotel,
+  hotelQueryKey,
+  updateHotel,
+  updateHotelBodySchema,
+} from "./hotel";
+export type { Hotel, UpdateHotelBody } from "./hotel";
+export {
   fetchGuest,
   fetchGuests,
   guestListParamsSchema,
