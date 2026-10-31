@@ -1,6 +1,7 @@
 export const ADMIN_LAYOUT_MESSAGES = {
   sidebarLabel: "주 메뉴",
   roomMenuLabel: "객실",
+  roomTypeMenuLabel: "객실 유형",
   guestMenuLabel: "이용객",
   stayMenuLabel: "이용",
   operatorMenuLabel: "운영자",
