@@ -3,6 +3,7 @@ package com.marco.assignment.handys.urbanstay.account.repository
 import com.marco.assignment.handys.urbanstay.TestcontainersConfiguration
 import com.marco.assignment.handys.urbanstay.account.entity.AppAdmin
 import com.marco.assignment.handys.urbanstay.common.config.JpaAuditingConfig
+import com.marco.assignment.handys.urbanstay.common.exception.violates
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -39,11 +40,13 @@ class AppAdminRepositoryTest {
 	}
 
 	@Test
-	fun `대소문자와 공백만 다른 로그인 아이디는 DB 유일 제약으로 저장을 막는다`() {
+	fun `대소문자와 공백만 다른 로그인 아이디는 이름 있는 DB 유일 제약으로 저장을 막는다`() {
 		appAdminRepository.saveAndFlush(AppAdmin("duplicate@test.local", PASSWORD_HASH, NAME))
 
 		assertThatThrownBy { appAdminRepository.saveAndFlush(AppAdmin(" Duplicate@TEST.local ", PASSWORD_HASH, NAME)) }
-			.isInstanceOf(DataIntegrityViolationException::class.java)
+			.isInstanceOfSatisfying(DataIntegrityViolationException::class.java) {
+				assertThat(it.violates(AppAdmin.LOGIN_ID_UNIQUE_CONSTRAINT)).isTrue()
+			}
 	}
 
 	@ParameterizedTest
@@ -70,6 +73,6 @@ class AppAdminRepositoryTest {
 		private const val PASSWORD_HASH = "password-hash"
 		private const val NAME = "어드민"
 		private const val INSERT_APP_ADMIN =
-			"insert into app_admin (login_id, password_hash, name, created_at, updated_at) values (?, ?, ?, now(), now())"
+			"insert into app_admin (login_id, password_hash, name, version, created_at, updated_at) values (?, ?, ?, 0, now(), now())"
 	}
 }
