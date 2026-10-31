@@ -1,1 +1,1 @@
-export { HomePage as default } from "@/_pages/home";
+export { HotelListPage as default } from "@/_pages/hotel-list";
