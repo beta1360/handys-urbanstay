@@ -104,6 +104,19 @@ function getRowTexts(row: HTMLElement) {
     .map((cell) => cell.textContent);
 }
 
+function membersPath(search: Record<string, string> = {}) {
+  const searchString = new URLSearchParams(search).toString();
+  return searchString ? `/members?${searchString}` : "/members";
+}
+
+function getPreviousButton() {
+  return screen.getByRole("button", { name: COMMON_MESSAGES.previousPage });
+}
+
+function getNextButton() {
+  return screen.getByRole("button", { name: COMMON_MESSAGES.nextPage });
+}
+
 beforeEach(() => {
   fetchMembers.mockResolvedValue(createMemberPage());
 });
@@ -194,5 +207,144 @@ describe("MemberListPage", () => {
         name: COMMON_MESSAGES.paginationLabel,
       }),
     ).not.toBeInTheDocument();
+  });
+
+  it("처음 불러오는 동안 불러오는 중 문구를 보여준다", async () => {
+    fetchMembers.mockReturnValue(new Promise<never>(() => {}));
+    renderMemberListPage();
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      COMMON_MESSAGES.loading,
+    );
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("불러오지 못하면 오류 문구와 다시 시도 버튼을 보여주고, 누르면 다시 조회한다", async () => {
+    const user = userEvent.setup();
+    fetchMembers
+      .mockRejectedValueOnce(new Error("서버 오류"))
+      .mockResolvedValueOnce(createMemberPage());
+    renderMemberListPage();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      MEMBER_LIST_CONTENT_MESSAGES.loadFailed,
+    );
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: COMMON_MESSAGES.retry }),
+    );
+
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(fetchMembers).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("MemberListPage 페이지 이동", () => {
+  it("다음 버튼을 누르면 검색어를 유지한 채 다음 페이지를 조회하고 그동안 이전 목록을 흐리게 보여준다", async () => {
+    const user = userEvent.setup();
+    fetchMembers
+      .mockResolvedValueOnce(createMemberPage({ totalPages: 3 }))
+      .mockReturnValueOnce(new Promise<never>(() => {}));
+    const router = renderMemberListPage(membersPath({ keyword: "kim" }));
+
+    await screen.findByRole("table");
+    await user.click(getNextButton());
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe(
+        membersPath({ keyword: "kim", page: "2" }),
+      );
+    });
+    expect(fetchMembers).toHaveBeenLastCalledWith({ keyword: "kim", page: 1 });
+    expect(screen.getByRole("table")).toHaveAttribute("aria-busy", "true");
+    expect(
+      screen.getByText(COMMON_MESSAGES.pageStatus(2, 3)),
+    ).toBeInTheDocument();
+  });
+
+  it("이전 버튼을 누르면 이전 페이지를 조회하고 1페이지는 URL에 남기지 않는다", async () => {
+    const user = userEvent.setup();
+    fetchMembers.mockResolvedValue(createMemberPage({ page: 1, totalPages: 3 }));
+    const router = renderMemberListPage(membersPath({ page: "2" }));
+
+    await screen.findByRole("table");
+    await user.click(getPreviousButton());
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe(membersPath());
+    });
+    expect(fetchMembers).toHaveBeenLastCalledWith({ page: 0 });
+  });
+
+  it.each([
+    ["1페이지에서는 이전", "1", 0, 3, getPreviousButton, getNextButton],
+    ["마지막 페이지에서는 다음", "3", 2, 3, getNextButton, getPreviousButton],
+    [
+      "전체 페이지가 100을 넘어도 100페이지에서는 다음",
+      "100",
+      99,
+      150,
+      getNextButton,
+      getPreviousButton,
+    ],
+  ])(
+    "%s 버튼을 누를 수 없다",
+    async (
+      _,
+      page,
+      apiPage,
+      totalPages,
+      getDisabledButton,
+      getEnabledButton,
+    ) => {
+      fetchMembers.mockResolvedValue(
+        createMemberPage({ page: apiPage, totalPages }),
+      );
+      renderMemberListPage(membersPath({ page }));
+
+      await screen.findByRole("table");
+      expect(getDisabledButton()).toBeDisabled();
+      expect(getEnabledButton()).toBeEnabled();
+    },
+  );
+
+  it("마지막 페이지를 넘은 페이지면 검색어를 유지한 채 마지막 페이지로 방문 기록을 바꿔 이동한다", async () => {
+    fetchMembers
+      .mockResolvedValueOnce(
+        createMemberPage({ items: [], page: 49, totalPages: 2 }),
+      )
+      .mockResolvedValueOnce(createMemberPage({ page: 1, totalPages: 2 }));
+    const router = renderMemberListPage(
+      membersPath({ keyword: "kim", page: "50" }),
+    );
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe(
+        membersPath({ keyword: "kim", page: "2" }),
+      );
+    });
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(router.history.length).toBe(1);
+    expect(fetchMembers).toHaveBeenLastCalledWith({ keyword: "kim", page: 1 });
+  });
+});
+
+describe("MemberListPage URL 정리", () => {
+  it.each([
+    ["page가 숫자가 아니면", { page: "abc" }],
+    ["page가 1보다 작으면", { page: "0" }],
+    ["page가 100보다 크면", { page: "101" }],
+    ["검색어가 공백뿐이면", { keyword: "   " }],
+    ["검색어가 100자를 넘으면", { keyword: "가".repeat(101) }],
+  ])("%s 기본값으로 조회하고 URL에서 지운다", async (_, search) => {
+    const router = renderMemberListPage(membersPath(search));
+
+    await screen.findByRole("table");
+    expect(router.state.location.href).toBe(membersPath());
+    expect(fetchMembers).toHaveBeenCalledExactlyOnceWith({ page: 0 });
+    expect(
+      screen.getByLabelText(MEMBER_SEARCH_FORM_MESSAGES.keywordLabel),
+    ).toHaveValue("");
   });
 });

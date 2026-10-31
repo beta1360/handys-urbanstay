@@ -22,6 +22,11 @@
   - 목록은 이름(상세 링크)·이메일·전화번호 열이고, 최근 가입순은 서버가 정한다. 검색어 하나로 이름·이메일·전화번호를 찾는다(검색창 이름 '이름·이메일·전화번호'). 등록 버튼은 없다.
   - 상세는 이름·이메일·전화번호·가입일(한국 날짜 `YYYY-MM-DD`)이다. 수정 화면이 없으므로 '목록으로' 링크 줄에 '수정' 버튼을 두지 않는다. 찾을 수 없음은 잘못된 회원 id와 404 `MEMBER_NOT_FOUND`다.
   - 상세 내용 아래 '호텔 이용 기록' 묶음은 그 회원과 연결된 이용객(모든 호텔)의 이용이다. 열은 호텔, 객실(호수), 유형, 기간(`체크인 ~ 체크아웃 (n박)`), 인원(`n명`), 최종 금액(천 단위 쉼표와 '원'), 취소 여부(취소한 이용만 '취소됨')다. 체크인이 늦은 순은 서버가 정한다.
+- 전체 어드민 계정 관리(`docs/domain.md`의 '전체 어드민')는 사이드바 '어드민 계정' 메뉴(회원 다음)의 목록(`/admins`), 추가(`/admins/new`), 상세(`/admins/$adminId`), 이름 수정(`/admins/$adminId/edit`)이다. 화면 동작은 `frontend/docs/admin-app.md`의 '목록 화면'·'상세 화면'·'등록·수정 화면'을 따르고, 아래만 더한다.
+  - 목록은 이름(상세 링크)·아이디·만든 날(한국 날짜 `YYYY-MM-DD`) 열이고, 최근 추가순은 서버가 정한다. API에 검색이 없어 검색창 없이 페이지(`?page=`)만 URL에 둔다. 오른쪽 위에 '어드민 계정 추가' 버튼을 둔다.
+  - 추가 화면은 '어드민 계정' 묶음의 아이디(이메일, `autocomplete="off"`)·이름·처음 비밀번호(`autocomplete="new-password"`, 보기 버튼 없음) 칸이다. 아이디 중복 409(`LOGIN_ID_DUPLICATED`)는 아이디 칸 오류다.
+  - 상세는 이름·아이디·만든 날이고 '목록으로' 링크 줄에 '수정' 버튼을 둔다. 찾을 수 없음은 잘못된 id와 404 `APP_ADMIN_NOT_FOUND`다.
+  - 이름 수정 화면은 이름 칸만 둔다. 아이디는 바꿀 수 없고 읽기 전용 칸을 쓰는 화면이 없어 보여주지 않는다. 수정 충돌 409(`APP_ADMIN_MODIFIED`)는 '최신 내용 불러오기'와 함께 폼 안에 보여준다. 로그인한 어드민이 자기 이름을 바꾸면 위쪽 영역의 이름이 바뀌도록 내 정보를 다시 불러온다(`refreshMeIfSelf`).
 
 ## 구조
 
@@ -33,15 +38,17 @@
 - 라우터의 URL search 직렬화는 `src/shared/lib/search-params`의 `parseSearch`·`stringifySearch`를 쓴다(일반 쿼리 문자열). 테스트용 memory 라우터도 같은 함수를 넣는다. 규칙은 `frontend/docs/admin-app.md`의 '구조'를 따른다.
 - 경로 파라미터(`$hotelId`)는 라우트의 `params.parse`·`params.stringify`로 읽고 쓴다. 두 함수는 `entities/hotel`에 두고, 상세·수정 라우트를 감싸는 `hotels/$hotelId/route.tsx`가 한 번 연결한다. 상세(`index.tsx`), 수정(`edit.tsx`), 마스터 정보 수정(`master/edit.tsx`) 화면은 이 라우트의 `useParams`로 검사한 id를 읽는다. 규칙은 `frontend/docs/admin-app.md`의 '상세 화면'을 따른다.
   - 회원은 상세 화면 하나뿐이라 감싸는 라우트 없이 `members/$memberId.tsx`가 `entities/member`의 두 함수를 연결한다.
-- 여러 화면이 함께 쓰는 코드는 `frontend/docs/admin-app.md`의 '구조'에 따라 역할별로 둔다. 호텔 id 검사, 호텔 하나 조회(`useHotel`: 상태 값 `loading`·`failed`·`notFound`·`ready` 하나를 돌려준다), 상태별 화면(`HotelLoading`·`HotelLoadFailed`·`HotelNotFound`)과 상세 내용 목록(`HotelInformation`), 호텔 항목 이름(`HOTEL_FIELD_LABELS`: 입력 칸·상세·목록 표가 함께 쓴다), 등록·수정이 함께 쓰는 호텔 정보 입력 칸(`HotelInfoFields`: 칸마다 입력창 props를 받는 표현 컴포넌트)과 그 폼 스키마 조각(`createHotelInfoFormShape`)은 `entities/hotel`에 둔다. 호텔 마스터 조회(`useHotelMaster`: `useHotel`과 같은 상태 값), '마스터 계정' 묶음 카드(`HotelMasterSection`)와 묶음 안 상태 표시(`HotelMasterLoading`·`HotelMasterLoadFailed`)·정보 목록(`HotelMasterInformation`), 등록·수정이 함께 쓰는 마스터 아이디·이름 칸(`HotelMasterInfoFields`)과 처음·새 비밀번호 칸(`HotelMasterPasswordField`), 그 폼 스키마 조각(`createHotelMasterInfoFormShape`·`createHotelMasterPasswordSchema`)은 `entities/hotel-master`에 둔다. 회원 id 검사, 회원 하나 조회(`useMember`: `useHotel`과 같은 상태 값), 목록·이용 기록 조회 훅, 목록 페이지 계산과 검색어 정리, 상태별 화면(`MemberLoading`·`MemberLoadFailed`·`MemberNotFound`)과 상세 내용 목록(`MemberInformation`), 회원 항목 이름(`MEMBER_FIELD_LABELS`)은 `entities/member`에, 호텔의 객실 목록 조회 훅, 객실 항목 이름(`ROOM_FIELD_LABELS`: 호텔 상세의 객실 표와 회원 상세의 이용 기록 표가 함께 쓴다), 상태 문구(`ROOM_STATUS_LABELS`), 층 표시(`RoomFloor`)는 `entities/room`에 둔다. 여러 화면이 함께 쓰는 문구(`COMMON_MESSAGES`: 불러오는 중, 다시 시도, 취소, 목록으로, 저장, 최신 내용 불러오기, 검색, 검색 결과 없음, 페이지 이동)는 `shared/config`에, 금액 표시(`formatWon`)와 서버 UTC 시각의 한국 날짜 표시(`formatKoreanDate`)는 `shared/lib`에 둔다. 도메인과 무관한 폼 도우미, 토스트 상태, 화면 이동 링크(`ButtonLink`·`TextLink`), 요청·응답 검증과 서버와 같은 입력 검증 문구는 `@repo/admin-kit`의 것을 쓴다(`frontend/docs/admin-app.md`의 'packages/admin-kit를 쓰는 법').
+  - 어드민 계정은 호텔처럼 `admins/$adminId/route.tsx`가 `entities/admin`의 두 함수를 한 번 연결하고, 상세(`index.tsx`)·이름 수정(`edit.tsx`)이 그 `useParams`로 읽는다.
+- 여러 화면이 함께 쓰는 코드는 `frontend/docs/admin-app.md`의 '구조'에 따라 역할별로 둔다. 호텔 id 검사, 호텔 하나 조회(`useHotel`: 상태 값 `loading`·`failed`·`notFound`·`ready` 하나를 돌려준다), 상태별 화면(`HotelLoading`·`HotelLoadFailed`·`HotelNotFound`)과 상세 내용 목록(`HotelInformation`), 호텔 항목 이름(`HOTEL_FIELD_LABELS`: 입력 칸·상세·목록 표가 함께 쓴다), 등록·수정이 함께 쓰는 호텔 정보 입력 칸(`HotelInfoFields`: 칸마다 입력창 props를 받는 표현 컴포넌트)과 그 폼 스키마 조각(`createHotelInfoFormShape`)은 `entities/hotel`에 둔다. 호텔 마스터 조회(`useHotelMaster`: `useHotel`과 같은 상태 값), '마스터 계정' 묶음 카드(`HotelMasterSection`)와 묶음 안 상태 표시(`HotelMasterLoading`·`HotelMasterLoadFailed`)·정보 목록(`HotelMasterInformation`), 등록·수정이 함께 쓰는 마스터 아이디·이름 칸(`HotelMasterInfoFields`)과 처음·새 비밀번호 칸(`HotelMasterPasswordField`), 그 폼 스키마 조각(`createHotelMasterInfoFormShape`·`createHotelMasterPasswordSchema`)은 `entities/hotel-master`에 둔다. 회원 id 검사, 회원 하나 조회(`useMember`: `useHotel`과 같은 상태 값), 목록·이용 기록 조회 훅, 목록 페이지 계산과 검색어 정리, 상태별 화면(`MemberLoading`·`MemberLoadFailed`·`MemberNotFound`)과 상세 내용 목록(`MemberInformation`), 회원 항목 이름(`MEMBER_FIELD_LABELS`)은 `entities/member`에, 호텔의 객실 목록 조회 훅, 객실 항목 이름(`ROOM_FIELD_LABELS`: 호텔 상세의 객실 표와 회원 상세의 이용 기록 표가 함께 쓴다), 상태 문구(`ROOM_STATUS_LABELS`), 층 표시(`RoomFloor`)는 `entities/room`에 둔다. 어드민 계정 id 검사, 계정 하나 조회(`useAdmin`: `useHotel`과 같은 상태 값), 목록 페이지 계산, 상태별 화면(`AdminLoading`·`AdminLoadFailed`·`AdminNotFound`)과 상세 내용 목록(`AdminInformation`), 만든 날 표시(`AdminCreatedDate`), 항목 이름(`ADMIN_FIELD_LABELS`), 추가·수정이 함께 쓰는 이름 칸(`AdminNameField`)과 그 폼 스키마 조각(`createAdminInfoFormShape`)은 `entities/admin`에 둔다. 여러 화면이 함께 쓰는 문구(`COMMON_MESSAGES`: 불러오는 중, 다시 시도, 취소, 등록, 저장, 수정, 목록으로, 최신 내용 불러오기, 검색, 검색 결과 없음, 페이지 이동)와 여러 계정 폼이 함께 쓰는 문구(`ACCOUNT_FORM_MESSAGES`: 아이디(이메일), 처음 비밀번호, 비밀번호 안내)는 `shared/config`에, 금액 표시(`formatWon`)와 서버 UTC 시각의 한국 날짜 표시(`formatKoreanDate`)는 `shared/lib`에 둔다. 도메인과 무관한 폼 도우미, 토스트 상태, 화면 이동 링크(`ButtonLink`·`TextLink`), 요청·응답 검증과 서버와 같은 입력 검증 문구는 `@repo/admin-kit`의 것을 쓴다(`frontend/docs/admin-app.md`의 'packages/admin-kit를 쓰는 법').
 - 서버 상태는 `frontend/CLAUDE.md`의 '서버 상태'를 따른다.
-  - `shared/api`: 검증을 거친 요청 함수(`fetchMe`, `fetchHotels`, `fetchHotel`, `fetchHotelMaster`, `fetchMembers`, `fetchMember`, `fetchMemberStays`, `fetchHotelRooms`, 로그인·로그아웃, 호텔 등록·수정, 마스터 정보 수정·비밀번호 재설정)와 쿼리 키 함수(`meQueryKey`, `hotelListQueryKey`, `hotelQueryKey`, `hotelMasterQueryKey`, `memberListQueryKey`, `memberQueryKey`, `memberStayListQueryKey`, `hotelRoomListQueryKey`), 서버 오류 정보 읽기(`getApiError`)와 오류 코드(`API_ERROR_CODES`)
-  - `entities/account/api`: 내 정보 조회(`useMe`, `ensureMe`)와 로그인 상태 캐시 규칙(`startSession`, `endSession`, `forgetMe`, `isPendingMeQuery`)
+  - `shared/api`: 검증을 거친 요청 함수(`fetchMe`, `fetchHotels`, `fetchHotel`, `fetchHotelMaster`, `fetchMembers`, `fetchMember`, `fetchMemberStays`, `fetchHotelRooms`, `fetchAdmins`, `fetchAdmin`, 로그인·로그아웃, 호텔 등록·수정, 마스터 정보 수정·비밀번호 재설정, 어드민 계정 추가·이름 수정)와 쿼리 키 함수(`meQueryKey`, `hotelListQueryKey`, `hotelQueryKey`, `hotelMasterQueryKey`, `memberListQueryKey`, `memberQueryKey`, `memberStayListQueryKey`, `hotelRoomListQueryKey`, `adminListQueryKey`, `adminQueryKey`), 서버 오류 정보 읽기(`getApiError`)와 오류 코드(`API_ERROR_CODES`)
+  - `entities/account/api`: 내 정보 조회(`useMe`, `ensureMe`)와 로그인 상태 캐시 규칙(`startSession`, `endSession`, `forgetMe`, `isPendingMeQuery`, 저장한 계정이 로그인한 계정이면 내 정보 다시 불러오기 `refreshMeIfSelf`)
+  - `entities/admin/api`: 어드민 계정 목록·상세 조회 훅(`useAdminListQuery`, `useAdminQuery`)과 캐시 규칙(`cacheSavedAdmin`, `refetchAdmin`·`useRefetchAdmin`). 목록 페이지 계산은 `entities/admin/lib`에 둔다
   - `entities/hotel/api`: 호텔 조회 훅(`useHotelQuery`, `useHotelListQuery`)과 캐시 규칙(`cacheSavedHotel`, `refetchHotel`·`useRefetchHotel`). 목록 페이지 계산(`getLastPage`, `isBeyondLastPage` 등)은 `entities/hotel/lib`에 둔다
   - `entities/hotel-master/api`: 마스터 조회 훅(`useHotelMasterQuery`)과 캐시 규칙(`cacheSavedHotelMaster`, `refetchHotelMaster`·`useRefetchHotelMaster`, 비밀번호 재설정 뒤 다시 불러오기 `refreshHotelMaster`)
   - `entities/member/api`: 회원 목록·상세·이용 기록 조회 훅(`useMemberListQuery`, `useMemberQuery`, `useMemberStayListQuery`). 회원은 조회만 하므로 캐시 규칙 함수가 없다. 목록 페이지 계산은 `entities/member/lib`에 둔다
   - `entities/room/api`: 호텔의 객실 목록 조회 훅(`useHotelRoomListQuery`). 조회만 하므로 캐시 규칙 함수가 없다
-  - `features/<동작>/api`: 변경 훅. `hotel-create`(`useCreateHotel`), `hotel-update`(`useUpdateHotel`), `hotel-master-update`(`useUpdateHotelMaster`), `hotel-master-password-reset`(`useResetHotelMasterPassword`: 성공하면 `refreshHotelMaster`가 끝날 때까지 요청 중으로 둔다), `auth-login`(`useLogin`), `auth-logout`(`useLogout`)
+  - `features/<동작>/api`: 변경 훅. `hotel-create`(`useCreateHotel`), `hotel-update`(`useUpdateHotel`), `hotel-master-update`(`useUpdateHotelMaster`), `hotel-master-password-reset`(`useResetHotelMasterPassword`: 성공하면 `refreshHotelMaster`가 끝날 때까지 요청 중으로 둔다), `admin-create`(`useCreateAdmin`), `admin-update`(`useUpdateAdmin`: 성공하면 `cacheSavedAdmin`과 `refreshMeIfSelf`), `auth-login`(`useLogin`), `auth-logout`(`useLogout`)
 - 라우트 트리는 `src/app/router/route-tree.gen.ts`에 생성된다. 직접 수정하지 않고 커밋한다.
 - 라우트 생성 설정은 `tsr.config.json`에만 둔다.
 
@@ -71,6 +78,13 @@ apps/app-admin/
    │  │  │  ├─ members/
    │  │  │  │  ├─ index.tsx      # /members (?keyword=&page=)
    │  │  │  │  └─ $memberId.tsx  # /members/$memberId (회원 상세). 경로 파라미터 검사
+   │  │  │  ├─ admins/
+   │  │  │  │  ├─ index.tsx      # /admins (?page=)
+   │  │  │  │  ├─ new.tsx        # /admins/new (어드민 계정 추가)
+   │  │  │  │  └─ $adminId/
+   │  │  │  │     ├─ route.tsx   # /admins/$adminId 경로 파라미터 검사. 화면 없이 상세·이름 수정을 감싼다
+   │  │  │  │     ├─ index.tsx   # /admins/$adminId (어드민 계정 상세)
+   │  │  │  │     └─ edit.tsx    # /admins/$adminId/edit (이름 수정)
    │  │  │  └─ hotels/
    │  │  │     ├─ index.tsx      # /hotels (?keyword=&page=)
    │  │  │     ├─ new.tsx        # /hotels/new (호텔 등록). 고정 경로라 $hotelId보다 먼저 잡힌다
@@ -82,8 +96,10 @@ apps/app-admin/
    │  │  │           └─ edit.tsx # /hotels/$hotelId/master/edit (마스터 정보 수정)
    │  │  └─ login.tsx            # /login (?redirect=)
    │  └─ styles/
-   ├─ pages/           # error(화면 오류), hotel-create(호텔 등록: features/hotel-create의 HotelCreateForm 배치), hotel-detail(호텔 상세: 경로 파라미터를 읽고 widgets/hotel-detail을 배치), hotel-edit(호텔 수정: 경로 파라미터를 읽고 features/hotel-update의 HotelUpdate 배치), hotel-master-edit(마스터 정보 수정: 경로 파라미터를 읽고 features/hotel-master-update의 HotelMasterUpdate 배치), hotel-list(호텔 목록: URL search 스키마. keyword·page를 읽어 features/hotel-search의 HotelSearchForm, 호텔 등록 링크, widgets/hotel-list의 HotelList 배치), member-list(회원 목록: URL search 스키마. keyword·page를 읽어 features/member-search의 MemberSearchForm, widgets/member-list의 MemberList 배치), member-detail(회원 상세: 경로 파라미터를 읽고 widgets/member-detail을 배치), login(로그인 화면 틀. redirect를 읽어 features/auth-login의 LoginForm 배치)
+   ├─ pages/           # error(화면 오류), hotel-create(호텔 등록: features/hotel-create의 HotelCreateForm 배치), hotel-detail(호텔 상세: 경로 파라미터를 읽고 widgets/hotel-detail을 배치), hotel-edit(호텔 수정: 경로 파라미터를 읽고 features/hotel-update의 HotelUpdate 배치), hotel-master-edit(마스터 정보 수정: 경로 파라미터를 읽고 features/hotel-master-update의 HotelMasterUpdate 배치), hotel-list(호텔 목록: URL search 스키마. keyword·page를 읽어 features/hotel-search의 HotelSearchForm, 호텔 등록 링크, widgets/hotel-list의 HotelList 배치), member-list(회원 목록: URL search 스키마. keyword·page를 읽어 features/member-search의 MemberSearchForm, widgets/member-list의 MemberList 배치), member-detail(회원 상세: 경로 파라미터를 읽고 widgets/member-detail을 배치), admin-list(어드민 계정 목록: URL search 스키마. page를 읽어 '어드민 계정 추가' 링크와 widgets/admin-list의 AdminList 배치), admin-create(features/admin-create의 AdminCreateForm 배치), admin-detail(경로 파라미터를 읽고 widgets/admin-detail을 배치), admin-edit(경로 파라미터를 읽고 features/admin-update의 AdminUpdate 배치), login(로그인 화면 틀. redirect를 읽어 features/auth-login의 LoginForm 배치)
    ├─ widgets/
+   │  ├─ admin-list/   # 어드민 계정 목록. hotel-list와 같은 구성에서 검색어만 없다(useAdminList, AdminList·표·페이지 이동·상태별 화면)
+   │  ├─ admin-detail/ # 어드민 계정 상세. AdminDetail(연결)이 useAdmin의 상태 값으로 찾을 수 없음 또는 '목록으로'·'수정' 링크 줄 + 불러오는 중·실패·내용을 고른다
    │  ├─ admin-layout/ # 사이드바 메뉴(config/menu.ts), 위쪽 영역. model: useAdminHeader(화면 제목·계정 이름·로그아웃 상태). ui: AdminHeader(연결)·AdminHeaderBar(표현)
    │  ├─ hotel-detail/ # 호텔 상세. HotelDetail(연결)이 useHotel의 상태 값으로 찾을 수 없음 또는 링크 줄 + 불러오는 중·실패·내용을 고른다. 내용 아래의 HotelMasterPanel(연결)이 useHotelMaster의 상태 값으로 '마스터 계정' 묶음 안의 불러오는 중·실패·마스터 정보('마스터 정보 수정' 링크, 비밀번호 재설정)를 고르고, 그 아래 HotelRoomList(연결)가 useHotelRoomList(불러오는 중·실패·빈 상태·내용, 화면 상태의 페이지 이동)로 '객실' 묶음 안을 고른다
    │  ├─ member-list/  # 회원 목록. hotel-list와 같은 구성(useMemberList, MemberList·표·페이지 이동·상태별 화면)
@@ -94,12 +110,15 @@ apps/app-admin/
    │  ├─ hotel-update/    # 호텔 수정. api: 수정 변경 훅(성공하면 entities/hotel의 캐시 규칙). model: 폼 스키마(version 포함), useHotelUpdateForm(react-hook-form, 처음 값으로 한 번만 채움, 수정 충돌 시 최신 내용 불러오기, 성공하면 상세로 이동). ui: HotelUpdate(연결: useHotel 상태로 불러오는 중·실패·찾을 수 없음·폼을 고름)·HotelUpdateForm(연결)·HotelUpdateFormView(표현)
    │  ├─ hotel-master-update/ # 마스터 정보 수정. api: 수정 변경 훅(성공하면 entities/hotel-master의 캐시 규칙). model: 폼 스키마(version 포함), useHotelMasterUpdateForm(호텔 수정과 같은 흐름, 아이디 중복은 아이디 칸 오류, 성공하면 호텔 상세로 이동). ui: HotelMasterUpdate(연결: useHotelMaster 상태로 고름)·HotelMasterUpdateForm(연결)·HotelMasterUpdateFormView(표현)
    │  ├─ hotel-master-password-reset/ # 마스터 비밀번호 재설정. api: 재설정 변경 훅(성공하면 마스터 다시 불러오기). model: useHotelMasterPasswordResetForm(성공하면 토스트·칸 비우기). ui: HotelMasterPasswordReset(연결)·HotelMasterPasswordResetView(표현)
+   │  ├─ admin-create/    # 어드민 계정 추가 폼. api: 추가 변경 훅(성공하면 entities/admin의 캐시 규칙). model: 폼 스키마, useAdminCreateForm(아이디 중복은 아이디 칸 오류, 성공하면 상세로 이동). ui: AdminCreateForm(연결)·AdminCreateFormView(표현)
+   │  ├─ admin-update/    # 어드민 계정 이름 수정. api: 수정 변경 훅(성공하면 entities/admin의 캐시 규칙, 내 계정이면 내 정보 다시 불러오기). model: 폼 스키마(version 포함), useAdminUpdateForm(호텔 수정과 같은 흐름). ui: AdminUpdate(연결: useAdmin 상태로 고름)·AdminUpdateForm(연결)·AdminUpdateFormView(표현)
    │  ├─ auth-login/      # 로그인 폼. api: 로그인(성공하면 로그인 상태 시작). model: 폼 스키마, useLoginForm(react-hook-form, 성공하면 redirect로 이동). ui: LoginForm(연결)·LoginFormView(표현)
    │  ├─ auth-logout/     # api: 로그아웃. 성공하거나 401이면 로그인 상태를 끝낸다
    │  ├─ member-search/   # 회원 목록 검색. hotel-search와 같은 흐름(검색하면 1페이지 /members로 이동)
    │  └─ hotel-search/    # 호텔 목록 검색. model: useHotelSearchForm(react-hook-form, URL 검색어를 따라감, 검색하면 1페이지 목록으로 이동). ui: HotelSearchForm(연결)·표현
    ├─ entities/
-   │  ├─ account/      # api: 내 정보 조회, 로그인 상태 캐시 규칙(시작·끝·내 정보 지우기)
+   │  ├─ account/      # api: 내 정보 조회, 로그인 상태 캐시 규칙(시작·끝·내 정보 지우기·내 계정이면 다시 불러오기)
+   │  ├─ admin/        # api: 어드민 계정 목록·상세 조회 훅, 캐시 규칙, 새로 조회. lib: 목록 페이지 계산. config: 항목 이름·화면 문구. model: 계정 id 경로 파라미터 검사, useAdmin(불러오는 중·실패·찾을 수 없음·내용), 추가·수정이 함께 쓰는 폼 스키마 조각. ui: 상태별 화면, 상세 내용 목록, 만든 날 표시, 이름 칸
    │  ├─ hotel/        # api: 호텔 상세·목록 조회 훅, 캐시 규칙. lib: 목록 페이지 계산, 요청할 수 있는 페이지 범위, 검색어 정리(URL 스키마·검색·목록이 함께 쓴다). config: 호텔 항목 이름(HOTEL_FIELD_LABELS). 호텔 id 경로 파라미터 검사, 호텔 하나 조회(상태 값 하나, 404는 notFound), 상태별 화면·상세 내용 목록(HotelInformation), 등록·수정이 함께 쓰는 호텔 정보 입력 칸(HotelInfoFields)과 폼 스키마 조각
    │  ├─ member/       # api: 회원 목록·상세·이용 기록 조회 훅. lib: 목록·이용 기록 페이지 계산, 검색어 정리. config: 회원 항목 이름·화면 문구. model: 회원 id 경로 파라미터 검사, useMember(불러오는 중·실패·찾을 수 없음·내용). ui: 상태별 화면, 상세 내용 목록
    │  ├─ room/         # api: 호텔의 객실 목록 조회 훅. config: 객실 항목 이름·상태 문구. lib: 객실 목록 페이지 검사. ui: 층 표시
@@ -111,11 +130,12 @@ apps/app-admin/
       │  ├─ hotel-master.ts     # 호텔 마스터 조회와 쿼리 키, 정보 수정, 비밀번호 재설정, 수정·재설정 요청 스키마, 마스터 타입
       │  ├─ room.ts             # 호텔의 객실 목록 조회와 쿼리 키, 목록 파라미터 스키마, 객실·객실 상태 타입
       │  ├─ member.ts           # 회원 목록·상세·이용 기록 조회와 쿼리 키, 목록·이용 기록 파라미터 스키마, 회원·이용 기록 타입
+      │  ├─ admin.ts            # 어드민 계정 목록·상세 조회와 쿼리 키(목록 전체 포함), 추가, 이름 수정, 목록·상세 파라미터·추가·수정 요청 스키마
       │  ├─ api-error.ts        # 서버 오류 정보 읽기 (getApiError: 생성된 ErrorApiResponse를 @repo/admin-kit의 createApiErrorReader에 넣는다), 오류 코드 (API_ERROR_CODES: 공통 코드 + 도메인 코드)
       │  ├─ http.ts             # orval mutator
       │  └─ generated/ # orval 생성 코드. 직접 수정하지 않고 shared/api 밖에서 import하지 않는다
       │     └─ zod/    # orval 생성 zod 스키마
-      ├─ config/       # APP_INFO (앱 이름), COMMON_MESSAGES (여러 화면이 함께 쓰는 문구), TOAST_MESSAGES (토스트 영역·닫기 버튼 이름)
+      ├─ config/       # APP_INFO (앱 이름), COMMON_MESSAGES (여러 화면이 함께 쓰는 문구), ACCOUNT_FORM_MESSAGES (여러 계정 폼이 함께 쓰는 문구), TOAST_MESSAGES (토스트 영역·닫기 버튼 이름)
       └─ lib/
          ├─ currency/      # 금액을 천 단위 쉼표와 '원'으로 보여주기(formatWon)
          ├─ date-time/     # 서버의 UTC 시각을 한국 날짜 `YYYY-MM-DD`로 보여주기(formatKoreanDate)

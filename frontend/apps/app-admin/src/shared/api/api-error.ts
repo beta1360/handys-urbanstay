@@ -12,6 +12,8 @@ export const API_ERROR_CODES = {
   loginIdDuplicated: "LOGIN_ID_DUPLICATED",
   hotelAdminModified: "HOTEL_ADMIN_MODIFIED",
   memberNotFound: "MEMBER_NOT_FOUND",
+  appAdminNotFound: "APP_ADMIN_NOT_FOUND",
+  appAdminModified: "APP_ADMIN_MODIFIED",
 } as const;
 
 export const getApiError = createApiErrorReader(ErrorApiResponse);

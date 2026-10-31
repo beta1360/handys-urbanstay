@@ -202,7 +202,7 @@ function getFields(): Record<InputField, HTMLElement> {
 }
 
 function getSubmitButton() {
-  return screen.getByRole("button", { name: HOTEL_CREATE_FORM_MESSAGES.submit });
+  return screen.getByRole("button", { name: COMMON_MESSAGES.register });
 }
 
 function getCancelLink() {

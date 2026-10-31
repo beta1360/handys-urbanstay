@@ -7,6 +7,7 @@ import {
   ensureMe,
   forgetMe,
   isPendingMeQuery,
+  refreshMeIfSelf,
   startSession,
 } from "./me-query";
 
@@ -91,6 +92,21 @@ describe("로그인 상태 캐시", () => {
     expect(queryClient.getQueryData(OTHER_QUERY_KEY)).toEqual([
       "이전 계정의 데이터",
     ]);
+  });
+});
+
+describe("refreshMeIfSelf", () => {
+  it.each([
+    ["내 계정이면 내 정보를 무효화한다", ACCOUNT.id, true],
+    ["다른 계정이면 내 정보를 그대로 둔다", NEXT_ACCOUNT.id, false],
+  ])("%s", async (_, accountId, isInvalidated) => {
+    const queryClient = createLoggedInQueryClient();
+
+    await refreshMeIfSelf(queryClient, accountId);
+
+    expect(queryClient.getQueryState(meQueryKey())?.isInvalidated).toBe(
+      isInvalidated,
+    );
   });
 });
 

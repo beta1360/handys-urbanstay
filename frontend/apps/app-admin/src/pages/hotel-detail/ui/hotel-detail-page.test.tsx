@@ -35,10 +35,7 @@ import { API_ERROR_CODES, resetHotelMasterPassword } from "@/shared/api";
 import type { Hotel, HotelMaster, HotelRoom } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
-import {
-  HOTEL_DETAIL_ACTION_MESSAGES,
-  HOTEL_ROOM_LIST_MESSAGES,
-} from "@/widgets/hotel-detail";
+import { HOTEL_ROOM_LIST_MESSAGES } from "@/widgets/hotel-detail";
 import { HotelDetailPage } from "./hotel-detail-page";
 
 const { fetchHotel, fetchHotelMaster, fetchHotelRooms } = vi.hoisted(() => ({
@@ -374,7 +371,7 @@ describe("HotelDetailPage 수정 버튼", () => {
     const router = renderHotelDetailPage();
 
     const editLink = await screen.findByRole("link", {
-      name: HOTEL_DETAIL_ACTION_MESSAGES.edit,
+      name: COMMON_MESSAGES.edit,
     });
     expect(editLink).toHaveAttribute("href", `${hotelPath(HOTEL.id)}/edit`);
     expect(editLink.parentElement).toBe(getBackLink().parentElement);
@@ -404,7 +401,7 @@ describe("HotelDetailPage 수정 버튼", () => {
 
     expect(await screen.findByRole(role)).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: HOTEL_DETAIL_ACTION_MESSAGES.edit }),
+      screen.queryByRole("link", { name: COMMON_MESSAGES.edit }),
     ).not.toBeInTheDocument();
   });
 });
