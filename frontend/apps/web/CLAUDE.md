@@ -16,11 +16,11 @@
 
 | 경로 | 화면 |
 |---|---|
-| `/` | 호텔 목록. 고르면 그 호텔의 예약 화면으로 간다 |
+| `/` | 호텔 목록. 고르면 그 호텔의 예약 화면으로 간다. 객실이 없는 호텔은 뒤에 비활성으로 둔다 |
 | `/hotels/[hotelId]` | 호텔 이름, 날짜·인원 → 객실 유형 선택(1박 요금) → 예약 내용(최종 금액) → 예약(회원만) → 같은 화면의 완료 화면 |
 | `/login` | 로그인(이메일, 비밀번호). 성공하면 `?redirect`로 간다. 회원이면 폼 없이 바로 간다 |
 | `/signup` | 회원가입(이메일, 비밀번호, 이름, 전화번호). 가입하면 바로 로그인되고 `?redirect`로 간다. 회원이면 폼 없이 바로 간다 |
-| `/me/stays` | 내 이용. 로그인 필요. 지금·앞으로의 이용과 지난 이용 |
+| `/me/stays` | 내 이용. 로그인 필요. 지금·앞으로의 이용과 지난 이용을 10건씩 이어 불러온다(무한 스크롤) |
 
 - 예약 조건(체크인·체크아웃 날짜, 인원)은 URL search(`?checkInDate&checkOutDate&guestCount`)에 둔다. 공유·새로고침·뒤로 가기로 같은 조건을 다시 볼 수 있게 하기 위해서다.
   - 날짜·인원 폼을 제출하면 `window.history.pushState`로 search만 바꾼다. 서버 컴포넌트를 다시 그리지 않고 `useSearchParams`가 따라간다.
@@ -28,6 +28,9 @@
   - 조건이 바뀌면 고른 객실 유형과 폼 오류를 지운다.
 - 완료 화면은 화면 상태라 새로고침하면 사라지고 예약 화면으로 돌아간다. 지난 예약은 '내 이용'에서 본다.
 - 금액은 원 단위에 천 단위 쉼표로 보여준다(예: 180,000원, `shared/lib/money`의 `formatWon`).
+- 호텔 목록은 서버 순서(객실이 있는 호텔 → 객실이 없는 호텔, 각각 이름순)를 그대로 쓰고 다시 정렬하지 않는다.
+  - 객실 수(`roomCount`)가 1 이상이면 고를 수 있다(`entities/hotel`의 `loadHotelList`가 `bookable`로 바꾼다).
+  - 객실이 없는 호텔은 링크가 아닌 흐린 카드로 그리고 '예약할 수 있는 객실이 없습니다'를 함께 보여준다. 초점을 받지 않는 글자라 화면 낭독기도 안내 문구까지 읽는다.
 
 ### 로그인 상태
 
@@ -67,7 +70,11 @@
   - 409 `ROOM_TYPE_UNAVAILABLE`·`STAY_PERIOD_OVERLAPPED`, 404 `ROOM_TYPE_NOT_FOUND`는 폼 알림으로 보여주고 객실 유형 목록을 다시 조회한다. 409 `GUEST_LINKED_TO_OTHER_MEMBER`도 폼 알림이다.
   - 성공하면 같은 화면에서 완료 화면(서버 문구, 호텔, 객실 유형, 기간, 인원, 이용객 이름, 최종 금액)으로 바꾸고 제목에 초점을 옮긴다. 배정된 객실(호수)은 보여주지 않는다.
 - 내 이용
-  - 체크아웃 날짜가 오늘(한국 시간)보다 뒤면 '지금·앞으로의 이용', 오늘이거나 지났으면 '지난 이용'이다. '지금·앞으로의 이용'은 체크인이 가까운 순(같으면 id 순)으로, '지난 이용'은 서버 순서(체크인 늦은 순)로 보여준다.
+  - 체크아웃 날짜가 오늘(한국 시간)보다 뒤면 '지금·앞으로의 이용', 오늘이거나 지났으면 '지난 이용'이다. 나누기와 정렬(지금·앞으로는 체크인 이른 순, 지난 이용은 체크인 늦은 순)은 서버가 `period`(`UPCOMING`·`PAST`)로 하고, 화면은 받은 순서대로 이어 붙인다.
+  - 처음 10건을 보여주고, 아래에 닿으면 10건씩 더 불러온다. '지금·앞으로'(`period=UPCOMING`)를 마지막 페이지까지 받은 뒤 '지난 이용'(`period=PAST`)을 0페이지부터 이어 받는다. 한 기간에서 100페이지(API 최대 `page` 99)를 넘으면 그 기간은 끝난 것으로 본다.
+  - 두 구역 제목은 그대로 두고, '지난 이용' 구역은 그 첫 페이지를 받은 뒤에 나타난다. 받은 '지금·앞으로'가 없으면 그 구역에 '이용이 없습니다.'를 보여준다.
+  - 목록 아래: 다음 페이지가 있으면 보이지 않는 센티널(`IntersectionObserver`, 아래 200px 앞에서)과 '더 보기' 버튼을 둔다. 센티널이 부르지 못할 때(키보드·화면 낭독기, 관찰이 안 될 때)는 버튼으로 불러온다. 불러오는 중에는 불러오는 중 문구, 다 받았으면 '이용을 모두 불러왔습니다.'를 보여준다.
+  - 다음 페이지가 실패하면 받은 이용은 그대로 두고 `role="alert"` 문구와 '다시 시도'를 보여준다. '더 보기'·'다시 시도'는 같은 버튼이라 눌러도 초점이 버튼에 남는다.
   - 항목마다 호텔, 객실 유형, 기간, 인원, 최종 금액, 취소 여부('취소됨')를 보여준다. 이용이 하나도 없으면 '호텔 목록' 링크를 보여준다.
 
 ## 구조
@@ -84,10 +91,10 @@ apps/web/
 └─ src/
    ├─ _app/                # QueryClient, 토스트 영역, Provider
    ├─ _pages/              # hotel-list, hotel-booking, login, signup, my-stays, not-found, error
-   ├─ widgets/             # app-layout (헤더 로그인 상태), hotel-booking (서버에서 호텔을 찾아 예약 화면 조립), my-stays (세션 쿠키를 넘겨 내 이용 조회), guest-only (회원을 로그인·가입 화면에서 내보내기)
+   ├─ widgets/             # app-layout (헤더 로그인 상태), hotel-booking (서버에서 호텔을 찾아 예약 화면 조립), my-stays (세션 쿠키를 넘겨 내 이용 첫 페이지 조회), guest-only (회원을 로그인·가입 화면에서 내보내기)
    ├─ features/            # stay-search (날짜·인원 → URL), stay-reserve (유형 선택·금액·예약·완료), auth-login, auth-signup, auth-logout
-   ├─ entities/            # hotel (목록, 호텔 찾기), room-type (유형 조회, 예약불가 표시), stay (조건 검사·URL, 기간·금액, 내 이용 표시), member (로그인 상태)
-   └─ shared/              # api, config, lib (form, date, path-param, login-redirect, current-href, money, toast), ui
+   ├─ entities/            # hotel (목록·비활성 호텔, 호텔 찾기), room-type (유형 조회, 예약불가 표시), stay (조건 검사·URL, 기간·금액, 내 이용 무한 스크롤), member (로그인 상태)
+   └─ shared/              # api, config, lib (form, date, path-param, login-redirect, current-href, money, toast, scroll-sentinel), ui
 ```
 
 ### 서버 컴포넌트의 조회
@@ -98,15 +105,24 @@ apps/web/
   - `<slice>/ui`: async 연결 컴포넌트. `load*` 하나를 부르고 표현 컴포넌트를 고르기만 한다.
 - `_pages`는 `<Suspense>` 안에서 `params.then(...)`으로 경로 파라미터를 읽어 연결 컴포넌트를 배치만 한다. Cache Components에서 `params`와 캐시하지 않는 조회는 `<Suspense>` 안에 있어야 하기 때문이다.
 - `'use cache'`는 쓰지 않는다. 호텔·객실 정보가 운영 앱에서 바뀌므로 항상 최신으로 조회한다.
-- 목록은 첫 페이지(`size` 100)만 쓴다. 객실 유형 화면의 호텔도 이 목록에서 찾고, 없으면 찾을 수 없음이다. 내 이용도 첫 페이지(`size` 100)만 쓴다.
+- 호텔 목록은 첫 페이지(`size` 100)만 쓴다. 객실 유형 화면의 호텔도 이 목록에서 찾고, 없으면 찾을 수 없음이다.
+- 내 이용은 서버가 첫 페이지만 읽고(아래 '브라우저의 조회와 변경'), 빈 상태와 401을 정한다.
+  - '지금·앞으로' 0페이지(`size` 10)를 읽어 이용이 있으면 그 페이지만 넘긴다. 없으면 '지난 이용' 0페이지까지 읽어 둘 다 넘기고, 그것도 없으면 빈 상태다. 서버가 빈 상태를 정해, 이용이 없는 회원에게 빈 구역을 보였다가 빈 상태로 바꾸며 깜빡이지 않게 한다.
+  - 페이지는 `entities/stay/api`의 `getMyStayPage(param, { cookie })`로 읽는다. 받은 페이지에 그 기간·페이지(`param`)와 다음 페이지(`next`, 없으면 `undefined`)를 담아, 서버와 브라우저가 같은 다음 페이지 규칙을 쓴다.
 - 로그인 정보가 필요한 서버 조회(내 이용)는 들어온 요청의 세션 쿠키만 백엔드에 넘긴다. 그 밖의 쿠키는 백엔드에 보낼 이유가 없어 넘기지 않는다.
-  - `widgets/my-stays/model`의 `load*`가 `cookies()`(`next/headers`)에서 세션 쿠키(`JSESSIONID`, 백엔드 `server.servlet.session.cookie.name`과 같은 값, `widgets/my-stays/config`)만 골라 `이름=값`으로 `entities/stay/api`의 `getMyStays(cookie)`에 넘기고, `shared/api`의 요청 함수가 `cookie` 헤더로 보낸다. 세션 쿠키가 없으면 헤더 없이 보낸다(백엔드가 401). `next/headers`는 widgets의 `model`에서만 쓴다.
+  - `widgets/my-stays/model`의 `load*`가 `cookies()`(`next/headers`)에서 세션 쿠키(`JSESSIONID`, 백엔드 `server.servlet.session.cookie.name`과 같은 값, `widgets/my-stays/config`)만 골라 `이름=값`으로 `entities/stay/api`의 `getMyStayPage(param, { cookie })`에 넘기고, `shared/api`의 요청 함수가 `cookie` 헤더로 보낸다. 세션 쿠키가 없으면 헤더 없이 보낸다(백엔드가 401). `next/headers`는 widgets의 `model`에서만 쓴다.
   - 401 `UNAUTHORIZED`면 `redirect`로 `/login?redirect=<그 화면>`에 보낸다. `<Suspense>` 안에서 스트리밍 중이라 HTTP 307이 아니라 화면 안의 이동(meta refresh)으로 간다.
 - 서버 컴포넌트가 가져오는 slice의 `index.ts`가 클라이언트 훅(`useSearchParams`, `usePathname` 등)을 쓰는 파일을 함께 내보내면 묶음 전체가 서버 그래프에 들어가 오류가 난다. 그런 훅 파일에는 `"use client"`를 붙이거나(`entities/stay`의 `useStayCriteria`), 서버가 쓰지 않는 세그먼트로 나눈다(`shared/lib/current-href`).
 
 ### 브라우저의 조회와 변경
 
-- 사용자 입력에 따른 조회(객실 유형), 로그인 상태(내 정보)와 변경(예약, 로그인·회원가입·로그아웃)만 브라우저에서 한다. `frontend/CLAUDE.md`의 '서버 상태 (TanStack Query)'를 따른다.
+- 사용자 입력에 따른 조회(객실 유형, 스크롤로 부르는 내 이용 다음 페이지), 로그인 상태(내 정보)와 변경(예약, 로그인·회원가입·로그아웃)만 브라우저에서 한다. `frontend/CLAUDE.md`의 '서버 상태 (TanStack Query)'를 따른다.
+- 내 이용 다음 페이지는 `entities/stay/api`의 `useInfiniteQuery`로 받는다. 세션 쿠키는 같은 출처라 rewrites를 거쳐 그대로 간다.
+  - 서버가 읽은 페이지를 `initialData`로 넣고, 마운트에서 다시 읽지 않는다(`refetchOnMount: false`).
+  - `gcTime` 0으로 화면을 떠나면 캐시를 버린다. 다시 들어오면 서버가 새로 읽은 첫 페이지로 시작해 그사이 한 예약·취소가 빠지지 않게 하기 위해서다.
+  - `fetchNextPage({ cancelRefetch: false })`로 불러오는 중에 센티널·버튼이 다시 불러도 요청을 겹쳐 보내지 않는다.
+  - 다음 페이지의 401(세션 끊김)도 다른 실패처럼 오류 문구와 '다시 시도'로 둔다. 로그인하지 않은 접속은 첫 페이지에서 서버가 로그인으로 보낸다.
+  - 센티널 관찰은 `shared/lib/scroll-sentinel`의 `useScrollSentinel`(ref 콜백을 돌려준다)이 맡는다. 센티널은 더 불러올 수 있을 때만 그려서, 한 페이지를 받을 때마다 새로 관찰하고 화면 안에 있으면 바로 다음 페이지를 부른다.
 - 객실 유형은 남은 객실 수가 자주 바뀌어 `staleTime` 0으로 조회하고, 예약이 성공하거나 객실이 없어졌다는 오류를 받으면 그 호텔의 유형 목록을 무효화한다.
 - 요청 검증·응답 검증 실패와 4xx는 재시도하지 않는다(`_app/query`).
 
