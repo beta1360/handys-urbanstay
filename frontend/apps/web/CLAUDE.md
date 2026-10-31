@@ -67,7 +67,7 @@
   - 409 `ROOM_TYPE_UNAVAILABLE`·`STAY_PERIOD_OVERLAPPED`, 404 `ROOM_TYPE_NOT_FOUND`는 폼 알림으로 보여주고 객실 유형 목록을 다시 조회한다. 409 `GUEST_LINKED_TO_OTHER_MEMBER`도 폼 알림이다.
   - 성공하면 같은 화면에서 완료 화면(서버 문구, 호텔, 객실 유형, 기간, 인원, 이용객 이름, 최종 금액)으로 바꾸고 제목에 초점을 옮긴다. 배정된 객실(호수)은 보여주지 않는다.
 - 내 이용
-  - 체크아웃 날짜가 오늘(한국 시간)보다 뒤면 '지금·앞으로의 이용', 오늘이거나 지났으면 '지난 이용'이다. 구역 안의 순서는 서버 순서(체크인 늦은 순)를 따른다.
+  - 체크아웃 날짜가 오늘(한국 시간)보다 뒤면 '지금·앞으로의 이용', 오늘이거나 지났으면 '지난 이용'이다. '지금·앞으로의 이용'은 체크인이 가까운 순(같으면 id 순)으로, '지난 이용'은 서버 순서(체크인 늦은 순)로 보여준다.
   - 항목마다 호텔, 객실 유형, 기간, 인원, 최종 금액, 취소 여부('취소됨')를 보여준다. 이용이 하나도 없으면 '호텔 목록' 링크를 보여준다.
 
 ## 구조
@@ -84,7 +84,7 @@ apps/web/
 └─ src/
    ├─ _app/                # QueryClient, 토스트 영역, Provider
    ├─ _pages/              # hotel-list, hotel-booking, login, signup, my-stays, not-found, error
-   ├─ widgets/             # app-layout (헤더 로그인 상태), hotel-booking (서버에서 호텔을 찾아 예약 화면 조립), my-stays (쿠키를 넘겨 내 이용 조회), guest-only (회원을 로그인·가입 화면에서 내보내기)
+   ├─ widgets/             # app-layout (헤더 로그인 상태), hotel-booking (서버에서 호텔을 찾아 예약 화면 조립), my-stays (세션 쿠키를 넘겨 내 이용 조회), guest-only (회원을 로그인·가입 화면에서 내보내기)
    ├─ features/            # stay-search (날짜·인원 → URL), stay-reserve (유형 선택·금액·예약·완료), auth-login, auth-signup, auth-logout
    ├─ entities/            # hotel (목록, 호텔 찾기), room-type (유형 조회, 예약불가 표시), stay (조건 검사·URL, 기간·금액, 내 이용 표시), member (로그인 상태)
    └─ shared/              # api, config, lib (form, date, path-param, login-redirect, current-href, money, toast), ui
@@ -99,8 +99,8 @@ apps/web/
 - `_pages`는 `<Suspense>` 안에서 `params.then(...)`으로 경로 파라미터를 읽어 연결 컴포넌트를 배치만 한다. Cache Components에서 `params`와 캐시하지 않는 조회는 `<Suspense>` 안에 있어야 하기 때문이다.
 - `'use cache'`는 쓰지 않는다. 호텔·객실 정보가 운영 앱에서 바뀌므로 항상 최신으로 조회한다.
 - 목록은 첫 페이지(`size` 100)만 쓴다. 객실 유형 화면의 호텔도 이 목록에서 찾고, 없으면 찾을 수 없음이다. 내 이용도 첫 페이지(`size` 100)만 쓴다.
-- 로그인 정보가 필요한 서버 조회(내 이용)는 들어온 요청의 쿠키를 백엔드에 넘긴다.
-  - `widgets/my-stays/model`의 `load*`가 `cookies()`(`next/headers`)를 읽어 문자열로 `entities/stay/api`의 `getMyStays(cookie)`에 넘기고, `shared/api`의 요청 함수가 `cookie` 헤더로 보낸다. `next/headers`는 widgets의 `model`에서만 쓴다.
+- 로그인 정보가 필요한 서버 조회(내 이용)는 들어온 요청의 세션 쿠키만 백엔드에 넘긴다. 그 밖의 쿠키는 백엔드에 보낼 이유가 없어 넘기지 않는다.
+  - `widgets/my-stays/model`의 `load*`가 `cookies()`(`next/headers`)에서 세션 쿠키(`JSESSIONID`, 백엔드 `server.servlet.session.cookie.name`과 같은 값, `widgets/my-stays/config`)만 골라 `이름=값`으로 `entities/stay/api`의 `getMyStays(cookie)`에 넘기고, `shared/api`의 요청 함수가 `cookie` 헤더로 보낸다. 세션 쿠키가 없으면 헤더 없이 보낸다(백엔드가 401). `next/headers`는 widgets의 `model`에서만 쓴다.
   - 401 `UNAUTHORIZED`면 `redirect`로 `/login?redirect=<그 화면>`에 보낸다. `<Suspense>` 안에서 스트리밍 중이라 HTTP 307이 아니라 화면 안의 이동(meta refresh)으로 간다.
 - 서버 컴포넌트가 가져오는 slice의 `index.ts`가 클라이언트 훅(`useSearchParams`, `usePathname` 등)을 쓰는 파일을 함께 내보내면 묶음 전체가 서버 그래프에 들어가 오류가 난다. 그런 훅 파일에는 `"use client"`를 붙이거나(`entities/stay`의 `useStayCriteria`), 서버가 쓰지 않는 세그먼트로 나눈다(`shared/lib/current-href`).
 

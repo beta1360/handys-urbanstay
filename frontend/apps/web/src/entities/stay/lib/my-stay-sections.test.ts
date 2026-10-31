@@ -21,7 +21,7 @@ function stay(id: number, checkInDate: string, checkOutDate: string) {
 }
 
 describe("splitMyStays", () => {
-  it("체크아웃 날짜가 오늘보다 뒤면 지금·앞으로의 이용, 오늘이거나 지났으면 지난 이용으로 나누고 순서는 그대로 둔다", () => {
+  it("체크아웃 날짜가 오늘보다 뒤면 지금·앞으로의 이용, 오늘이거나 지났으면 지난 이용으로 나눈다", () => {
     const upcoming = stay(1, "2026-11-05", "2026-11-07");
     const staying = stay(2, "2026-10-30", "2026-11-01");
     const checkOutToday = stay(3, "2026-10-29", TODAY);
@@ -30,8 +30,26 @@ describe("splitMyStays", () => {
     expect(
       splitMyStays([upcoming, staying, checkOutToday, past], TODAY),
     ).toEqual({
-      upcoming: [upcoming, staying],
+      upcoming: [staying, upcoming],
       past: [checkOutToday, past],
+    });
+  });
+
+  it("지금·앞으로의 이용은 체크인이 가까운 순, 같으면 id 순으로 두고 지난 이용은 받은 순서를 그대로 둔다", () => {
+    const later = stay(10, "2026-11-20", "2026-11-21");
+    const soonHigherId = stay(12, "2026-11-02", "2026-11-03");
+    const soonLowerId = stay(11, "2026-11-02", "2026-11-04");
+    const recentPast = stay(9, "2026-10-20", "2026-10-21");
+    const olderPast = stay(8, "2026-10-01", "2026-10-02");
+
+    expect(
+      splitMyStays(
+        [later, soonHigherId, soonLowerId, recentPast, olderPast],
+        TODAY,
+      ),
+    ).toEqual({
+      upcoming: [soonLowerId, soonHigherId, later],
+      past: [recentPast, olderPast],
     });
   });
 
