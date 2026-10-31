@@ -78,6 +78,10 @@ class RoomService(
 	@Transactional(readOnly = true)
 	fun getRoom(hotelId: Long, roomId: Long): Room = findRoom(hotelId, roomId)
 
+	@Transactional(readOnly = true)
+	fun getRoomWithHotel(roomId: Long): Room =
+		roomRepository.findWithHotelById(roomId) ?: throw BusinessException(RoomErrorCode.ROOM_NOT_FOUND)
+
 	@Transactional
 	fun update(
 		hotelId: Long,

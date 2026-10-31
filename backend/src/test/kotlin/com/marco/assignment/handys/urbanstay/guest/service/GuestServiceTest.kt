@@ -57,14 +57,17 @@ class GuestServiceTest {
 	}
 
 	@Test
-	fun `먼저 온 등록이 커밋되기 전이라 중복 확인을 통과한 하이픈 모양만 다른 전화번호의 등록도 DB 유일 인덱스에 막혀 GUEST_PHONE_DUPLICATED로 거절된다`() {
+	fun `먼저 온 수정이 커밋되기 전이라 중복 확인을 통과한 하이픈 모양만 다른 전화번호로의 수정도 DB 유일 인덱스에 막혀 GUEST_PHONE_DUPLICATED로 거절된다`() {
+		val firstId = checkNotNull(create(FIRST_NAME, "010-0000-0001").id)
+		val secondId = checkNotNull(create(SECOND_NAME, "010-0000-0002").id)
+
 		val second = runSecondWhileFirstUncommitted(
-			first = { create(FIRST_NAME, "010-1234-5678") },
-			second = { create(SECOND_NAME, "01012345678") },
+			first = { update(firstId, FIRST_NAME, "010-1234-5678") },
+			second = { update(secondId, SECOND_NAME, "01012345678") },
 		)
 
 		assertErrorCode(second, GuestErrorCode.GUEST_PHONE_DUPLICATED)
-		assertThat(guests()).containsExactly(FIRST_NAME to "010-1234-5678")
+		assertThat(guests()).containsExactly(FIRST_NAME to "010-1234-5678", SECOND_NAME to "010-0000-0002")
 	}
 
 	@Test
@@ -81,9 +84,9 @@ class GuestServiceTest {
 		assertThat(jdbcTemplate.queryForObject(SELECT_VERSION, Long::class.java, guestId)).isEqualTo(1)
 	}
 
-	private fun create(name: String, phone: String) = guestService.create(checkNotNull(hotel.id), name, phone, EMAIL)
+	private fun create(name: String, phone: String) = guestService.getOrCreate(checkNotNull(hotel.id), name, phone, EMAIL)
 
-	private fun update(guestId: Long, name: String) = guestService.update(checkNotNull(hotel.id), guestId, 0, name, PHONE, EMAIL)
+	private fun update(guestId: Long, name: String, phone: String = PHONE) = guestService.update(checkNotNull(hotel.id), guestId, 0, name, phone, EMAIL)
 
 	private fun <T> runSecondWhileFirstUncommitted(first: () -> Unit, second: () -> T): Result<T> {
 		val firstApplied = CountDownLatch(1)

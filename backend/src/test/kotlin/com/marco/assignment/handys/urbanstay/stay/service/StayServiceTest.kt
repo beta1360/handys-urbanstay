@@ -83,23 +83,37 @@ class StayServiceTest {
 		executor.shutdownNow()
 		jdbcTemplate.update(DELETE_STAYS, room.id)
 		jdbcTemplate.update(DELETE_HISTORIES, room.id)
-		guestRepository.deleteById(checkNotNull(guest.id))
+		jdbcTemplate.update(DELETE_GUESTS, hotel.id)
 		roomRepository.deleteById(checkNotNull(room.id))
 		hotelAdminRepository.deleteById(checkNotNull(hotelAdmin.id))
 		hotelRepository.deleteById(checkNotNull(hotel.id))
 	}
 
 	@Test
-	fun `먼저 온 등록이 커밋되기 전이라 겹침 확인을 통과한 겹치는 기간의 등록도 DB 배제 제약에 막혀 STAY_PERIOD_OVERLAPPED로 거절된다`() {
+	fun `먼저 온 예약이 커밋되기 전이라 겹침 확인을 통과한 겹치는 기간의 예약도 DB 배제 제약에 막혀 STAY_PERIOD_OVERLAPPED로 거절되고 함께 등록한 새 이용객도 남지 않는다`() {
 		val second = runSecondWhileFirstUncommitted(
 			first = { create(TODAY, TODAY.plusDays(3)) },
-			second = { create(TODAY.plusDays(2), TODAY.plusDays(4)) },
+			second = { reserve(TODAY.plusDays(2), TODAY.plusDays(4), SECOND_NAME, NEW_PHONE) },
 			lockedQuery = "insert into stay",
 		)
 
 		assertThat(second.exceptionOrNull())
 			.isInstanceOfSatisfying(BusinessException::class.java) { assertThat(it.errorCode).isEqualTo(StayErrorCode.STAY_PERIOD_OVERLAPPED) }
 		assertThat(stays()).containsExactly(TODAY to TODAY.plusDays(3))
+		assertThat(guests()).containsExactly(guest.name to guest.phone)
+	}
+
+	@Test
+	fun `먼저 온 같은 새 이용객의 예약이 커밋되기 전이라 이용객을 찾지 못한 예약도 이용객 등록에서 기다렸다가 먼저 등록된 이용객으로 예약하고 이용객은 하나만 남는다`() {
+		val second = runSecondWhileFirstUncommitted(
+			first = { reserve(TODAY, TODAY.plusDays(2), FIRST_NAME, NEW_PHONE) },
+			second = { reserve(TODAY.plusDays(2), TODAY.plusDays(4), SECOND_NAME, NEW_PHONE.replace("-", "")) },
+			lockedQuery = "insert into guest",
+		)
+
+		assertThat(second.getOrThrow().guest.name).isEqualTo(FIRST_NAME)
+		assertThat(guests()).containsExactly(guest.name to guest.phone, FIRST_NAME to NEW_PHONE)
+		assertThat(jdbcTemplate.queryForList(SELECT_STAY_GUEST_NAMES, String::class.java, room.id)).containsExactly(FIRST_NAME, FIRST_NAME)
 	}
 
 	@Test
@@ -119,8 +133,10 @@ class StayServiceTest {
 		assertThat(jdbcTemplate.queryForList(SELECT_HISTORIES, String::class.java, room.id)).containsExactly("${RoomStatus.RESERVED} -> ${RoomStatus.VACANT}")
 	}
 
-	private fun create(checkInDate: LocalDate, checkOutDate: LocalDate) =
-		stayService.create(checkNotNull(hotel.id), checkNotNull(room.id), checkNotNull(guest.id), checkInDate, checkOutDate, 2)
+	private fun create(checkInDate: LocalDate, checkOutDate: LocalDate) = reserve(checkInDate, checkOutDate, guest.name, guest.phone)
+
+	private fun reserve(checkInDate: LocalDate, checkOutDate: LocalDate, name: String, phone: String) =
+		stayService.reserve(checkNotNull(room.id), checkInDate, checkOutDate, 2, name, phone, "guest@example.com")
 
 	private fun cancel(stayId: Long, reason: String) = stayService.cancel(checkNotNull(hotel.id), stayId, checkNotNull(hotelAdmin.id), reason)
 
@@ -153,16 +169,25 @@ class StayServiceTest {
 	private fun stays(): List<Pair<LocalDate, LocalDate>> =
 		jdbcTemplate.query(SELECT_STAYS, { rs, _ -> rs.getObject(1, LocalDate::class.java) to rs.getObject(2, LocalDate::class.java) }, room.id)
 
+	private fun guests(): List<Pair<String, String>> =
+		jdbcTemplate.query(SELECT_GUESTS, { rs, _ -> rs.getString("name") to rs.getString("phone") }, hotel.id)
+
 	companion object {
 		private const val PHONE = "02-1234-5678"
+		private const val NEW_PHONE = "010-5555-0000"
+		private const val FIRST_NAME = "먼저 예약한 이용객"
+		private const val SECOND_NAME = "나중에 예약한 이용객"
 		private const val TIMEOUT_SECONDS = 10L
 		private const val POLL_INTERVAL_MILLIS = 20L
 		private const val FIRST_REASON = "먼저 보낸 사유"
 		private const val SECOND_REASON = "나중에 보낸 사유"
 		private const val DELETE_STAYS = "delete from stay where room_id = ?"
 		private const val DELETE_HISTORIES = "delete from room_status_history where room_id = ?"
+		private const val DELETE_GUESTS = "delete from guest where hotel_id = ?"
 		private const val UPDATE_ROOM_STATUS = "update room set status = ? where id = ?"
 		private const val SELECT_STAYS = "select check_in_date, check_out_date from stay where room_id = ? order by id"
+		private const val SELECT_GUESTS = "select name, phone from guest where hotel_id = ? order by id"
+		private const val SELECT_STAY_GUEST_NAMES = "select g.name from stay s join guest g on g.id = s.guest_id where s.room_id = ? order by s.id"
 		private const val SELECT_CANCEL_REASONS = "select cancel_reason from stay where room_id = ? and canceled_at is not null"
 		private const val SELECT_HISTORIES = "select from_status || ' -> ' || to_status from room_status_history where room_id = ? order by id"
 		private const val LOCK_WAITS = """

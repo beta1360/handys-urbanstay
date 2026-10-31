@@ -6,7 +6,6 @@ import com.marco.assignment.handys.urbanstay.guest.entity.Guest
 import com.marco.assignment.handys.urbanstay.guest.exception.GuestErrorCode
 import com.marco.assignment.handys.urbanstay.guest.repository.GuestRepository
 import com.marco.assignment.handys.urbanstay.guest.repository.GuestSpecifications
-import com.marco.assignment.handys.urbanstay.hotel.service.HotelService
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.OptimisticLockingFailureException
 import org.springframework.data.domain.Page
@@ -14,18 +13,20 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
+import java.time.Instant
 
 @Service
 class GuestService(
 	private val guestRepository: GuestRepository,
-	private val hotelService: HotelService,
+	private val clock: Clock,
 ) {
 
 	@Transactional
-	fun create(hotelId: Long, name: String, phone: String, email: String): Guest {
-		val hotel = hotelService.getHotel(hotelId)
-		checkPhoneNotDuplicated(hotelId, phone, null)
-		return translateConflicts { guestRepository.saveAndFlush(Guest(hotel, name, phone, email)) }
+	fun getOrCreate(hotelId: Long, name: String, phone: String, email: String): Guest {
+		findSamePhone(hotelId, phone)?.let { return it }
+		guestRepository.insertIfPhoneAbsent(hotelId, Guest.normalize(name), Guest.normalize(phone), Guest.normalize(email), Instant.now(clock))
+		return checkNotNull(findSamePhone(hotelId, phone))
 	}
 
 	@Transactional(readOnly = true)
@@ -48,6 +49,9 @@ class GuestService(
 
 	private fun findGuest(hotelId: Long, guestId: Long): Guest =
 		guestRepository.findByIdAndHotelId(guestId, hotelId) ?: throw BusinessException(GuestErrorCode.GUEST_NOT_FOUND)
+
+	private fun findSamePhone(hotelId: Long, phone: String): Guest? =
+		guestRepository.findOne(GuestSpecifications.samePhone(hotelId, phone, null)).orElse(null)
 
 	private fun checkPhoneNotDuplicated(hotelId: Long, phone: String, guestId: Long?) {
 		if (guestRepository.exists(GuestSpecifications.samePhone(hotelId, phone, guestId))) {
