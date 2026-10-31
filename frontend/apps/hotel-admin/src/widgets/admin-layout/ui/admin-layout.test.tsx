@@ -161,6 +161,7 @@ describe("AdminLayout", () => {
         ADMIN_LAYOUT_MESSAGES.guestMenuLabel,
         ADMIN_LAYOUT_MESSAGES.stayMenuLabel,
         ADMIN_LAYOUT_MESSAGES.operatorMenuLabel,
+        ADMIN_LAYOUT_MESSAGES.hotelMenuLabel,
         ADMIN_LAYOUT_MESSAGES.settlementMenuLabel,
       ],
     ],
