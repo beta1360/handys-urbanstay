@@ -35,6 +35,7 @@
 ### 로그인 상태
 
 - 로그인 상태는 브라우저에서 내 정보(`GET /auth/me`)로 확인한다(`entities/member`). 401 `UNAUTHORIZED`는 오류가 아니라 비회원(`null`)으로 캐시하고, 그 밖의 실패도 비회원으로 본다. 상태는 `checking | guest | member` 하나의 값이다.
+  - 하이드레이션 첫 렌더는 캐시가 있어도 `checking`이고, 하이드레이션 뒤에 캐시 값을 쓴다(`shared/lib/hydration`의 `useHydrated`). 서버는 로그인 상태를 몰라 늘 확인 중으로 그린다. 그래서 늦게 스트리밍되는 `<Suspense>`(로그인·가입 화면의 `GuestOnly` 등)가 헤더가 먼저 받은 캐시로 서버와 다르게 그리면 하이드레이션 오류가 나기 때문이다.
 - 로그인·회원가입이 성공하면 받은 회원을 그 캐시에 넣고 `redirect`로 `router.replace`한다. 로그아웃은 캐시를 `null`로 바꾸고 `router.refresh()`로 서버 컴포넌트를 다시 그린다(로그인이 필요한 화면은 서버가 로그인으로 보낸다). 로그아웃의 401은 이미 끊긴 세션이라 성공으로 본다.
 - `redirect`는 `/`로 시작하는 앱 안의 경로만 받는다(`shared/lib/login-redirect`의 `sanitizeLoginRedirect`).
   - 역슬래시나 제어 문자가 있으면 `/`로 간다.
@@ -94,7 +95,7 @@ apps/web/
    ├─ widgets/             # app-layout (헤더 로그인 상태), hotel-booking (서버에서 호텔을 찾아 예약 화면 조립), my-stays (세션 쿠키를 넘겨 내 이용 첫 페이지 조회), guest-only (회원을 로그인·가입 화면에서 내보내기)
    ├─ features/            # stay-search (날짜·인원 → URL), stay-reserve (유형 선택·금액·예약·완료), auth-login, auth-signup, auth-logout
    ├─ entities/            # hotel (목록·비활성 호텔, 호텔 찾기), room-type (유형 조회, 예약불가 표시), stay (조건 검사·URL, 기간·금액, 내 이용 무한 스크롤), member (로그인 상태)
-   └─ shared/              # api, config, lib (form, date, path-param, login-redirect, current-href, money, toast, scroll-sentinel), ui
+   └─ shared/              # api, config, lib (form, date, path-param, login-redirect, current-href, money, toast, scroll-sentinel, hydration), ui
 ```
 
 ### 서버 컴포넌트의 조회
