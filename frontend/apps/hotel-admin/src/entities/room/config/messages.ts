@@ -22,3 +22,11 @@ export const ROOM_INFORMATION_MESSAGES = {
   emptyFloor: "층 없음",
   emptyDescription: "소개 없음",
 } as const;
+
+export const ROOM_LOAD_MESSAGES = {
+  loadFailed: "객실 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+} as const;
+
+export const ROOM_NOT_FOUND_MESSAGES = {
+  description: "객실을 찾을 수 없습니다.",
+} as const;

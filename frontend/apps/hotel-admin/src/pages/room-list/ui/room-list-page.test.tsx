@@ -106,7 +106,13 @@ function renderRoomListPage(initialPath = roomsPath()) {
   });
   const router = createRouter({
     routeTree: rootRoute.addChildren([
-      layoutRoute.addChildren([roomListRoute]),
+      layoutRoute.addChildren([
+        roomListRoute,
+        createRoute({
+          getParentRoute: () => layoutRoute,
+          path: "rooms/$roomId",
+        }),
+      ]),
     ]),
     history: createMemoryHistory({ initialEntries: [initialPath] }),
     parseSearch,
@@ -177,6 +183,19 @@ describe("RoomListPage 목록", () => {
       ],
     ]);
     expect(fetchRooms).toHaveBeenCalledExactlyOnceWith({ page: 0 });
+  });
+
+  it("객실 이름은 그 객실의 상세 화면으로 가는 링크다", async () => {
+    const { router, user } = renderRoomListPage();
+
+    const nameLink = await screen.findByRole("link", { name: ROOMS[0].name });
+    expect(nameLink).toHaveAttribute("href", `/rooms/${ROOMS[0].id}`);
+
+    await user.click(nameLink);
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe(`/rooms/${ROOMS[0].id}`);
+    });
   });
 
   it("처음 불러오는 동안 불러오는 중 문구를 보여준다", async () => {

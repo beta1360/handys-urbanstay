@@ -1,5 +1,6 @@
 import { Table } from "@repo/ui/table";
 import type { TableColumn } from "@repo/ui/table";
+import { TextLink } from "@repo/admin-kit/link";
 import { ROOM_FIELD_LABELS, ROOM_STATUS_LABELS, RoomFloor } from "@/entities/room";
 import type { Room } from "@/shared/api";
 
@@ -7,7 +8,11 @@ const ROOM_COLUMNS: readonly TableColumn<Room>[] = [
   {
     key: "name",
     header: ROOM_FIELD_LABELS.name,
-    cell: (room) => room.name,
+    cell: (room) => (
+      <TextLink to="/rooms/$roomId" params={{ roomId: room.id }}>
+        {room.name}
+      </TextLink>
+    ),
   },
   {
     key: "type",
