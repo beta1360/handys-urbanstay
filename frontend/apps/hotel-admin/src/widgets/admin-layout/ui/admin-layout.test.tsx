@@ -158,6 +158,7 @@ describe("AdminLayout", () => {
       [
         ADMIN_LAYOUT_MESSAGES.roomMenuLabel,
         ADMIN_LAYOUT_MESSAGES.guestMenuLabel,
+        ADMIN_LAYOUT_MESSAGES.stayMenuLabel,
         ADMIN_LAYOUT_MESSAGES.operatorMenuLabel,
       ],
     ],
@@ -166,6 +167,7 @@ describe("AdminLayout", () => {
       [
         ADMIN_LAYOUT_MESSAGES.roomMenuLabel,
         ADMIN_LAYOUT_MESSAGES.guestMenuLabel,
+        ADMIN_LAYOUT_MESSAGES.stayMenuLabel,
       ],
     ],
   ] as const)(

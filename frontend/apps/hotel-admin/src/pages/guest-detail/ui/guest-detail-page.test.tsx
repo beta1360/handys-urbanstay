@@ -17,6 +17,7 @@ import {
   parseGuestPathParams,
   stringifyGuestPathParams,
 } from "@/entities/guest";
+import { STAY_LINK_MESSAGES } from "@/entities/stay";
 import { API_ERROR_CODES } from "@/shared/api";
 import type { Guest } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
@@ -87,6 +88,7 @@ function renderGuestDetailPage(guestId = String(GUEST.id)) {
           }),
           createRoute({ getParentRoute: () => guestRoute, path: "edit" }),
         ]),
+        createRoute({ getParentRoute: () => layoutRoute, path: "stays/" }),
       ]),
     ]),
     history: createMemoryHistory({ initialEntries: [`/guests/${guestId}`] }),
@@ -125,7 +127,7 @@ afterEach(() => {
 });
 
 describe("GuestDetailPage", () => {
-  it("이용객의 이름·전화번호·이메일을 항목 목록으로 보여주고 위쪽에 목록으로 링크와 수정 버튼을 둔다", async () => {
+  it("이용객의 이름·전화번호·이메일을 항목 목록으로 보여주고 위쪽에 목록으로·이용 보기 링크와 수정 버튼을 둔다", async () => {
     renderGuestDetailPage();
 
     const terms = await screen.findAllByRole("term");
@@ -146,6 +148,9 @@ describe("GuestDetailPage", () => {
     expect(
       screen.getByRole("link", { name: COMMON_MESSAGES.edit }),
     ).toHaveAttribute("href", `/guests/${GUEST.id}/edit`);
+    expect(
+      screen.getByRole("link", { name: STAY_LINK_MESSAGES.stays }),
+    ).toHaveAttribute("href", `/stays?guestId=${GUEST.id}`);
     expect(fetchGuest).toHaveBeenCalledExactlyOnceWith(GUEST.id);
   });
 
