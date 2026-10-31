@@ -197,6 +197,54 @@ class StayHotelAdminControllerTest {
 		}
 	}
 
+	@ParameterizedTest(name = "{0} -> {1}")
+	@CsvSource(
+		delimiter = '|',
+		value = [
+			"keyword=홍길동 | s3,s1",
+			"keyword= kIM | s4",
+			"keyword=01087654321 | s2",
+			"keyword=4-56 | s3,s1",
+			"checkInFrom=0 | s4,s3,s2",
+			"checkInTo=0 | s2,s1",
+			"checkInFrom=0&checkInTo=0 | s2",
+			"checkInFrom=3&checkInTo=5 | s4,s3",
+			"keyword=홍길동&checkInFrom=0 | s3",
+			"keyword=홍길동&roomId=room | s1",
+			"keyword=홍길동&canceled=false | s3",
+			"keyword=홍길동&canceled=true&checkInTo=0 | s1",
+			"keyword=없는 이용객 | ''",
+		],
+	)
+	fun `검색어는 이용객 이름을 대소문자 구분 없이, 전화번호를 양쪽 하이픈을 빼고 찾고 체크인 기간은 양 끝을 포함해 다른 필터와 함께 거른다`(query: String, expected: String) {
+		val englishGuest = saveGuest(room.hotel, "Kim Lee", "02-555-0000")
+		val stays = mapOf(
+			"s1" to saveStay(room, guest, TODAY.minusDays(10), TODAY.minusDays(8)),
+			"s2" to saveStay(room, otherGuest, TODAY, TODAY.plusDays(1)),
+			"s3" to saveStay(otherRoom, guest, TODAY.plusDays(3), TODAY.plusDays(4)),
+			"s4" to saveStay(otherRoom, englishGuest, TODAY.plusDays(5), TODAY.plusDays(6)),
+		)
+		saveStay(otherHotelRoom, otherHotelGuest, TODAY, TODAY.plusDays(1))
+		jdbcTemplate.update(CANCEL_STAY, (masterPrincipal as HotelAdminPrincipal).id, stays.getValue("s1").id)
+		val params = query.split("&").map { it.substringBefore("=") to filterValue(it.substringBefore("="), it.substringAfter("=")) }
+
+		val data = getStays(*params.toTypedArray())
+
+		assertThat(itemIds(data)).containsExactlyElementsOf(expected.split(",").filter { it.isNotEmpty() }.map { stays.getValue(it).id })
+	}
+
+	@Test
+	fun `체크인 기간의 시작이 끝보다 늦으면 checkInTo로, 날짜 형식이 틀리거나 검색어가 100자를 넘으면 그 파라미터로 400 응답한다`() {
+		val max = StayHotelAdminController.KEYWORD_MAX_LENGTH
+
+		requestStays("checkInFrom" to TODAY.plusDays(1), "checkInTo" to TODAY)
+			.andExpectError(CommonErrorCode.INVALID_INPUT, "checkInTo" to message("validation.from-or-later"))
+		requestStays("checkInFrom" to "2026/11/01").andExpectError(CommonErrorCode.INVALID_INPUT, "checkInFrom" to message("validation.type"))
+		requestStays("keyword" to "가".repeat(max + 1))
+			.andExpectError(CommonErrorCode.INVALID_INPUT, "keyword" to message("validation.max-length", "max" to max.toString()))
+		assertThat(pageInfo(getStays("keyword" to " ${"가".repeat(max)} "))).containsExactly(0, 10, 0, 0)
+	}
+
 	@Test
 	fun `page와 size로 원하는 페이지를 조회한다`() {
 		val ids = (1L..7L).map { checkNotNull(saveStay(room, guest, TODAY.plusDays(it * 2), TODAY.plusDays(it * 2 + 1)).id) }.reversed()
@@ -329,7 +377,10 @@ class StayHotelAdminControllerTest {
 		assertThat(operations.map { it["operationId"].stringValue() }).containsExactly("getStays", "getStay", "cancelStay")
 		assertThat(operations.map { op -> op["tags"].values().map { it.stringValue() } }).containsOnly(listOf("stay"))
 		assertThat(stays["get"]["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "403", "500")
-		assertThat(stays["get"]["parameters"].values().map { it["name"].stringValue() }).containsExactly("roomId", "guestId", "canceled", "page", "size")
+		assertThat(stays["get"]["parameters"].values().map { it["name"].stringValue() })
+			.containsExactly("roomId", "guestId", "canceled", "keyword", "checkInFrom", "checkInTo", "page", "size")
+		assertThat(stays["get"]["parameters"].values().filter { it["name"].stringValue().startsWith("checkIn") }.map { it["schema"]["format"].stringValue() })
+			.containsOnly("date")
 		assertThat(errorCodes(stay["get"], HttpStatus.NOT_FOUND)).containsExactly(StayErrorCode.STAY_NOT_FOUND.code)
 		assertThat(cancel["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "403", "404", "409", "500")
 		assertThat(errorCodes(cancel, HttpStatus.NOT_FOUND)).containsExactly(StayErrorCode.STAY_NOT_FOUND.code)
@@ -342,10 +393,20 @@ class StayHotelAdminControllerTest {
 	}
 
 	private fun getStays(vararg params: Pair<String, Any?>, principal: UserDetails = masterPrincipal): JsonNode =
+		requestStays(*params, principal = principal).andExpectSuccess(HttpStatus.OK)
+
+	private fun requestStays(vararg params: Pair<String, Any?>, principal: UserDetails = masterPrincipal): ResultActionsDsl =
 		mockMvc.get(STAYS) {
 			with(user(principal))
 			params.forEach { (name, value) -> param(name, value.toString()) }
-		}.andExpectSuccess(HttpStatus.OK)
+		}
+
+	private fun filterValue(name: String, value: String): Any? =
+		when (name) {
+			"checkInFrom", "checkInTo" -> TODAY.plusDays(value.toLong())
+			"roomId" -> room.id
+			else -> value
+		}
 
 	private fun getStay(id: Long, principal: UserDetails = masterPrincipal): ResultActionsDsl =
 		mockMvc.get("$STAYS/$id") { with(user(principal)) }
