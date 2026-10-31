@@ -139,22 +139,25 @@ describe("AdminLayout", () => {
     expect(screen.getByText(APP_INFO.name)).toBeInTheDocument();
   });
 
-  it("/ 경로에서는 홈 메뉴를 현재 페이지로 표시한다", async () => {
-    renderAdminLayout("/");
+  it.each(["/rooms", "/rooms/new"])(
+    "%s 경로에서는 객실 메뉴를 현재 페이지로 표시한다",
+    async (path) => {
+      renderAdminLayout(path);
+
+      const roomMenu = await screen.findByRole("link", {
+        name: ADMIN_LAYOUT_MESSAGES.roomMenuLabel,
+      });
+      expect(roomMenu).toHaveAttribute("href", "/rooms");
+      expect(roomMenu).toHaveAttribute("aria-current", "page");
+    },
+  );
+
+  it("다른 경로에서는 객실 메뉴를 현재 페이지로 표시하지 않는다", async () => {
+    renderAdminLayout("/untitled");
 
     expect(
       await screen.findByRole("link", {
-        name: ADMIN_LAYOUT_MESSAGES.homeMenuLabel,
-      }),
-    ).toHaveAttribute("aria-current", "page");
-  });
-
-  it("다른 경로에서는 홈 메뉴를 현재 페이지로 표시하지 않는다", async () => {
-    renderAdminLayout("/rooms");
-
-    expect(
-      await screen.findByRole("link", {
-        name: ADMIN_LAYOUT_MESSAGES.homeMenuLabel,
+        name: ADMIN_LAYOUT_MESSAGES.roomMenuLabel,
       }),
     ).not.toHaveAttribute("aria-current");
   });

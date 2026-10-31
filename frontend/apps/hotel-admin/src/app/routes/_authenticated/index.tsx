@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HOME_MESSAGES, HomePage } from "@/pages/home";
+import { redirectFromIndex } from "../../router/index-redirect";
 
 export const Route = createFileRoute("/_authenticated/")({
-  staticData: { title: HOME_MESSAGES.title },
-  component: HomePage,
+  beforeLoad: redirectFromIndex,
 });
