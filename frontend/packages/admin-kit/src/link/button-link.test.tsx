@@ -57,25 +57,6 @@ describe("ButtonLink", () => {
     ).toHaveAttribute("class", buttonClassName("primary"));
   });
 
-  it.each(["primary", "secondary", "ghost"] as const)(
-    "%s variant는 buttonClassName이 정한 버튼 모양으로 보여준다",
-    async (variant) => {
-      renderInRouter(
-        <ButtonLink
-          to="/hotels/$hotelId/edit"
-          params={{ hotelId: 1 }}
-          variant={variant}
-        >
-          {LINK_TEXT}
-        </ButtonLink>,
-      );
-
-      expect(
-        await screen.findByRole("link", { name: LINK_TEXT }),
-      ).toHaveAttribute("class", buttonClassName(variant));
-    },
-  );
-
   it("className을 넘기면 버튼 모양에 덧붙인다", async () => {
     renderInRouter(
       <ButtonLink

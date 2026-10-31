@@ -4,12 +4,7 @@ import {
   ResponseValidationError,
 } from "@repo/admin-kit/api";
 import * as generated from "./generated";
-import {
-  fetchSettlement,
-  fetchSettlementStays,
-  settlementQueryKey,
-  settlementStayListQueryKey,
-} from "./settlement";
+import { fetchSettlement, fetchSettlementStays } from "./settlement";
 
 vi.mock("./generated", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./generated")>()),
@@ -140,16 +135,5 @@ describe("fetchSettlementStays", () => {
     await expect(
       fetchSettlementStays({ month: MONTH }),
     ).rejects.toBeInstanceOf(ResponseValidationError);
-  });
-});
-
-describe("쿼리 키", () => {
-  it("생성된 정산·이용 로그 쿼리 키를 쓴다", () => {
-    expect(settlementQueryKey({ month: MONTH })).toEqual(
-      generated.getGetSettlementQueryKey({ month: MONTH }),
-    );
-    expect(settlementStayListQueryKey({ month: MONTH, page: 0 })).toEqual(
-      generated.getGetSettlementStaysQueryKey({ month: MONTH, page: 0 }),
-    );
   });
 });

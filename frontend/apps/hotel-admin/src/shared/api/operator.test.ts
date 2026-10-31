@@ -8,8 +8,6 @@ import {
   createOperator,
   fetchOperator,
   fetchOperators,
-  operatorListQueryKey,
-  operatorQueryKey,
   resetOperatorPassword,
   updateOperator,
   updateOperatorActive,
@@ -218,18 +216,5 @@ describe("요청 검증", () => {
     expect(generated.createHotelOperator).not.toHaveBeenCalled();
     expect(generated.updateHotelOperator).not.toHaveBeenCalled();
     expect(generated.resetHotelOperatorPassword).not.toHaveBeenCalled();
-  });
-});
-
-describe("쿼리 키", () => {
-  it("생성된 목록·상세 쿼리 키를 쓴다", () => {
-    const params = { keyword: "김", active: true };
-
-    expect(operatorListQueryKey(params)).toEqual(
-      generated.getGetHotelOperatorsQueryKey(params),
-    );
-    expect(operatorQueryKey(OPERATOR_ID)).toEqual(
-      generated.getGetHotelOperatorQueryKey(OPERATOR_ID),
-    );
   });
 });

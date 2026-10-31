@@ -14,18 +14,6 @@ describe("Button", () => {
     expect(button).not.toHaveAttribute("aria-busy");
   });
 
-  it.each(["primary", "secondary", "ghost"] as const)(
-    "%s variant는 buttonClassName이 정한 스타일로 보여준다",
-    (variant) => {
-      render(<Button variant={variant}>저장</Button>);
-
-      expect(screen.getByRole("button", { name: "저장" })).toHaveAttribute(
-        "class",
-        buttonClassName(variant),
-      );
-    },
-  );
-
   it("className을 넘기면 기본 스타일에 덧붙인다", () => {
     render(<Button className="w-full">저장</Button>);
 

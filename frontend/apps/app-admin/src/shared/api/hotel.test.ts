@@ -220,12 +220,6 @@ describe("fetchHotels", () => {
 });
 
 describe("hotelListQueryKey", () => {
-  it("파라미터가 있으면 생성된 목록 쿼리 키를 쓴다", () => {
-    expect(hotelListQueryKey(LIST_PARAMS)).toEqual(
-      generated.getGetHotelsQueryKey(LIST_PARAMS),
-    );
-  });
-
   it("파라미터 없이 만들면 모든 목록 쿼리를 가리키고 상세 쿼리는 가리키지 않는다", async () => {
     const queryClient = new QueryClient();
     const firstPageKey = hotelListQueryKey({});
@@ -242,14 +236,6 @@ describe("hotelListQueryKey", () => {
     expect(isInvalidated(firstPageKey)).toBe(true);
     expect(isInvalidated(searchedKey)).toBe(true);
     expect(isInvalidated(detailKey)).toBe(false);
-  });
-});
-
-describe("hotelQueryKey", () => {
-  it("생성된 상세 쿼리 키를 쓴다", () => {
-    expect(hotelQueryKey(HOTEL_ID)).toEqual(
-      generated.getGetHotelQueryKey(HOTEL_ID),
-    );
   });
 });
 

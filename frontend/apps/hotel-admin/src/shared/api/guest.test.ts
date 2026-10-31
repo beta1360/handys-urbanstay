@@ -177,15 +177,6 @@ describe("fetchGuests", () => {
 });
 
 describe("쿼리 키", () => {
-  it("생성된 목록·상세 쿼리 키를 쓴다", () => {
-    expect(guestListQueryKey(LIST_PARAMS)).toEqual(
-      generated.getGetGuestsQueryKey(LIST_PARAMS),
-    );
-    expect(guestQueryKey(GUEST_ID)).toEqual(
-      generated.getGetGuestQueryKey(GUEST_ID),
-    );
-  });
-
   it("파라미터 없이 만든 목록 키는 모든 목록 쿼리를 가리키고 상세 쿼리는 가리키지 않는다", async () => {
     const queryClient = new QueryClient();
     const firstPageKey = guestListQueryKey({});

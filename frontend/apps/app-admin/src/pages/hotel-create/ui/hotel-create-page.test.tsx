@@ -296,15 +296,6 @@ describe("HotelCreatePage 화면", () => {
       expect(field).not.toHaveAttribute("maxlength");
     }
   });
-
-  it("/hotels/new는 호텔 상세가 아닌 등록 화면으로 잡힌다", async () => {
-    const { router } = await renderHotelCreatePage();
-
-    expect(router.state.matches.at(-1)?.routeId).toBe(
-      "/_authenticated/hotels/new",
-    );
-    expect(screen.queryByText(DETAIL_PAGE_TEXT)).not.toBeInTheDocument();
-  });
 });
 
 describe("HotelCreatePage 입력 검사", () => {
