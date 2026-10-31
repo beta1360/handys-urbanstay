@@ -6,3 +6,4 @@ export {
   startSession,
   useMe,
 } from "./api/me-query";
+export { ACCOUNT_ROLE_LABELS } from "./config/messages";

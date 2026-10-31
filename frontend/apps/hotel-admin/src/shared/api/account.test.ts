@@ -3,13 +3,14 @@ import {
   RequestValidationError,
   ResponseValidationError,
 } from "@repo/admin-kit/api";
-import { fetchMe, loginAccount, meQueryKey } from "./account";
-import { getGetMeQueryKey, getMe, login } from "./generated";
+import { fetchMe, loginAccount, logoutAccount, meQueryKey } from "./account";
+import { getGetMeQueryKey, getMe, login, logout } from "./generated";
 
 vi.mock("./generated", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./generated")>()),
   getMe: vi.fn(),
   login: vi.fn(),
+  logout: vi.fn(),
 }));
 
 const LOGIN_BODY = {
@@ -53,6 +54,15 @@ const INVALID_LOGIN_RESPONSES = [
   ["data가 null", { ...LOGIN_RESPONSE, data: null }],
   ["message가 null", { ...LOGIN_RESPONSE, message: null }],
 ] as const;
+
+const LOGOUT_MESSAGE = "로그아웃했습니다.";
+
+const LOGOUT_RESPONSE = {
+  success: true,
+  data: null,
+  message: LOGOUT_MESSAGE,
+  error: null,
+};
 
 beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -115,5 +125,23 @@ describe("loginAccount", () => {
       loginAccount({ loginId: "", password: "" }),
     ).rejects.toBeInstanceOf(RequestValidationError);
     expect(login).not.toHaveBeenCalled();
+  });
+});
+
+describe("logoutAccount", () => {
+  it("응답이 스키마와 맞으면 성공 문구를 돌려준다", async () => {
+    vi.mocked(logout).mockResolvedValue(LOGOUT_RESPONSE);
+
+    await expect(logoutAccount()).resolves.toEqual({
+      message: LOGOUT_MESSAGE,
+    });
+  });
+
+  it("성공 응답의 message가 null이면 응답 검증 오류를 던진다", async () => {
+    vi.mocked(logout).mockResolvedValue({ ...LOGOUT_RESPONSE, message: null });
+
+    await expect(logoutAccount()).rejects.toBeInstanceOf(
+      ResponseValidationError,
+    );
   });
 });

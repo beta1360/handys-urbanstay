@@ -1,15 +1,15 @@
-import { useCurrentTitle } from "../model/use-current-title";
+import { useAdminHeader } from "../model/use-admin-header";
+import { AdminHeaderBar } from "./admin-header-bar";
 
 export function AdminHeader() {
-  const currentTitle = useCurrentTitle();
+  const { title, account, logoutStatus, logout } = useAdminHeader();
 
   return (
-    <header className="flex h-14 shrink-0 items-center border-b border-neutral-200 bg-white px-6">
-      {currentTitle ? (
-        <h1 className="text-lg font-semibold text-neutral-900">
-          {currentTitle}
-        </h1>
-      ) : null}
-    </header>
+    <AdminHeaderBar
+      title={title}
+      account={account}
+      logoutStatus={logoutStatus}
+      onLogout={logout}
+    />
   );
 }

@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { parseRequest, parseResponseBody } from "@repo/admin-kit/api";
-import { getGetMeQueryKey, getMe, login } from "./generated";
-import { GetMeResponse, LoginBody, LoginResponse } from "./generated/zod";
+import { getGetMeQueryKey, getMe, login, logout } from "./generated";
+import {
+  GetMeResponse,
+  LoginBody,
+  LoginResponse,
+  LogoutResponse,
+} from "./generated/zod";
 import { AccountHotelAdminResponse } from "./generated/zod/schemas";
 
 export const loginAccountBodySchema = LoginBody;
@@ -21,6 +26,8 @@ const LoginSuccessResponse = LoginResponse.extend({
   ...ACCOUNT_SUCCESS_SHAPE,
   message: z.string(),
 });
+
+const LogoutSuccessResponse = LogoutResponse.extend({ message: z.string() });
 
 type RequestOptions = {
   signal?: AbortSignal;
@@ -44,4 +51,14 @@ export async function loginAccount(body: LoginAccountBody) {
     response,
   );
   return { data, message };
+}
+
+export async function logoutAccount() {
+  const response = await logout();
+  const { message } = parseResponseBody(
+    "logout",
+    LogoutSuccessResponse,
+    response,
+  );
+  return { message };
 }

@@ -2,6 +2,7 @@ export {
   fetchMe,
   loginAccount,
   loginAccountBodySchema,
+  logoutAccount,
   meQueryKey,
 } from "./account";
 export type { Account, LoginAccountBody } from "./account";
