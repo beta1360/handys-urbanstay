@@ -21,9 +21,6 @@ interface RoomRepository : JpaRepository<Room, Long> {
 
 	fun findByIdAndHotelId(id: Long, hotelId: Long): Room?
 
-	@EntityGraph(attributePaths = ["hotel"])
-	fun findWithHotelById(id: Long): Room?
-
 	fun findByHotelId(hotelId: Long, pageable: Pageable): Page<Room>
 
 	fun findByHotelIdAndNameContainingIgnoreCase(hotelId: Long, keyword: String, pageable: Pageable): Page<Room>

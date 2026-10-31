@@ -1,9 +1,7 @@
 package com.marco.assignment.handys.urbanstay.stay.controller.app
 
 import com.marco.assignment.handys.urbanstay.common.ApiPaths
-import com.marco.assignment.handys.urbanstay.common.request.PageParams
 import com.marco.assignment.handys.urbanstay.common.response.ApiResponse
-import com.marco.assignment.handys.urbanstay.common.response.PageResponse
 import com.marco.assignment.handys.urbanstay.common.response.SuccessMessage
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelApiErrors
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelErrorCode
@@ -11,7 +9,6 @@ import com.marco.assignment.handys.urbanstay.room.exception.RoomApiErrors
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import com.marco.assignment.handys.urbanstay.stay.dto.app.StayAppResponse
 import com.marco.assignment.handys.urbanstay.stay.dto.app.StayCreateAppRequest
-import com.marco.assignment.handys.urbanstay.stay.dto.app.StayReservedPeriodAppResponse
 import com.marco.assignment.handys.urbanstay.stay.dto.app.StayRoomTypeAppResponse
 import com.marco.assignment.handys.urbanstay.stay.entity.Stay
 import com.marco.assignment.handys.urbanstay.stay.exception.StayApiErrors
@@ -21,7 +18,6 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
-import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
@@ -58,27 +54,6 @@ class StayAppController(
 		guestCount: Int,
 	): ApiResponse<List<StayRoomTypeAppResponse>> =
 		ApiResponse.success(stayService.getRoomTypes(hotelId, checkInDate, checkOutDate, guestCount).map(StayRoomTypeAppResponse::from))
-
-	@Operation(
-		summary = "openapi.app.operation.getRoomReservedPeriods.summary",
-		description = "openapi.app.operation.getRoomReservedPeriods.description",
-	)
-	@RoomApiErrors(RoomErrorCode.ROOM_NOT_FOUND)
-	@GetMapping("/rooms/{roomId}/reserved-periods")
-	fun getRoomReservedPeriods(
-		@PathVariable roomId: Long,
-		@RequestParam(defaultValue = PageParams.DEFAULT_PAGE)
-		@Min(value = PageParams.MIN_PAGE, message = "{validation.min}")
-		@Max(value = PageParams.MAX_PAGE, message = "{validation.max}")
-		@Parameter(description = "openapi.app.operation.getRoomReservedPeriods.parameter.page")
-		page: Int,
-		@RequestParam(defaultValue = PageParams.DEFAULT_SIZE)
-		@Min(value = PageParams.MIN_SIZE, message = "{validation.min}")
-		@Max(value = PageParams.MAX_SIZE, message = "{validation.max}")
-		@Parameter(description = "openapi.app.operation.getRoomReservedPeriods.parameter.size")
-		size: Int,
-	): ApiResponse<PageResponse<StayReservedPeriodAppResponse>> =
-		ApiResponse.success(PageResponse.from(stayService.getReservedPeriods(roomId, page, size).map(StayReservedPeriodAppResponse::from)))
 
 	@Operation(summary = "openapi.app.operation.createStay.summary", description = "openapi.app.operation.createStay.description")
 	@RoomApiErrors(RoomErrorCode.ROOM_TYPE_NOT_FOUND, RoomErrorCode.ROOM_TYPE_UNAVAILABLE)

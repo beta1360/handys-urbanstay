@@ -299,43 +299,30 @@ class StayAppControllerTest {
 	}
 
 	@Test
-	fun `없는 객실의 예약된 기간 조회는 404 ROOM_NOT_FOUND로 응답한다`() {
-		reservedPeriods(MISSING_ID).andExpectError(RoomErrorCode.ROOM_NOT_FOUND)
+	fun `게스트 앱에서 지운 호텔 객실 목록과 객실의 예약된 기간 API는 404 NOT_FOUND로 응답하고 문서에도 없다`() {
+		listOf("${ApiPaths.APP}/hotels/${hotel.id}/rooms", "${ApiPaths.APP}/rooms/${room.id}/reserved-periods").forEach { path ->
+			mockMvc.get(path).andExpectError(CommonErrorCode.NOT_FOUND)
+		}
+
+		val docs = json(mockMvc.get(APP_DOCS).andExpect { status { isOk() } }.andReturn().response.getContentAsString(StandardCharsets.UTF_8))
+		assertThat(docs["paths"].propertyNames()).doesNotContain("${ApiPaths.APP}/hotels/{hotelId}/rooms", "${ApiPaths.APP}/rooms/{roomId}/reserved-periods")
+		assertThat(docs["components"]["schemas"].propertyNames()).doesNotContain("RoomAppResponse", "StayReservedPeriodAppResponse", "StayRoomAppResponse")
+		assertThat(docs.path("tags").values().map { it["name"].stringValue() }).doesNotContain("room")
 	}
 
 	@Test
-	fun `예약된 기간은 취소하지 않았고 끝나지 않은 그 객실 이용의 날짜만 체크인 이른 순으로 페이지로 보여준다`() {
-		saveStay(room, TODAY.minusDays(2), TODAY)
-		saveStay(room, TODAY.plusDays(5), TODAY.plusDays(7))
-		saveStay(room, TODAY, TODAY.plusDays(2))
-		saveStay(room, TODAY.plusDays(2), TODAY.plusDays(4))
-		cancelStay(saveStay(room, TODAY.plusDays(8), TODAY.plusDays(9)))
-		saveStay(otherRoom, TODAY.plusDays(1), TODAY.plusDays(2))
-
-		val data = reservedPeriods(checkNotNull(room.id)).andReturn().andExpectSuccess(HttpStatus.OK)
-
-		assertThat(data["items"]).isEqualTo(periodsJson(TODAY to TODAY.plusDays(2), TODAY.plusDays(2) to TODAY.plusDays(4), TODAY.plusDays(5) to TODAY.plusDays(7)))
-		assertThat(pageInfo(data)).containsExactly(0, 10, 3, 1)
-		val second = reservedPeriods(room.id!!, "page" to "1", "size" to "2").andReturn().andExpectSuccess(HttpStatus.OK)
-		assertThat(second["items"]).isEqualTo(periodsJson(TODAY.plusDays(5) to TODAY.plusDays(7)))
-	}
-
-	@Test
-	fun `예약 API 문서는 게스트 앱 그룹의 stay 태그에 객실·이용 에러 예시와 요청 규칙을 보여준다`() {
+	fun `예약 API 문서는 게스트 앱 그룹의 stay 태그에 객실 유형·이용 에러 예시와 요청 규칙을 보여준다`() {
 		val docs = json(mockMvc.get(APP_DOCS).andExpect { status { isOk() } }.andReturn().response.getContentAsString(StandardCharsets.UTF_8))
 		val create = docs["paths"][STAYS]["post"]
-		val periods = docs["paths"]["${ApiPaths.APP}/rooms/{roomId}/reserved-periods"]["get"]
 		val schemas = docs["components"]["schemas"]
 		val guestProperties = schemas["StayGuestCreateAppRequest"]["properties"]
 
-		assertThat(listOf(create, periods).map { it["operationId"].stringValue() }).containsExactly("createStay", "getRoomReservedPeriods")
-		assertThat(listOf(create, periods).map { op -> op["tags"].values().map { it.stringValue() } }).containsOnly(listOf("stay"))
+		assertThat(create["operationId"].stringValue()).isEqualTo("createStay")
+		assertThat(create["tags"].values().map { it.stringValue() }).containsExactly("stay")
 		assertThat(create["responses"].propertyNames()).containsExactlyInAnyOrder("201", "400", "404", "409", "500")
 		assertThat(errorCodes(create, HttpStatus.NOT_FOUND)).containsExactly(RoomErrorCode.ROOM_TYPE_NOT_FOUND.code)
 		assertThat(errorCodes(create, HttpStatus.CONFLICT))
 			.containsExactlyInAnyOrder(RoomErrorCode.ROOM_TYPE_UNAVAILABLE.code, StayErrorCode.STAY_PERIOD_OVERLAPPED.code)
-		assertThat(periods["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "404", "500")
-		assertThat(errorCodes(periods, HttpStatus.NOT_FOUND)).containsExactly(RoomErrorCode.ROOM_NOT_FOUND.code)
 		assertThat(required(schemas["StayCreateAppRequest"]))
 			.containsExactlyInAnyOrder("hotelId", "roomType", "checkInDate", "checkOutDate", "guestCount", "guest")
 		assertThat(schemas["StayCreateAppRequest"]["properties"]["roomType"]["maxLength"].asString()).isEqualTo(Room.TYPE_MAX_LENGTH.toString())
@@ -348,7 +335,6 @@ class StayAppControllerTest {
 			)
 		assertThat(schemas["StayAppResponse"]["properties"].propertyNames())
 			.containsExactly("id", "hotel", "roomType", "checkInDate", "checkOutDate", "guestCount", "guest")
-		assertThat(schemas["StayReservedPeriodAppResponse"]["properties"].propertyNames()).containsExactly("checkInDate", "checkOutDate")
 	}
 
 	private fun reserve(body: Map<String, Any?>): ResultActionsDsl =
@@ -362,9 +348,6 @@ class StayAppControllerTest {
 
 	private fun roomTypeParams(checkIn: LocalDate, checkOut: LocalDate, guestCount: Int): Array<Pair<String, String>> =
 		arrayOf("checkInDate" to checkIn.toString(), "checkOutDate" to checkOut.toString(), "guestCount" to guestCount.toString())
-
-	private fun reservedPeriods(roomId: Long, vararg params: Pair<String, String>): ResultActionsDsl =
-		mockMvc.get("${ApiPaths.APP}/rooms/$roomId/reserved-periods") { params.forEach { (name, value) -> param(name, value) } }
 
 	private fun body(
 		checkIn: LocalDate,
@@ -445,11 +428,6 @@ class StayAppControllerTest {
 				},
 			),
 		)
-
-	private fun periodsJson(vararg periods: Pair<LocalDate, LocalDate>): JsonNode =
-		json(jsonMapper.writeValueAsString(periods.map { (checkIn, checkOut) -> linkedMapOf("checkInDate" to checkIn.toString(), "checkOutDate" to checkOut.toString()) }))
-
-	private fun pageInfo(data: JsonNode): List<Long> = listOf("page", "size", "totalElements", "totalPages").map { data[it].longValue() }
 
 	private fun errorCodes(operation: JsonNode, status: HttpStatus): List<String> {
 		val content = operation["responses"][status.value().toString()]["content"][JSON]
