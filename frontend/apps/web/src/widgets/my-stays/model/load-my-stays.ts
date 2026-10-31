@@ -1,15 +1,15 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getMyStays, splitMyStays } from "@/entities/stay";
-import type { MyStaySections } from "@/entities/stay";
+import { getMyStayPage, MY_STAY_FIRST_PAGE } from "@/entities/stay";
+import type { MyStayPage, MyStayPageParam } from "@/entities/stay";
 import { API_ERROR_CODES, getApiError } from "@/shared/api";
 import { ROUTES } from "@/shared/config";
-import { getKoreanToday } from "@/shared/lib/date";
 import { loginHref } from "@/shared/lib/login-redirect";
 import { SESSION_COOKIE } from "../config/session-cookie";
 
 export type MyStaysState =
-  { status: "empty" } | { status: "ready"; sections: MyStaySections };
+  | { status: "empty" }
+  | { status: "ready"; initialPages: MyStayPage[] };
 
 async function readSessionCookie() {
   const session = (await cookies()).get(SESSION_COOKIE.name);
@@ -18,9 +18,12 @@ async function readSessionCookie() {
     : `${SESSION_COOKIE.name}=${session.value}`;
 }
 
-async function getMyStaysOrLogin() {
+async function getMyStayPageOrLogin(
+  param: MyStayPageParam,
+  cookie: string | undefined,
+) {
   try {
-    return await getMyStays(await readSessionCookie());
+    return await getMyStayPage(param, { cookie });
   } catch (error) {
     if (getApiError(error)?.code === API_ERROR_CODES.unauthorized) {
       redirect(loginHref(ROUTES.myStays));
@@ -30,8 +33,16 @@ async function getMyStaysOrLogin() {
 }
 
 export async function loadMyStays(): Promise<MyStaysState> {
-  const { items } = await getMyStaysOrLogin();
-  return items.length === 0
+  const cookie = await readSessionCookie();
+  const upcoming = await getMyStayPageOrLogin(
+    MY_STAY_FIRST_PAGE.upcoming,
+    cookie,
+  );
+  if (upcoming.items.length > 0) {
+    return { status: "ready", initialPages: [upcoming] };
+  }
+  const past = await getMyStayPageOrLogin(MY_STAY_FIRST_PAGE.past, cookie);
+  return past.items.length === 0
     ? { status: "empty" }
-    : { status: "ready", sections: splitMyStays(items, getKoreanToday()) };
+    : { status: "ready", initialPages: [upcoming, past] };
 }

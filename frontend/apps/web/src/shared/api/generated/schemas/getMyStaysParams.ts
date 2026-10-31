@@ -5,8 +5,13 @@
  * 숙박 운영(호텔·객실·이용) API
  * OpenAPI spec version: v1
  */
+import type { GetMyStaysPeriod } from './getMyStaysPeriod';
 
 export type GetMyStaysParams = {
+/**
+ * 기간(선택). UPCOMING이면 체크아웃 날짜가 오늘(한국 시간)보다 뒤인 이용을 체크인 이른 순으로, PAST면 체크아웃 날짜가 오늘이거나 지난 이용을 체크인 늦은 순으로 줍니다(대소문자 구분). 보내지 않거나 비어 있거나 공백만 있으면 모든 이용을 체크인 늦은 순으로 줍니다.
+ */
+period?: GetMyStaysPeriod;
 /**
  * 페이지 번호. 0~99, 기본 0
  * @minimum 0

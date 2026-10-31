@@ -20,11 +20,19 @@ export {
   roomTypesQueryKey,
 } from "./room-type";
 export type { RoomType, RoomTypeListParams } from "./room-type";
-export { createStay, createStayBodySchema, fetchMyStays } from "./stay";
+export {
+  createStay,
+  createStayBodySchema,
+  fetchMyStays,
+  MY_STAY_LIST_MAX_PAGE,
+  MY_STAY_PERIOD,
+  myStaysQueryKey,
+} from "./stay";
 export type {
   CreateStayBody,
   MyStay,
   MyStayListParams,
+  MyStayPeriod,
   ReservedStay,
 } from "./stay";
 export {

@@ -1,10 +1,12 @@
+import type { ReactNode } from "react";
 import type { MyStay } from "@/shared/api";
 import { MY_STAY_MESSAGES } from "../config/messages";
-import type { MyStaySections } from "../lib/my-stay-sections";
+import type { MyStaySections } from "../model/use-my-stay-feed";
 import { MyStayCard } from "./my-stay-card";
 
 type MyStayListViewProps = {
   sections: MyStaySections;
+  children: ReactNode;
 };
 
 type MyStaySectionProps = {
@@ -31,14 +33,20 @@ function MyStaySection({ title, stays }: MyStaySectionProps) {
   );
 }
 
-export function MyStayListView({ sections }: MyStayListViewProps) {
+export function MyStayListView({ sections, children }: MyStayListViewProps) {
   return (
     <div className="flex flex-col gap-8">
       <MyStaySection
         title={MY_STAY_MESSAGES.upcomingTitle}
         stays={sections.upcoming}
       />
-      <MyStaySection title={MY_STAY_MESSAGES.pastTitle} stays={sections.past} />
+      {sections.past === undefined ? null : (
+        <MyStaySection
+          title={MY_STAY_MESSAGES.pastTitle}
+          stays={sections.past}
+        />
+      )}
+      {children}
     </div>
   );
 }

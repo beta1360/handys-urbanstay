@@ -13,6 +13,9 @@ export const MY_STAY_MESSAGES = {
   sectionEmpty: "이용이 없습니다.",
   empty: "아직 이용이 없습니다.",
   canceled: "취소됨",
+  loadMore: "더 보기",
+  loadMoreFailed: "이용을 더 불러오지 못했습니다.",
+  end: "이용을 모두 불러왔습니다.",
 } as const;
 
 export const STAY_MESSAGES = {

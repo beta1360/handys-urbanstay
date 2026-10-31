@@ -16,6 +16,7 @@ export const getMyStaysParamsSizeMax = 100;
 
 
 export const GetMyStaysParams = zod.object({
+  "period": zod.enum(['UPCOMING', 'PAST']).optional(),
   "page": zod.int().min(getMyStaysParamsPageMin).max(getMyStaysParamsPageMax).default(getMyStaysParamsPageDefault),
   "size": zod.int().min(1).max(getMyStaysParamsSizeMax).default(getMyStaysParamsSizeDefault)
 })

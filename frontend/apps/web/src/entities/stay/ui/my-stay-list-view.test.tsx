@@ -22,7 +22,9 @@ const CANCELED_STAY = {
 describe("MyStayListView", () => {
   it("구역마다 이용의 호텔·금액·취소 여부를 보여주고 빈 구역은 없다고 알린다", () => {
     render(
-      <MyStayListView sections={{ upcoming: [CANCELED_STAY], past: [] }} />,
+      <MyStayListView sections={{ upcoming: [CANCELED_STAY], past: [] }}>
+        {null}
+      </MyStayListView>,
     );
 
     const upcoming = within(

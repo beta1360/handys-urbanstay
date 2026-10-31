@@ -111,7 +111,7 @@ describe("createStay", () => {
 });
 
 describe("fetchMyStays", () => {
-  const PAGE_PARAMS = { page: 0, size: 100 };
+  const PAGE_PARAMS = { period: "UPCOMING" as const, page: 0, size: 10 };
   const COOKIE = "JSESSIONID=abc";
   const MY_STAY = {
     id: 11,

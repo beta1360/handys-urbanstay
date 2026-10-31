@@ -1,9 +1,11 @@
 import { z } from "zod";
 import * as generated from "./generated";
+import { GetMyStaysPeriod } from "./generated/schemas";
 import {
   CreateStayResponse,
   GetMyStaysQueryParams,
   GetMyStaysResponse,
+  getMyStaysQueryPageMax,
 } from "./generated/zod";
 import {
   PageResponseStayMyAppResponse,
@@ -23,13 +25,20 @@ export type MyStay = z.output<typeof StayMyAppResponse>;
 
 export type MyStayListParams = z.input<typeof GetMyStaysQueryParams>;
 
+export const MY_STAY_PERIOD = GetMyStaysPeriod;
+
+export type MyStayPeriod = GetMyStaysPeriod;
+
+export const MY_STAY_LIST_MAX_PAGE = getMyStaysQueryPageMax;
+
 const GetMyStaysSuccessResponse = GetMyStaysResponse.extend({
   success: z.literal(true),
   data: PageResponseStayMyAppResponse,
 });
 
-type ServerRequestOptions = {
+type MyStaysRequestOptions = {
   cookie?: string;
+  signal?: AbortSignal;
 };
 
 const CreateStaySuccessResponse = CreateStayResponse.extend({
@@ -49,14 +58,18 @@ export async function createStay(body: CreateStayBody) {
   return { data, message };
 }
 
+export function myStaysQueryKey() {
+  return generated.getGetMyStaysQueryKey();
+}
+
 export async function fetchMyStays(
   params: MyStayListParams,
-  { cookie }: ServerRequestOptions = {},
+  { cookie, signal }: MyStaysRequestOptions = {},
 ) {
   const validParams = parseRequest("getMyStays", GetMyStaysQueryParams, params);
-  const response = await generated.getMyStays(
-    validParams,
-    cookie === undefined ? undefined : { headers: { cookie } },
-  );
+  const response = await generated.getMyStays(validParams, {
+    signal,
+    headers: cookie === undefined ? undefined : { cookie },
+  });
   return parseResponse("getMyStays", GetMyStaysSuccessResponse, response).data;
 }

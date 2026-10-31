@@ -18,6 +18,7 @@ export * from './fieldErrorResponse';
 export * from './getHotelRoomTypesParams';
 export * from './getHotelsParams';
 export * from './getMyStaysParams';
+export * from './getMyStaysPeriod';
 export * from './hotelAppResponse';
 export * from './memberAppResponse';
 export * from './memberLoginAppRequest';
