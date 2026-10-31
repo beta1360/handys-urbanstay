@@ -6,20 +6,16 @@
  * OpenAPI spec version: v1
  */
 import * as zod from 'zod';
-import { StayGuestCreateAppRequest } from './stayGuestCreateAppRequest.zod';
-
-export const stayCreateAppRequestRoomTypeMax = 50;
 
 
 
 
 export const StayCreateAppRequest = zod.object({
   "hotelId": zod.int().describe('예약할 호텔 ID'),
-  "roomType": zod.string().min(1).max(stayCreateAppRequestRoomTypeMax).describe('예약할 객실 유형. 객실 유형 목록의 type 값을 그대로 보냅니다. 앞뒤 공백을 지운 뒤 1~50자이고, 글자가 똑같아야(대소문자 구분) 같은 유형입니다.'),
+  "roomTypeId": zod.int().describe('예약할 객실 유형 ID. 객실 유형 목록의 id 값을 그대로 보냅니다.'),
   "checkInDate": zod.iso.date().describe('체크인 날짜. "YYYY-MM-DD" 형식의 문자열. 오늘(한국 시간)이거나 그 뒤여야 합니다.'),
   "checkOutDate": zod.iso.date().describe('체크아웃 날짜. "YYYY-MM-DD" 형식의 문자열. 체크인 날짜보다 뒤이고 체크인 날짜와 30일 이하로 차이 나야 합니다(최대 30박). 이 날은 묵지 않는 날로 봅니다.'),
-  "guestCount": zod.int().min(1).describe('인원. 1 이상 정수. 최대 인원이 이 값 이상인 객실에만 배정합니다.'),
-  "guest": StayGuestCreateAppRequest.describe('예약하는 이용객. 그 호텔에 숫자가 같은 전화번호의 이용객이 있으면 그 이용객으로 예약합니다.')
+  "guestCount": zod.int().min(1).describe('인원. 1 이상 정수. 그 유형의 최대 인원보다 많으면 예약할 수 없습니다(409 ROOM_TYPE_UNAVAILABLE).')
 });
 
 export type StayCreateAppRequest = zod.input<typeof StayCreateAppRequest>;

@@ -37,7 +37,7 @@ export function StayReserve({ hotelId, children }: StayReserveProps) {
           fields={state.fields}
           summary={state.summary}
           formAlert={state.formAlert}
-          isSubmitting={state.isSubmitting}
+          action={state.action}
           onSubmit={state.handleSubmit}
         />
       ) : null}

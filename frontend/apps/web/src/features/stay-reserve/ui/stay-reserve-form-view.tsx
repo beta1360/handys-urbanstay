@@ -4,13 +4,14 @@ import { formatStayPeriod, STAY_LABELS } from "@/entities/stay";
 import type { RoomType } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import type { FormFieldProps } from "@/shared/lib/form";
-import { Button, TextField } from "@/shared/ui";
-import {
-  STAY_RESERVE_LABELS,
-  STAY_RESERVE_MESSAGES,
-} from "../config/messages";
+import { formatWon } from "@/shared/lib/money";
+import { Button, ButtonLink } from "@/shared/ui";
+import { STAY_RESERVE_MESSAGES } from "../config/messages";
 import type { StayReserveField } from "../model/stay-reserve-form-schema";
-import type { ReservationSummary } from "../model/use-stay-reserve";
+import type {
+  ReservationSummary,
+  ReserveAction,
+} from "../model/use-stay-reserve";
 import { StayDetailList } from "./stay-detail-list";
 
 type StayReserveFormViewProps = {
@@ -18,7 +19,7 @@ type StayReserveFormViewProps = {
   fields: Record<StayReserveField, FormFieldProps>;
   summary: ReservationSummary | undefined;
   formAlert: string | undefined;
-  isSubmitting: boolean;
+  action: ReserveAction;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
@@ -27,68 +28,59 @@ export function StayReserveFormView({
   fields,
   summary,
   formAlert,
-  isSubmitting,
+  action,
   onSubmit,
 }: StayReserveFormViewProps) {
   return (
     <form noValidate onSubmit={onSubmit} className="flex flex-col gap-6">
-      <RoomTypeOptions roomTypes={roomTypes} field={fields.roomType} />
+      <RoomTypeOptions roomTypes={roomTypes} field={fields.roomTypeId} />
       {summary ? (
-        <>
-          <fieldset className="flex flex-col gap-4">
-            <legend className="mb-3 text-base font-semibold text-gray-900">
-              {STAY_RESERVE_MESSAGES.guestLegend}
-            </legend>
-            <TextField
-              label={STAY_RESERVE_LABELS.guestName}
-              autoComplete="name"
-              {...fields["guest.name"]}
-            />
-            <TextField
-              label={STAY_RESERVE_LABELS.guestPhone}
-              type="tel"
-              autoComplete="tel"
-              hint={STAY_RESERVE_MESSAGES.phoneHint}
-              {...fields["guest.phone"]}
-            />
-            <TextField
-              label={STAY_RESERVE_LABELS.guestEmail}
-              type="email"
-              autoComplete="email"
-              hint={STAY_RESERVE_MESSAGES.emailHint}
-              {...fields["guest.email"]}
-            />
-          </fieldset>
-          <section className="flex flex-col gap-3">
-            <h2 className="text-base font-semibold text-gray-900">
-              {STAY_RESERVE_MESSAGES.summaryTitle}
-            </h2>
-            <StayDetailList
-              rows={[
-                {
-                  label: ROOM_TYPE_LABELS.roomType,
-                  value: summary.roomType.type,
-                },
-                {
-                  label: STAY_LABELS.period,
-                  value: formatStayPeriod(summary.criteria),
-                },
-                {
-                  label: STAY_LABELS.guestCount,
-                  value: COMMON_MESSAGES.people(summary.criteria.guestCount),
-                },
-              ]}
-            />
-          </section>
-        </>
+        <section className="flex flex-col gap-3">
+          <h2 className="text-base font-semibold text-gray-900">
+            {STAY_RESERVE_MESSAGES.summaryTitle}
+          </h2>
+          <StayDetailList
+            rows={[
+              {
+                label: ROOM_TYPE_LABELS.roomType,
+                value: summary.roomType.name,
+              },
+              {
+                label: STAY_LABELS.period,
+                value: formatStayPeriod(summary.criteria),
+              },
+              {
+                label: STAY_LABELS.guestCount,
+                value: COMMON_MESSAGES.people(summary.criteria.guestCount),
+              },
+              {
+                label: STAY_LABELS.roomRate,
+                value: formatWon(summary.roomType.roomRate),
+              },
+              {
+                label: STAY_LABELS.totalAmount,
+                value: formatWon(summary.totalAmount),
+              },
+            ]}
+          />
+        </section>
       ) : null}
       {formAlert ? (
         <p role="alert" className="text-sm text-red-600">
           {formAlert}
         </p>
       ) : null}
-      {summary ? (
-        <Button type="submit" variant="primary" loading={isSubmitting}>
+      {summary && action.status === "loginRequired" ? (
+        <ButtonLink href={action.loginHref} variant="primary">
+          {STAY_RESERVE_MESSAGES.loginToReserve}
+        </ButtonLink>
+      ) : null}
+      {summary && action.status !== "loginRequired" ? (
+        <Button
+          type="submit"
+          variant="primary"
+          loading={action.status === "checking" || action.isSubmitting}
+        >
           {STAY_RESERVE_MESSAGES.submit}
         </Button>
       ) : null}

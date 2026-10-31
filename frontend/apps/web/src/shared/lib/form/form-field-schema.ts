@@ -42,6 +42,17 @@ export function requiredTextSchema(rule: z.ZodType, formatMessage?: string) {
     );
 }
 
+export function passwordSchema(rule: z.ZodType, invalidMessage: string) {
+  return z.string().superRefine(
+    checkMessage((value) => {
+      if (value.trim() === "") {
+        return FORM_VALIDATION_MESSAGES.required;
+      }
+      return rule.safeParse(value).success ? undefined : invalidMessage;
+    }),
+  );
+}
+
 const INTEGER_PATTERN = /^-?\d+$/;
 
 function toInteger(value: string) {

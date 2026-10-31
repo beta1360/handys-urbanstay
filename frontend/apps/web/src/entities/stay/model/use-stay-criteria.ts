@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { parseStayCriteria } from "./stay-criteria";
