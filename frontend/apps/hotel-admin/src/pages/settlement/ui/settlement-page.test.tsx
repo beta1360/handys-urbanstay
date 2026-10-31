@@ -42,7 +42,7 @@ vi.mock("@/shared/api", async (importOriginal) => {
   };
 });
 
-const TODAY = new Date(2026, 9, 31, 23, 30);
+const TODAY = new Date("2026-10-31T14:30:00Z");
 
 const SETTLEMENT: Settlement = {
   month: "2026-10",

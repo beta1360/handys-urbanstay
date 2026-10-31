@@ -19,6 +19,9 @@ function keepPreviousPageInRange(previousData: SettlementStayPage | undefined) {
 export function useSettlementStayListQuery(params: SettlementStayListParams) {
   return useQuery({
     ...settlementStayListQueryOptions(params),
-    placeholderData: keepPreviousPageInRange,
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[1]?.month === params.month
+        ? keepPreviousPageInRange(previousData)
+        : undefined,
   });
 }

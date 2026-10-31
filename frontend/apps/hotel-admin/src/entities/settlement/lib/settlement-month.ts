@@ -1,7 +1,9 @@
 import { settlementParamsSchema } from "@/shared/api";
+import { getKoreanToday } from "@/shared/lib/date-time";
 import { SETTLEMENT_MONTH_MESSAGES } from "../config/messages";
 
 const MONTHS_PER_YEAR = 12;
+const YEAR_MONTH_LENGTH = "YYYY-MM".length;
 
 function toSettlementMonth(year: number, month: number) {
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}`;
@@ -17,8 +19,7 @@ function isSettlementMonth(value: string) {
 }
 
 function getCurrentSettlementMonth() {
-  const now = new Date();
-  return toSettlementMonth(now.getFullYear(), now.getMonth() + 1);
+  return getKoreanToday().slice(0, YEAR_MONTH_LENGTH);
 }
 
 export function normalizeSettlementMonth(value: string | undefined) {
