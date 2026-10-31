@@ -583,3 +583,22 @@ describe("StayListPage 빈 상태와 URL 정리", () => {
     });
   });
 });
+
+describe("StayListPage 불러오기 실패", () => {
+  it("목록을 불러오지 못하면 오류 문구와 다시 시도 버튼을 보여주고, 누르면 다시 조회한다", async () => {
+    fetchStays.mockRejectedValueOnce(new Error("서버 오류"));
+    const { user } = renderStayListPage();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      STAY_LIST_CONTENT_MESSAGES.loadFailed,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: COMMON_MESSAGES.retry }),
+    );
+
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(fetchStays).toHaveBeenCalledTimes(2);
+  });
+});

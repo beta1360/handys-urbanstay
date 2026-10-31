@@ -246,3 +246,59 @@ describe("OperatorListPage 검색과 사용 여부 거르기", () => {
     expect(await screen.findByText(text)).toBeInTheDocument();
   });
 });
+
+describe("OperatorListPage 페이지 이동과 불러오기 실패", () => {
+  it("다음·이전을 누르면 검색어와 사용 여부를 둔 채 그 페이지로 URL을 바꿔 조회한다", async () => {
+    fetchOperators.mockImplementation(({ page }: { page: number }) =>
+      Promise.resolve(createOperatorPage({ page, totalPages: 3 })),
+    );
+    const { router, user } = renderOperatorListPage(
+      operatorsPath({ keyword: KEYWORD, active: "true" }),
+    );
+
+    await screen.findByRole("table");
+    const previousButton = screen.getByRole("button", {
+      name: COMMON_MESSAGES.previousPage,
+    });
+    expect(previousButton).toBeDisabled();
+    await user.click(
+      screen.getByRole("button", { name: COMMON_MESSAGES.nextPage }),
+    );
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe(
+        operatorsPath({ keyword: KEYWORD, active: "true", page: "2" }),
+      );
+    });
+    expect(fetchOperators).toHaveBeenLastCalledWith({
+      keyword: KEYWORD,
+      active: true,
+      page: 1,
+    });
+
+    await user.click(previousButton);
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe(
+        operatorsPath({ keyword: KEYWORD, active: "true" }),
+      );
+    });
+  });
+
+  it("목록을 불러오지 못하면 오류 문구와 다시 시도 버튼을 보여주고, 누르면 다시 조회한다", async () => {
+    fetchOperators.mockRejectedValueOnce(new Error("서버 오류"));
+    const { user } = renderOperatorListPage();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      OPERATOR_LIST_CONTENT_MESSAGES.loadFailed,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: COMMON_MESSAGES.retry }),
+    );
+
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(fetchOperators).toHaveBeenCalledTimes(2);
+  });
+});

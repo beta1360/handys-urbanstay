@@ -49,3 +49,10 @@ export function forgetMe(queryClient: QueryClient) {
     exact: true,
   });
 }
+
+export function invalidateMe(queryClient: QueryClient) {
+  return queryClient.invalidateQueries({
+    queryKey: meQueryOptions().queryKey,
+    exact: true,
+  });
+}

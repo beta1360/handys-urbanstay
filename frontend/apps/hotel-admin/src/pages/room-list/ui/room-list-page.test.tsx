@@ -511,6 +511,26 @@ describe("RoomListPage 유형 거르기", () => {
       page: 0,
     });
   });
+
+  it("유형 목록이 비면 선택지는 전체뿐이고 생성 안내 없이 URL의 유형을 지운 뒤 유형 없이 다시 조회한다", async () => {
+    fetchRoomTypes.mockResolvedValue([]);
+    const { router } = renderRoomListPage(
+      roomsPath({ roomTypeId: UNLISTED_ROOM_TYPE_ID }),
+    );
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe(roomsPath());
+    });
+    expect(
+      within(getRoomTypeSelect())
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual([COMMON_MESSAGES.all]);
+    expect(
+      screen.queryByText(ROOM_TYPE_OPTION_MESSAGES.empty),
+    ).not.toBeInTheDocument();
+    expect(fetchRooms).toHaveBeenLastCalledWith({ page: 0 });
+  });
 });
 
 describe("RoomListPage 빈 상태", () => {

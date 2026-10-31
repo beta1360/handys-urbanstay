@@ -22,6 +22,11 @@ export const ADMIN_MENU_ITEMS: readonly AdminMenuItem[] = [
     masterOnly: true,
   },
   {
+    to: "/hotel",
+    label: ADMIN_LAYOUT_MESSAGES.hotelMenuLabel,
+    masterOnly: true,
+  },
+  {
     to: "/settlements",
     label: ADMIN_LAYOUT_MESSAGES.settlementMenuLabel,
     masterOnly: true,

@@ -14,7 +14,12 @@ import { ROOM_FIELD_LABELS } from "@/entities/room";
 import { SETTLEMENT_FIELD_LABELS } from "@/entities/settlement";
 import { STAY_CANCELED_LABELS, STAY_FIELD_LABELS } from "@/entities/stay";
 import { SETTLEMENT_MONTH_CHANGE_MESSAGES } from "@/features/settlement-month-change";
-import type { Settlement, SettlementStay } from "@/shared/api";
+import type {
+  Settlement,
+  SettlementStay,
+  SettlementStayPage,
+} from "@/shared/api";
+import { COMMON_MESSAGES } from "@/shared/config";
 import { formatWon } from "@/shared/lib/money";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { SETTLEMENT_STAY_LIST_MESSAGES } from "@/widgets/settlement-stay-list";
@@ -267,6 +272,116 @@ describe("SettlementPage", () => {
         month,
         page: 0,
       });
+    },
+  );
+});
+
+describe("SettlementPage 이 달 이용 페이지 이동", () => {
+  it("같은 달에서 다음을 누르면 불러오는 동안 이전 목록을 흐리게 두고 다음 페이지를 보여주며, 이전을 누르면 1페이지로 돌아온다", async () => {
+    let resolveNextPage: (page: SettlementStayPage) => void = () => {};
+    fetchSettlementStays.mockImplementation(({ page }: { page: number }) =>
+      page === 0
+        ? Promise.resolve({ ...createStayPage(), totalPages: 2 })
+        : new Promise<SettlementStayPage>((resolve) => {
+            resolveNextPage = resolve;
+          }),
+    );
+    const { router, user } = renderSettlementPage();
+    await screen.findByRole("table");
+
+    await user.click(
+      screen.getByRole("button", { name: COMMON_MESSAGES.nextPage }),
+    );
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe(
+        "/settlements?month=2026-10&page=2",
+      );
+    });
+    expect(screen.getByRole("table")).toHaveAttribute("aria-busy", "true");
+    expect(
+      screen.getByText(SETTLEMENT_STAYS[0].guest.name),
+    ).toBeInTheDocument();
+
+    resolveNextPage({
+      ...createStayPage([SETTLEMENT_STAYS[1]]),
+      page: 1,
+      totalPages: 2,
+    });
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole("table")).not.toHaveAttribute("aria-busy");
+    });
+    expect(
+      screen.queryByText(SETTLEMENT_STAYS[0].guest.name),
+    ).not.toBeInTheDocument();
+    expect(fetchSettlementStays).toHaveBeenLastCalledWith({
+      month: "2026-10",
+      page: 1,
+    });
+    expect(fetchSettlement).toHaveBeenCalledOnce();
+
+    await user.click(
+      screen.getByRole("button", { name: COMMON_MESSAGES.previousPage }),
+    );
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe("/settlements?month=2026-10");
+    });
+    expect(
+      await screen.findByText(SETTLEMENT_STAYS[0].guest.name),
+    ).toBeInTheDocument();
+  });
+
+  it("URL의 페이지가 마지막 페이지보다 크면 같은 달의 마지막 페이지로 방문 기록을 바꿔 이동한다", async () => {
+    fetchSettlementStays.mockImplementation(({ page }: { page: number }) =>
+      Promise.resolve({
+        ...createStayPage(page > 1 ? [] : SETTLEMENT_STAYS),
+        page,
+        totalPages: 2,
+      }),
+    );
+    const { router } = renderSettlementPage(
+      "/settlements?month=2026-10&page=50",
+    );
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe(
+        "/settlements?month=2026-10&page=2",
+      );
+    });
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(router.history.length).toBe(1);
+  });
+});
+
+describe("SettlementPage 불러오기 실패", () => {
+  it.each([
+    ["요약", fetchSettlement, SETTLEMENT_SUMMARY_MESSAGES.loadFailed],
+    [
+      "이 달 이용 표",
+      fetchSettlementStays,
+      SETTLEMENT_STAY_LIST_MESSAGES.loadFailed,
+    ],
+  ])(
+    "%s를 불러오지 못하면 그 자리에만 오류 문구와 다시 시도를 보여주고, 누르면 다시 불러온다",
+    async (_, request, message) => {
+      request.mockRejectedValueOnce(new Error("서버 오류"));
+      const { user } = renderSettlementPage();
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(message);
+      expect(
+        screen.getByText(SETTLEMENT_SUMMARY_MESSAGES.basis),
+      ).toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole("button", { name: COMMON_MESSAGES.retry }),
+      );
+
+      expect(await screen.findByRole("table")).toBeInTheDocument();
+      expect(await screen.findAllByRole("term")).toHaveLength(3);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(request).toHaveBeenCalledTimes(2);
     },
   );
 });

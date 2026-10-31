@@ -2,6 +2,7 @@ export {
   endSession,
   ensureMe,
   forgetMe,
+  invalidateMe,
   isPendingMeQuery,
   startSession,
   useMe,
