@@ -10,10 +10,21 @@ import * as zod from 'zod';
 import {
   ApiResponsePageResponseStayHotelAdminResponse,
   ApiResponseStayHotelAdminResponse,
-  StayCancelHotelAdminRequest,
-  StayCreateHotelAdminRequest
+  StayCancelHotelAdminRequest
 } from '../schemas';
 
+
+/**
+ * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 이용을 취소합니다. 본문의 reason에 취소 사유를 보낼 수 있고(선택), 사유 없이 취소하려면 빈 객체({})를 보냅니다. 취소 시각, 취소를 처리한 계정(id와 그때의 이름), 사유를 기록하며 취소는 되돌릴 수 없습니다. 끝나지 않은 이용(체크아웃 날짜가 오늘(한국 시간)보다 뒤)만 취소할 수 있고, 체크아웃 날짜가 오늘이거나 지난 이용은 409 STAY_ALREADY_ENDED로 응답합니다. 이미 취소한 이용은 409 STAY_ALREADY_CANCELED로 응답하며, 끝난 이용이어도 이미 취소했으면 STAY_ALREADY_CANCELED입니다. 같은 이용을 동시에 취소하면 한 번만 기록되고 나머지는 409 STAY_ALREADY_CANCELED입니다. 취소한 이용은 겹침 검사에서 빠지므로 같은 객실의 같은 기간을 게스트 앱에서 다시 예약할 수 있습니다. 취소할 때 객실 상태가 RESERVED(예약됨)이면 VACANT(공실)로 바꾸고 취소한 계정이 바꾼 것으로 상태 이력을 남기며, OCCUPIED(이용중), MAINTENANCE(정비중), VACANT(공실)이면 그대로 둡니다. 성공하면 취소 정보(cancellation)가 담긴 이용을 돌려줍니다. 없는 id와 다른 호텔의 이용 id는 모두 404 STAY_NOT_FOUND로 응답합니다. 사유가 200자를 넘으면 400 INVALID_INPUT으로 응답하고 fieldErrors에 reason을 담습니다.
+ * @summary 이용 취소
+ */
+export const CancelStayParams = zod.object({
+  "stayId": zod.int()
+})
+
+export const CancelStayBody = StayCancelHotelAdminRequest
+
+export const CancelStayResponse = ApiResponseStayHotelAdminResponse
 
 /**
  * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 이용 목록을 체크인 날짜 내림차순(같으면 이용 id 내림차순)으로 페이지로 나눠 조회합니다. 다른 호텔의 이용은 나오지 않고, 취소한 이용도 함께 나옵니다. roomId를 보내면 그 객실의 이용만, guestId를 보내면 그 이용객의 이용만, canceled를 보내면 취소 여부가 맞는 이용만 조회하고, 함께 보내면 모두 맞는 이용만 조회합니다. 없는 id나 다른 호텔의 id로 거르면 빈 목록입니다. 객실 이름과 이용객의 이름·전화번호는 조회하는 시점의 값입니다. canceled가 true, false가 아니면(대문자, 빈 값 등) 400 INVALID_INPUT으로 응답하고 fieldErrors에 canceled를 담습니다.
@@ -37,26 +48,6 @@ export const GetStaysQueryParams = zod.object({
 })
 
 export const GetStaysResponse = ApiResponsePageResponseStayHotelAdminResponse
-
-/**
- * 로그인한 호텔 계정(마스터·운영자)의 호텔에 이용(객실, 이용객, 기간, 인원)을 등록합니다. 객실과 이용객은 로그인한 계정의 호텔에 속해야 하며, 없는 id와 다른 호텔의 id는 각각 404 ROOM_NOT_FOUND, GUEST_NOT_FOUND로 응답합니다. 기간은 날짜 단위로 체크인 날짜부터 체크아웃 날짜 전날까지 묵는 것으로 보고(체크아웃 날은 비어 있음), 1박 이상 30박 이하이며 체크인 날짜는 오늘(한국 시간)이거나 그 뒤여야 합니다. 인원은 1명 이상이고 객실의 최대 인원 이하입니다. 기간·인원 규칙을 어기면 400 INVALID_INPUT으로 응답하고 fieldErrors에 틀린 항목(checkInDate, checkOutDate, guestCount)을 모두 담습니다. 판단 순서는 객실, 이용객, 기간·인원, 겹침 순입니다. 같은 객실에 기간이 하루라도 겹치는 취소하지 않은 이용이 있으면 409 STAY_PERIOD_OVERLAPPED로 응답합니다. 취소한 이용과는 겹쳐도 됩니다. 체크아웃 날에 다음 이용이 체크인하는 것은 겹치지 않습니다(예: 11월 1일~3일과 3일~5일). 동시에 겹치는 기간을 등록하면 하나만 등록되고 나머지는 409 STAY_PERIOD_OVERLAPPED입니다. 등록은 객실 상태와 관계없고 객실 상태를 바꾸지 않습니다.
- * @summary 이용 등록
- */
-export const CreateStayBody = StayCreateHotelAdminRequest
-
-export const CreateStayResponse = ApiResponseStayHotelAdminResponse
-
-/**
- * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 이용을 취소합니다. 본문의 reason에 취소 사유를 보낼 수 있고(선택), 사유 없이 취소하려면 빈 객체({})를 보냅니다. 취소 시각, 취소를 처리한 계정(id와 그때의 이름), 사유를 기록하며 취소는 되돌릴 수 없습니다. 끝나지 않은 이용(체크아웃 날짜가 오늘(한국 시간)보다 뒤)만 취소할 수 있고, 체크아웃 날짜가 오늘이거나 지난 이용은 409 STAY_ALREADY_ENDED로 응답합니다. 이미 취소한 이용은 409 STAY_ALREADY_CANCELED로 응답하며, 끝난 이용이어도 이미 취소했으면 STAY_ALREADY_CANCELED입니다. 같은 이용을 동시에 취소하면 한 번만 기록되고 나머지는 409 STAY_ALREADY_CANCELED입니다. 취소한 이용은 겹침 검사에서 빠지므로 같은 객실에 같은 기간을 다시 등록할 수 있습니다. 취소할 때 객실 상태가 RESERVED(예약됨)이면 VACANT(공실)로 바꾸고 취소한 계정이 바꾼 것으로 상태 이력을 남기며, OCCUPIED(이용중), MAINTENANCE(정비중), VACANT(공실)이면 그대로 둡니다. 성공하면 취소 정보(cancellation)가 담긴 이용을 돌려줍니다. 없는 id와 다른 호텔의 이용 id는 모두 404 STAY_NOT_FOUND로 응답합니다. 사유가 200자를 넘으면 400 INVALID_INPUT으로 응답하고 fieldErrors에 reason을 담습니다.
- * @summary 이용 취소
- */
-export const CancelStayParams = zod.object({
-  "stayId": zod.int()
-})
-
-export const CancelStayBody = StayCancelHotelAdminRequest
-
-export const CancelStayResponse = ApiResponseStayHotelAdminResponse
 
 /**
  * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 이용 하나를 조회합니다. 취소한 이용도 조회하며 cancellation에 취소 정보가 담깁니다. 객실 이름과 이용객의 이름·전화번호는 조회하는 시점의 값입니다. 없는 id와 다른 호텔의 이용 id는 모두 404 STAY_NOT_FOUND로 응답합니다.

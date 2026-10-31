@@ -10,7 +10,6 @@ import * as zod from 'zod';
 import {
   ApiResponseGuestHotelAdminResponse,
   ApiResponsePageResponseGuestHotelAdminResponse,
-  GuestCreateHotelAdminRequest,
   GuestUpdateHotelAdminRequest
 } from '../schemas';
 
@@ -26,7 +25,7 @@ export const GetGuestParams = zod.object({
 export const GetGuestResponse = ApiResponseGuestHotelAdminResponse
 
 /**
- * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 이용객의 이름, 전화번호, 이메일을 요청 값으로 바꿉니다. 입력값 규칙은 이용객 등록과 같습니다. 조회할 때 받은 version을 함께 보냅니다. 그사이 다른 사용자가 먼저 수정해 version이 다르면 409 GUEST_MODIFIED로 응답하므로, 다시 조회한 뒤 수정합니다. 동시에 같은 version으로 수정하면 하나만 반영되고 나머지는 409 GUEST_MODIFIED입니다. 같은 호텔의 다른 이용객과 하이픈을 뺀 전화번호 숫자가 같아지면 409 GUEST_PHONE_DUPLICATED로 응답합니다. 자기 전화번호를 그대로 두거나 하이픈 모양만 바꾸는 수정은 됩니다. version이 다르면서 전화번호도 겹치면 GUEST_MODIFIED입니다. 성공하면 수정한 이용객을 최신 version과 함께 돌려주며, 바뀐 값이 없으면 version도 그대로입니다. 없는 id와 다른 호텔의 이용객 id는 모두 404 GUEST_NOT_FOUND로 응답합니다.
+ * 로그인한 호텔 계정(마스터·운영자)의 호텔에 속한 이용객의 이름, 전화번호, 이메일을 요청 값으로 바꿉니다. 이름, 전화번호, 이메일은 앞뒤 공백을 지운 뒤 검사하고 저장하며, 최대 길이도 지운 값으로 셉니다. 공백만 있는 값은 빈 값으로 봅니다. 전화번호와 이메일은 앞뒤 공백만 지우고 입력한 모양 그대로(하이픈 위치, 대소문자 포함) 저장합니다. 다른 호텔의 이용객과는 전화번호가 같아도 되고, 이름과 이메일은 같은 호텔에서도 겹쳐도 됩니다. 조회할 때 받은 version을 함께 보냅니다. 그사이 다른 사용자가 먼저 수정해 version이 다르면 409 GUEST_MODIFIED로 응답하므로, 다시 조회한 뒤 수정합니다. 동시에 같은 version으로 수정하면 하나만 반영되고 나머지는 409 GUEST_MODIFIED입니다. 같은 호텔의 다른 이용객과 하이픈을 뺀 전화번호 숫자가 같아지면 409 GUEST_PHONE_DUPLICATED로 응답합니다. 자기 전화번호를 그대로 두거나 하이픈 모양만 바꾸는 수정은 됩니다. version이 다르면서 전화번호도 겹치면 GUEST_MODIFIED입니다. 성공하면 수정한 이용객을 최신 version과 함께 돌려주며, 바뀐 값이 없으면 version도 그대로입니다. 없는 id와 다른 호텔의 이용객 id는 모두 404 GUEST_NOT_FOUND로 응답합니다.
  * @summary 이용객 수정
  */
 export const UpdateGuestParams = zod.object({
@@ -60,12 +59,4 @@ export const GetGuestsQueryParams = zod.object({
 })
 
 export const GetGuestsResponse = ApiResponsePageResponseGuestHotelAdminResponse
-
-/**
- * 로그인한 호텔 계정(마스터·운영자)의 호텔에 이용객을 등록합니다. 대상 호텔은 로그인한 계정의 호텔이며 요청으로 정하지 않습니다. 이름, 전화번호, 이메일은 앞뒤 공백을 지운 뒤 검사하고 저장하며, 최대 길이도 지운 값으로 셉니다. 공백만 있는 값은 빈 값으로 봅니다. 전화번호와 이메일은 앞뒤 공백만 지우고 입력한 모양 그대로(하이픈 위치, 대소문자 포함) 저장합니다. 같은 호텔에 하이픈을 뺀 숫자가 같은 전화번호의 이용객(예: 010-1234-5678과 01012345678)이 이미 있으면 409 GUEST_PHONE_DUPLICATED로 응답합니다. 다른 호텔의 이용객과는 전화번호가 같아도 되고, 이름과 이메일은 같은 호텔에서도 겹쳐도 됩니다. 같은 전화번호로 동시에 여러 번 등록해도 하나만 등록되고 나머지는 409 GUEST_PHONE_DUPLICATED입니다. 응답은 등록한 이용객이고 version은 0입니다.
- * @summary 이용객 등록
- */
-export const CreateGuestBody = GuestCreateHotelAdminRequest
-
-export const CreateGuestResponse = ApiResponseGuestHotelAdminResponse
 
