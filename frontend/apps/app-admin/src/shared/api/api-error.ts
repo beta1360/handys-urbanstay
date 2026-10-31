@@ -10,6 +10,7 @@ export const API_ERROR_CODES = {
   hotelDuplicated: "HOTEL_DUPLICATED",
   hotelModified: "HOTEL_MODIFIED",
   loginIdDuplicated: "LOGIN_ID_DUPLICATED",
+  hotelAdminModified: "HOTEL_ADMIN_MODIFIED",
 } as const;
 
 export const getApiError = createApiErrorReader(ErrorApiResponse);

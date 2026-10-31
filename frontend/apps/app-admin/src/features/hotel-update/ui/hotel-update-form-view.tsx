@@ -5,7 +5,6 @@ import { ButtonLink } from "@repo/admin-kit/link";
 import { HotelInfoFields } from "@/entities/hotel";
 import type { HotelInfoField } from "@/entities/hotel";
 import { COMMON_MESSAGES } from "@/shared/config";
-import { HOTEL_UPDATE_FORM_MESSAGES } from "../config/messages";
 import type { HotelUpdateStatus } from "../model/use-hotel-update-form";
 
 type HotelUpdateFormViewProps = {
@@ -42,7 +41,7 @@ export function HotelUpdateFormView({
             loading={status === "reloading"}
             onClick={onReload}
           >
-            {HOTEL_UPDATE_FORM_MESSAGES.reload}
+            {COMMON_MESSAGES.reload}
           </Button>
         </div>
       ) : null}
@@ -53,7 +52,7 @@ export function HotelUpdateFormView({
           loading={status === "submitting"}
           disabled={status === "reloading"}
         >
-          {HOTEL_UPDATE_FORM_MESSAGES.submit}
+          {COMMON_MESSAGES.save}
         </Button>
         <ButtonLink
           to="/hotels/$hotelId"

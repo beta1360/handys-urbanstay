@@ -30,7 +30,6 @@ import {
   stringifyHotelPathParams,
 } from "@/entities/hotel";
 import type { HotelInfoField } from "@/entities/hotel";
-import { HOTEL_UPDATE_FORM_MESSAGES } from "@/features/hotel-update";
 import {
   API_ERROR_CODES,
   hotelListQueryKey,
@@ -241,7 +240,7 @@ function getInvalidFields() {
 
 function getSubmitButton() {
   return screen.getByRole("button", {
-    name: HOTEL_UPDATE_FORM_MESSAGES.submit,
+    name: COMMON_MESSAGES.save,
   });
 }
 
@@ -251,13 +250,13 @@ function getCancelLink() {
 
 function queryReloadButton() {
   return screen.queryByRole("button", {
-    name: HOTEL_UPDATE_FORM_MESSAGES.reload,
+    name: COMMON_MESSAGES.reload,
   });
 }
 
 function getReloadButton() {
   return screen.getByRole("button", {
-    name: HOTEL_UPDATE_FORM_MESSAGES.reload,
+    name: COMMON_MESSAGES.reload,
   });
 }
 

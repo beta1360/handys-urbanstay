@@ -6,6 +6,7 @@ import {
   useHotel,
 } from "@/entities/hotel";
 import { HotelDetailActions } from "./hotel-detail-actions";
+import { HotelMasterPanel } from "./hotel-master-panel";
 
 type HotelDetailProps = {
   hotelId: number;
@@ -36,6 +37,7 @@ export function HotelDetail({ hotelId }: HotelDetailProps) {
         <>
           <HotelDetailActions editHotelId={state.hotel.id} />
           <HotelInformation hotel={state.hotel} />
+          <HotelMasterPanel hotelId={state.hotel.id} />
         </>
       );
   }

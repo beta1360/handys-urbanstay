@@ -6,10 +6,12 @@ import {
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FORM_VALIDATION_MESSAGES } from "@repo/admin-kit/config";
+import { showToast } from "@repo/admin-kit/toast";
 import {
   HOTEL_FIELD_LABELS,
   HOTEL_INFORMATION_MESSAGES,
@@ -18,22 +20,38 @@ import {
   parseHotelPathParams,
   stringifyHotelPathParams,
 } from "@/entities/hotel";
-import { API_ERROR_CODES } from "@/shared/api";
-import type { Hotel } from "@/shared/api";
+import {
+  HOTEL_MASTER_FIELD_LABELS,
+  HOTEL_MASTER_INFO_MESSAGES,
+  HOTEL_MASTER_LOAD_MESSAGES,
+} from "@/entities/hotel-master";
+import { HOTEL_MASTER_PASSWORD_RESET_MESSAGES } from "@/features/hotel-master-password-reset";
+import { API_ERROR_CODES, resetHotelMasterPassword } from "@/shared/api";
+import type { Hotel, HotelMaster } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { HOTEL_DETAIL_ACTION_MESSAGES } from "@/widgets/hotel-detail";
 import { HotelDetailPage } from "./hotel-detail-page";
 
-const { fetchHotel } = vi.hoisted(() => ({ fetchHotel: vi.fn() }));
+const { fetchHotel, fetchHotelMaster } = vi.hoisted(() => ({
+  fetchHotel: vi.fn(),
+  fetchHotelMaster: vi.fn(),
+}));
 
 vi.mock("@/shared/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/api")>();
   return {
     ...actual,
     fetchHotel: (hotelId: number) => fetchHotel(hotelId),
+    fetchHotelMaster: (hotelId: number) => fetchHotelMaster(hotelId),
+    resetHotelMasterPassword: vi.fn(),
   };
 });
+
+vi.mock("@repo/admin-kit/toast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@repo/admin-kit/toast")>()),
+  showToast: vi.fn(),
+}));
 
 const HOTEL: Hotel = {
   id: 1,
@@ -44,9 +62,18 @@ const HOTEL: Hotel = {
   version: 3,
 };
 
+const MASTER: HotelMaster = {
+  id: 7,
+  loginId: "master@example.com",
+  name: "홍길동",
+  version: 2,
+};
+
 const MULTILINE_DESCRIPTION = "바다가 보이는 호텔입니다.\n\n조식을 제공합니다.";
 
 const EDIT_PAGE_TEXT = "호텔 수정 화면";
+
+const MASTER_EDIT_PAGE_TEXT = "마스터 수정 화면";
 
 function hotelPath(hotelId: number | string) {
   return `/hotels/${hotelId}`;
@@ -100,11 +127,20 @@ function renderHotelDetailPage(initialEntries = [hotelPath(HOTEL.id)]) {
     path: "edit",
     component: () => <p>{EDIT_PAGE_TEXT}</p>,
   });
+  const masterEditRoute = createRoute({
+    getParentRoute: () => hotelRoute,
+    path: "master/edit",
+    component: () => <p>{MASTER_EDIT_PAGE_TEXT}</p>,
+  });
   const router = createRouter({
     routeTree: rootRoute.addChildren([
       layoutRoute.addChildren([
         hotelListRoute,
-        hotelRoute.addChildren([hotelDetailRoute, hotelEditRoute]),
+        hotelRoute.addChildren([
+          hotelDetailRoute,
+          hotelEditRoute,
+          masterEditRoute,
+        ]),
       ]),
     ]),
     history: createMemoryHistory({
@@ -147,8 +183,15 @@ async function expectNotFound() {
   expect(screen.queryByRole("definition")).not.toBeInTheDocument();
 }
 
+function findMasterRegion() {
+  return screen.findByRole("region", {
+    name: HOTEL_MASTER_INFO_MESSAGES.legend,
+  });
+}
+
 beforeEach(() => {
   fetchHotel.mockResolvedValue(HOTEL);
+  fetchHotelMaster.mockReturnValue(new Promise<never>(() => {}));
 });
 
 afterEach(() => {
@@ -237,6 +280,7 @@ describe("HotelDetailPage 찾을 수 없음", () => {
 
       await expectNotFound();
       expect(fetchHotel).not.toHaveBeenCalled();
+      expect(fetchHotelMaster).not.toHaveBeenCalled();
     },
   );
 
@@ -351,5 +395,168 @@ describe("HotelDetailPage 목록으로", () => {
     await vi.waitFor(() => {
       expect(router.state.location.href).toBe("/hotels");
     });
+  });
+});
+
+describe("HotelDetailPage 마스터 계정", () => {
+  it("호텔 내용 아래 마스터 계정 묶음에 이름과 아이디를 보여준다", async () => {
+    fetchHotelMaster.mockResolvedValue(MASTER);
+    renderHotelDetailPage();
+
+    const region = await findMasterRegion();
+    const master = within(region);
+    expect(await master.findByText(MASTER.loginId)).toBeInTheDocument();
+    expect(master.getAllByRole("term").map((term) => term.textContent)).toEqual(
+      [HOTEL_MASTER_FIELD_LABELS.name, HOTEL_MASTER_FIELD_LABELS.loginId],
+    );
+    expect(
+      master.getAllByRole("definition").map((item) => item.textContent),
+    ).toEqual([MASTER.name, MASTER.loginId]);
+    expect(
+      screen.getByText(HOTEL.address).compareDocumentPosition(region) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(fetchHotelMaster).toHaveBeenCalledExactlyOnceWith(HOTEL.id);
+  });
+
+  it("마스터 정보를 보여줄 때만 묶음에 마스터 정보 수정 버튼을 두고, 누르면 마스터 수정 화면으로 이동한다", async () => {
+    const user = userEvent.setup();
+    let showMaster: (master: HotelMaster) => void = () => {};
+    fetchHotelMaster.mockReturnValue(
+      new Promise((resolve) => {
+        showMaster = resolve;
+      }),
+    );
+    const router = renderHotelDetailPage();
+    const master = within(await findMasterRegion());
+    const editName = { name: HOTEL_MASTER_INFO_MESSAGES.edit };
+    expect(master.queryByRole("link", editName)).not.toBeInTheDocument();
+
+    showMaster(MASTER);
+    const editLink = await master.findByRole("link", editName);
+    expect(editLink).toHaveAttribute(
+      "href",
+      `${hotelPath(HOTEL.id)}/master/edit`,
+    );
+
+    await user.click(editLink);
+
+    expect(await screen.findByText(MASTER_EDIT_PAGE_TEXT)).toBeInTheDocument();
+    expect(router.state.location.href).toBe(
+      `${hotelPath(HOTEL.id)}/master/edit`,
+    );
+  });
+
+  it("마스터 정보를 불러오는 동안 묶음 안에 불러오는 중 문구를 보여준다", async () => {
+    renderHotelDetailPage();
+
+    const region = await findMasterRegion();
+    expect(within(region).getByRole("status")).toHaveTextContent(
+      COMMON_MESSAGES.loading,
+    );
+    expect(screen.getByText(HOTEL.address)).toBeInTheDocument();
+  });
+
+  it("마스터 정보를 불러오지 못하면 묶음 안에 오류 문구와 다시 시도 버튼을 보여주고, 누르면 마스터만 다시 조회한다", async () => {
+    const user = userEvent.setup();
+    fetchHotelMaster
+      .mockRejectedValueOnce(createApiError(500, "INTERNAL_SERVER_ERROR"))
+      .mockResolvedValueOnce(MASTER);
+    renderHotelDetailPage();
+
+    const master = within(await findMasterRegion());
+    expect(await master.findByRole("alert")).toHaveTextContent(
+      HOTEL_MASTER_LOAD_MESSAGES.loadFailed,
+    );
+    expect(screen.getByText(HOTEL.address)).toBeInTheDocument();
+
+    await user.click(master.getByRole("button", { name: COMMON_MESSAGES.retry }));
+
+    expect(await master.findByText(MASTER.loginId)).toBeInTheDocument();
+    expect(master.queryByRole("alert")).not.toBeInTheDocument();
+    expect(fetchHotelMaster).toHaveBeenCalledTimes(2);
+    expect(fetchHotel).toHaveBeenCalledOnce();
+  });
+});
+
+describe("HotelDetailPage 마스터 비밀번호 재설정", () => {
+  const RESET_MESSAGE = "마스터 비밀번호를 재설정했습니다.";
+
+  async function findPasswordReset() {
+    fetchHotelMaster.mockResolvedValue(MASTER);
+    renderHotelDetailPage();
+    const master = within(await findMasterRegion());
+    const form = within(
+      await master.findByRole("form", {
+        name: HOTEL_MASTER_PASSWORD_RESET_MESSAGES.submit,
+      }),
+    );
+    return {
+      user: userEvent.setup(),
+      password: form.getByLabelText(
+        HOTEL_MASTER_PASSWORD_RESET_MESSAGES.passwordLabel,
+      ),
+      submit: form.getByRole("button", {
+        name: HOTEL_MASTER_PASSWORD_RESET_MESSAGES.submit,
+      }),
+    };
+  }
+
+  it("묶음 안에 새 비밀번호 칸과 세션이 끊긴다는 안내를 두고, 재설정에 성공하면 입력 그대로 보내고 서버 문구 토스트를 띄운 뒤 칸을 비우고 마스터 정보를 다시 불러온다", async () => {
+    vi.mocked(resetHotelMasterPassword).mockResolvedValue({
+      message: RESET_MESSAGE,
+    });
+    const { user, password, submit } = await findPasswordReset();
+    expect(password).toHaveAttribute("type", "password");
+    expect(password).toHaveAttribute("autocomplete", "new-password");
+    expect(password).toHaveAccessibleDescription(
+      HOTEL_MASTER_PASSWORD_RESET_MESSAGES.passwordHint,
+    );
+
+    await user.type(password, " master123 ");
+    await user.click(submit);
+
+    await vi.waitFor(() => {
+      expect(password).toHaveValue("");
+    });
+    expect(resetHotelMasterPassword).toHaveBeenCalledExactlyOnceWith(
+      HOTEL.id,
+      { password: " master123 " },
+    );
+    expect(showToast).toHaveBeenCalledExactlyOnceWith({
+      type: "success",
+      message: RESET_MESSAGE,
+    });
+    expect(fetchHotelMaster).toHaveBeenCalledTimes(2);
+  });
+
+  it("비워 두고 재설정하면 칸 아래에 필수 오류를 보여주고 요청하지 않는다", async () => {
+    const { user, password, submit } = await findPasswordReset();
+
+    await user.click(submit);
+
+    expect(password).toHaveAccessibleDescription(
+      `${HOTEL_MASTER_PASSWORD_RESET_MESSAGES.passwordHint} ${FORM_VALIDATION_MESSAGES.required}`,
+    );
+    expect(password).toHaveFocus();
+    expect(resetHotelMasterPassword).not.toHaveBeenCalled();
+  });
+
+  it("칸과 묶이지 않는 오류 응답이면 서버 문구를 오류 토스트로 보여주고 입력한 값은 그대로 둔다", async () => {
+    vi.mocked(resetHotelMasterPassword).mockRejectedValue(
+      createApiError(500, "INTERNAL_SERVER_ERROR"),
+    );
+    const { user, password, submit } = await findPasswordReset();
+
+    await user.type(password, "master123");
+    await user.click(submit);
+
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalledExactlyOnceWith({
+        type: "error",
+        message: "요청을 처리하지 못했습니다.",
+      });
+    });
+    expect(password).toHaveValue("master123");
   });
 });
