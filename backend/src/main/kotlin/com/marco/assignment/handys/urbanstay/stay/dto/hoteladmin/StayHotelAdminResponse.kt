@@ -17,6 +17,16 @@ data class StayHotelAdminResponse(
 	val checkOutDate: LocalDate,
 	@Schema(description = "openapi.schema.StayHotelAdminResponse.guestCount", example = "2")
 	val guestCount: Int,
+	@Schema(description = "openapi.schema.StayHotelAdminResponse.roomRate", example = "100000")
+	val roomRate: Int,
+	@Schema(description = "openapi.schema.StayHotelAdminResponse.nights", example = "2")
+	val nights: Int,
+	@Schema(description = "openapi.schema.StayHotelAdminResponse.baseAmount", example = "200000")
+	val baseAmount: Int,
+	@Schema(description = "openapi.schema.StayHotelAdminResponse.discountAmount", example = "0")
+	val discountAmount: Int,
+	@Schema(description = "openapi.schema.StayHotelAdminResponse.totalAmount", example = "200000")
+	val totalAmount: Int,
 	@Schema(description = "openapi.schema.StayHotelAdminResponse.cancellation")
 	val cancellation: StayCancellationHotelAdminResponse?,
 ) {
@@ -31,6 +41,11 @@ data class StayHotelAdminResponse(
 				checkInDate = stay.checkInDate,
 				checkOutDate = stay.checkOutDate,
 				guestCount = stay.guestCount,
+				roomRate = stay.roomRate,
+				nights = stay.nights,
+				baseAmount = stay.baseAmount,
+				discountAmount = stay.discountAmount,
+				totalAmount = stay.totalAmount,
 				cancellation = StayCancellationHotelAdminResponse.from(stay),
 			)
 	}

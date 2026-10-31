@@ -18,7 +18,9 @@ import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRepository
 import com.marco.assignment.handys.urbanstay.room.entity.Room
 import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
+import com.marco.assignment.handys.urbanstay.room.entity.RoomType
 import com.marco.assignment.handys.urbanstay.room.repository.RoomRepository
+import com.marco.assignment.handys.urbanstay.room.repository.RoomTypeRepository
 import com.marco.assignment.handys.urbanstay.stay.entity.Stay
 import com.marco.assignment.handys.urbanstay.stay.exception.StayErrorCode
 import com.marco.assignment.handys.urbanstay.stay.repository.StayRepository
@@ -53,6 +55,7 @@ import java.nio.charset.StandardCharsets
 import java.sql.Timestamp
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
 
@@ -72,6 +75,11 @@ class StayHotelAdminControllerTest {
 
 	@Autowired
 	private lateinit var roomRepository: RoomRepository
+
+	@Autowired
+	private lateinit var roomTypeRepository: RoomTypeRepository
+
+	private val roomTypes = mutableMapOf<Long, RoomType>()
 
 	@Autowired
 	private lateinit var guestRepository: GuestRepository
@@ -366,11 +374,16 @@ class StayHotelAdminControllerTest {
 		hotelAdminRepository.save(HotelAdmin(hotel, loginId, PASSWORD_HASH, "계정", role))
 
 	private fun saveRoom(hotel: Hotel, name: String): Room =
-		roomRepository.save(Room(hotel, name, "스탠다드", CAPACITY, null, null, LocalTime.of(15, 0), LocalTime.of(11, 0)))
+		roomRepository.save(Room(hotel, name, roomType(hotel), null, null))
+
+	private fun roomType(hotel: Hotel): RoomType =
+		roomTypes.getOrPut(checkNotNull(hotel.id)) {
+			roomTypeRepository.save(RoomType(hotel, "스탠다드", CAPACITY, ROOM_RATE, LocalTime.of(15, 0), LocalTime.of(11, 0)))
+		}
 
 	private fun saveGuest(hotel: Hotel, name: String, phone: String): Guest = guestRepository.save(Guest(hotel, name, phone, "guest@example.com"))
 
-	private fun saveStay(room: Room, guest: Guest, checkIn: LocalDate, checkOut: LocalDate): Stay = stayRepository.save(Stay(room, guest, checkIn, checkOut, 2))
+	private fun saveStay(room: Room, guest: Guest, checkIn: LocalDate, checkOut: LocalDate): Stay = stayRepository.save(Stay(room, guest, checkIn, checkOut, 2, ROOM_RATE))
 
 	private fun stayIds(room: Room): List<Long> = jdbcTemplate.queryForList(SELECT_STAY_IDS, Long::class.javaObjectType, room.id).filterNotNull()
 
@@ -416,6 +429,11 @@ class StayHotelAdminControllerTest {
 					"checkInDate" to checkIn.toString(),
 					"checkOutDate" to checkOut.toString(),
 					"guestCount" to guestCount,
+					"roomRate" to ROOM_RATE,
+					"nights" to ChronoUnit.DAYS.between(checkIn, checkOut),
+					"baseAmount" to ROOM_RATE * ChronoUnit.DAYS.between(checkIn, checkOut),
+					"discountAmount" to 0,
+					"totalAmount" to ROOM_RATE * ChronoUnit.DAYS.between(checkIn, checkOut),
 					"cancellation" to cancellation,
 				),
 			),
@@ -452,6 +470,7 @@ class StayHotelAdminControllerTest {
 		private const val HOTEL_PHONE = "02-1234-5678"
 		private const val PASSWORD_HASH = "password-hash"
 		private const val CAPACITY = 4
+		private const val ROOM_RATE = 100000
 		private const val XSRF_COOKIE = "XSRF-TOKEN"
 		private const val XSRF_HEADER = "X-XSRF-TOKEN"
 		private const val FIELD_ERRORS = "fieldErrors"
@@ -470,6 +489,7 @@ class StayHotelAdminControllerTest {
 			"delete from room_status_history where room_id in (select id from room where hotel_id = ?)",
 			"delete from guest where hotel_id = ?",
 			"delete from room where hotel_id = ?",
+			"delete from room_type where hotel_id = ?",
 			"delete from hotel_admin where hotel_id = ?",
 		)
 	}

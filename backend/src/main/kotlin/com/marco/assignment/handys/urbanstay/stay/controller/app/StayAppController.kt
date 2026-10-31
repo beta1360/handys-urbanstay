@@ -64,7 +64,7 @@ class StayAppController(
 	fun createStay(@Valid @RequestBody request: StayCreateAppRequest): ApiResponse<StayAppResponse> {
 		val stay = stayService.reserve(
 			hotelId = request.hotelId,
-			roomType = request.roomType,
+			roomTypeId = request.roomTypeId,
 			checkInDate = request.checkInDate,
 			checkOutDate = request.checkOutDate,
 			guestCount = request.guestCount,

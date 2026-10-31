@@ -10,7 +10,9 @@ import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRepository
 import com.marco.assignment.handys.urbanstay.room.entity.Room
 import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
+import com.marco.assignment.handys.urbanstay.room.entity.RoomType
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
+import com.marco.assignment.handys.urbanstay.room.repository.RoomTypeRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -42,6 +44,9 @@ class RoomServiceTest {
 	private lateinit var hotelAdminRepository: HotelAdminRepository
 
 	@Autowired
+	private lateinit var roomTypeRepository: RoomTypeRepository
+
+	@Autowired
 	private lateinit var transactionManager: PlatformTransactionManager
 
 	@Autowired
@@ -57,10 +62,14 @@ class RoomServiceTest {
 
 	private lateinit var hotelAdmin: HotelAdmin
 
+	private lateinit var roomTypes: Map<String, RoomType>
+
 	@BeforeEach
 	fun createHotel() {
 		hotel = hotelRepository.save(Hotel("어반스테이 $suffix", "서울 $suffix", PHONE, null)).also { createdHotelIds += checkNotNull(it.id) }
 		hotelAdmin = hotelAdminRepository.save(HotelAdmin(hotel, "master-$suffix@test.local", "password-hash", "마스터", HotelAdminRole.MASTER))
+		roomTypes = listOf(FIRST_TYPE, SECOND_TYPE, FIRST_UPDATE_TYPE, SECOND_UPDATE_TYPE)
+			.associateWith { roomTypeRepository.save(RoomType(hotel, it, 2, 100000, CHECK_IN, CHECK_OUT)) }
 	}
 
 	@AfterEach
@@ -69,6 +78,7 @@ class RoomServiceTest {
 		createdHotelIds.forEach {
 			jdbcTemplate.update(DELETE_HISTORIES, it)
 			jdbcTemplate.update(DELETE_ROOMS, it)
+			jdbcTemplate.update(DELETE_ROOM_TYPES, it)
 			jdbcTemplate.update(DELETE_HOTEL_ADMINS, it)
 		}
 		hotelRepository.deleteAllByIdInBatch(createdHotelIds)
@@ -158,12 +168,9 @@ class RoomServiceTest {
 			roomId = roomId,
 			version = 0,
 			name = name,
-			type = type,
-			capacity = 2,
+			roomTypeId = checkNotNull(roomTypes.getValue(type).id),
 			floor = 1,
 			description = null,
-			checkInTime = CHECK_IN,
-			checkOutTime = CHECK_OUT,
 		)
 
 	private fun create(name: String, type: String): Room =
@@ -171,12 +178,9 @@ class RoomServiceTest {
 			hotelId = checkNotNull(hotel.id),
 			hotelAdminId = checkNotNull(hotelAdmin.id),
 			name = name,
-			type = type,
-			capacity = 2,
+			roomTypeId = checkNotNull(roomTypes.getValue(type).id),
 			floor = 1,
 			description = null,
-			checkInTime = CHECK_IN,
-			checkOutTime = CHECK_OUT,
 		)
 
 	private fun <T> runSecondWhileFirstUncommitted(first: () -> Unit, second: () -> T, lockedTable: String): Result<T> {
@@ -230,8 +234,9 @@ class RoomServiceTest {
 		private const val POLL_INTERVAL_MILLIS = 20L
 		private const val DELETE_HISTORIES = "delete from room_status_history where room_id in (select id from room where hotel_id = ?)"
 		private const val DELETE_ROOMS = "delete from room where hotel_id = ?"
+		private const val DELETE_ROOM_TYPES = "delete from room_type where hotel_id = ?"
 		private const val DELETE_HOTEL_ADMINS = "delete from hotel_admin where hotel_id = ?"
-		private const val SELECT_ROOMS = "select name, type from room where hotel_id = ? order by id"
+		private const val SELECT_ROOMS = "select r.name, t.name as type from room r join room_type t on t.id = r.room_type_id where r.hotel_id = ? order by r.id"
 		private const val SELECT_VERSION = "select version from room where id = ?"
 		private const val SELECT_STATUS_VERSION = "select status, version from room where id = ?"
 		private const val SELECT_HISTORIES = """

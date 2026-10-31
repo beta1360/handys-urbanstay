@@ -1,6 +1,5 @@
 package com.marco.assignment.handys.urbanstay.room.dto.hoteladmin
 
-import com.marco.assignment.handys.urbanstay.common.config.JacksonConfig
 import com.marco.assignment.handys.urbanstay.common.request.TrimmedStringDeserializer
 import com.marco.assignment.handys.urbanstay.room.entity.Room
 import io.swagger.v3.oas.annotations.media.Schema
@@ -10,7 +9,6 @@ import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import org.hibernate.validator.constraints.Length
 import tools.jackson.databind.annotation.JsonDeserialize
-import java.time.LocalTime
 
 data class RoomCreateHotelAdminRequest(
 	@JsonDeserialize(using = TrimmedStringDeserializer::class)
@@ -18,15 +16,8 @@ data class RoomCreateHotelAdminRequest(
 	@Length(max = Room.NAME_MAX_LENGTH, message = "{validation.max-length}")
 	@Schema(description = "openapi.schema.RoomCreateHotelAdminRequest.name", example = "101", maxLength = Room.NAME_MAX_LENGTH)
 	val name: String,
-	@JsonDeserialize(using = TrimmedStringDeserializer::class)
-	@NotBlank(message = "{validation.required}")
-	@Length(max = Room.TYPE_MAX_LENGTH, message = "{validation.max-length}")
-	@Schema(description = "openapi.schema.RoomCreateHotelAdminRequest.type", example = "스탠다드", maxLength = Room.TYPE_MAX_LENGTH)
-	val type: String,
-	@Min(value = Room.MIN_CAPACITY, message = "{validation.min}")
-	@Max(value = Room.MAX_CAPACITY, message = "{validation.max}")
-	@Schema(description = "openapi.schema.RoomCreateHotelAdminRequest.capacity", example = "2")
-	val capacity: Int,
+	@Schema(description = "openapi.schema.RoomCreateHotelAdminRequest.roomTypeId", example = "1")
+	val roomTypeId: Long,
 	@Min(value = Room.MIN_FLOOR, message = "{validation.min}")
 	@Max(value = Room.MAX_FLOOR, message = "{validation.max}")
 	@Schema(description = "openapi.schema.RoomCreateHotelAdminRequest.floor", example = "1")
@@ -35,8 +26,4 @@ data class RoomCreateHotelAdminRequest(
 	@Size(max = Room.DESCRIPTION_MAX_LENGTH, message = "{validation.max-length}")
 	@Schema(description = "openapi.schema.RoomCreateHotelAdminRequest.description", example = "도심이 보이는 퀸 침대 객실입니다.")
 	val description: String?,
-	@Schema(description = "openapi.schema.RoomCreateHotelAdminRequest.checkInTime", example = "15:00", pattern = JacksonConfig.LOCAL_TIME_PATTERN)
-	val checkInTime: LocalTime,
-	@Schema(description = "openapi.schema.RoomCreateHotelAdminRequest.checkOutTime", example = "11:00", pattern = JacksonConfig.LOCAL_TIME_PATTERN)
-	val checkOutTime: LocalTime,
 )

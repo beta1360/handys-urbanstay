@@ -1,8 +1,9 @@
 package com.marco.assignment.handys.urbanstay.stay.service
 
+import com.marco.assignment.handys.urbanstay.room.entity.RoomType
+
 data class RoomTypeAvailability(
-	val type: String,
+	val roomType: RoomType,
 	val roomCount: Int,
-	val maxGuests: Int,
 	val availableCount: Int,
 )

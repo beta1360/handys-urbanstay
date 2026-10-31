@@ -9,6 +9,7 @@ import jakarta.persistence.FetchType
 import jakarta.persistence.ManyToOne
 import java.time.Instant
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 @Entity
 class Stay(
@@ -17,6 +18,7 @@ class Stay(
 	checkInDate: LocalDate,
 	checkOutDate: LocalDate,
 	guestCount: Int,
+	roomRate: Int,
 ) : BaseEntity() {
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -34,6 +36,21 @@ class Stay(
 		protected set
 
 	var guestCount: Int = guestCount
+		protected set
+
+	var roomRate: Int = roomRate
+		protected set
+
+	var nights: Int = ChronoUnit.DAYS.between(checkInDate, checkOutDate).toInt()
+		protected set
+
+	var baseAmount: Int = roomRate * nights
+		protected set
+
+	var discountAmount: Int = 0
+		protected set
+
+	var totalAmount: Int = baseAmount - discountAmount
 		protected set
 
 	var canceledAt: Instant? = null

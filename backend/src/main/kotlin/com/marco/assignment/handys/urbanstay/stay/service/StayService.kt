@@ -9,6 +9,7 @@ import com.marco.assignment.handys.urbanstay.guest.service.GuestService
 import com.marco.assignment.handys.urbanstay.room.entity.Room
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import com.marco.assignment.handys.urbanstay.room.service.RoomService
+import com.marco.assignment.handys.urbanstay.room.service.RoomTypeService
 import com.marco.assignment.handys.urbanstay.stay.entity.Stay
 import com.marco.assignment.handys.urbanstay.stay.exception.StayErrorCode
 import com.marco.assignment.handys.urbanstay.stay.repository.StayRepository
@@ -28,6 +29,7 @@ import java.time.temporal.ChronoUnit
 class StayService(
 	private val stayRepository: StayRepository,
 	private val roomService: RoomService,
+	private val roomTypeService: RoomTypeService,
 	private val guestService: GuestService,
 	private val hotelAdminService: HotelAdminService,
 	private val clock: Clock,
@@ -36,7 +38,7 @@ class StayService(
 	@Transactional
 	fun reserve(
 		hotelId: Long,
-		roomType: String,
+		roomTypeId: Long,
 		checkInDate: LocalDate,
 		checkOutDate: LocalDate,
 		guestCount: Int,
@@ -45,20 +47,24 @@ class StayService(
 		guestEmail: String,
 	): Stay {
 		checkPeriod(checkInDate, checkOutDate)
-		val rooms = roomService.lockRoomsByType(hotelId, roomType)
+		val roomType = roomTypeService.getRoomType(hotelId, roomTypeId)
+		val rooms = roomService.lockRoomsByType(roomTypeId)
 		val room = availableRooms(rooms, checkInDate, checkOutDate, guestCount).firstOrNull()
 			?: throw BusinessException(RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
 		val guest = guestService.getOrCreate(hotelId, guestName, guestPhone, guestEmail)
-		return translateConflicts { stayRepository.saveAndFlush(Stay(room, guest, checkInDate, checkOutDate, guestCount)) }
+		return translateConflicts { stayRepository.saveAndFlush(Stay(room, guest, checkInDate, checkOutDate, guestCount, roomType.roomRate)) }
 	}
 
 	@Transactional(readOnly = true)
 	fun getRoomTypes(hotelId: Long, checkInDate: LocalDate, checkOutDate: LocalDate, guestCount: Int): List<RoomTypeAvailability> {
 		checkPeriod(checkInDate, checkOutDate)
-		val rooms = roomService.getHotelRoomsInTypeOrder(hotelId)
+		val roomTypes = roomTypeService.getRoomTypes(hotelId)
+		val rooms = roomService.getHotelRooms(hotelId)
 		val availableIds = availableRooms(rooms, checkInDate, checkOutDate, guestCount).mapTo(HashSet()) { it.id }
-		return rooms.groupBy(Room::type).map { (type, typeRooms) ->
-			RoomTypeAvailability(type, typeRooms.size, typeRooms.maxOf(Room::capacity), typeRooms.count { it.id in availableIds })
+		val roomsByType = rooms.groupBy { it.roomType.id }
+		return roomTypes.map { roomType ->
+			val typeRooms = roomsByType[roomType.id].orEmpty()
+			RoomTypeAvailability(roomType, typeRooms.size, typeRooms.count { it.id in availableIds })
 		}
 	}
 
@@ -109,7 +115,7 @@ class StayService(
 		}
 
 	private fun availableRooms(rooms: List<Room>, checkInDate: LocalDate, checkOutDate: LocalDate, guestCount: Int): List<Room> {
-		val candidates = rooms.filter { it.capacity >= guestCount }
+		val candidates = rooms.filter { it.roomType.capacity >= guestCount }
 		if (candidates.isEmpty()) {
 			return emptyList()
 		}

@@ -41,7 +41,8 @@ class SecurityConfig(
 			.authorizeHttpRequests { registry ->
 				PUBLIC_ADMIN_APIS.forEach { registry.requestMatchers(it.method, it.path).permitAll() }
 				registry.requestMatchers(APP_ADMIN_PATTERN).hasRole(Role.APP_ADMIN.name)
-					.requestMatchers(HOTEL_MASTER_PATTERN).hasRole(Role.HOTEL_MASTER.name)
+				HOTEL_MASTER_APIS.forEach { registry.requestMatchers(it.method, it.path).hasRole(Role.HOTEL_MASTER.name) }
+				registry.requestMatchers(HOTEL_MASTER_PATTERN).hasRole(Role.HOTEL_MASTER.name)
 					.requestMatchers(HOTEL_ADMIN_PATTERN).hasRole(Role.HOTEL_ADMIN.name)
 			}
 			.csrf { it.spa().csrfTokenRepository(adminCsrfTokenRepository) }
@@ -72,12 +73,18 @@ class SecurityConfig(
 			.requestCache { it.requestCache(NullRequestCache()) }
 			.exceptionHandling { it.authenticationEntryPoint(securityErrorHandler).accessDeniedHandler(securityErrorHandler) }
 
-	data class PublicApi(val method: HttpMethod, val path: String)
+	data class AdminApi(val method: HttpMethod, val path: String)
 
 	companion object {
 		val PUBLIC_ADMIN_APIS = listOf(
-			PublicApi(HttpMethod.POST, ApiPaths.APP_ADMIN + ApiPaths.AUTH + ApiPaths.LOGIN),
-			PublicApi(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.AUTH + ApiPaths.LOGIN),
+			AdminApi(HttpMethod.POST, ApiPaths.APP_ADMIN + ApiPaths.AUTH + ApiPaths.LOGIN),
+			AdminApi(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.AUTH + ApiPaths.LOGIN),
+		)
+		private val HOTEL_MASTER_APIS = listOf(
+			AdminApi(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOM_TYPES),
+			AdminApi(HttpMethod.PUT, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOM_TYPES + "/*"),
+			AdminApi(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOMS),
+			AdminApi(HttpMethod.PUT, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOMS + "/*"),
 		)
 		private const val APP_PATTERN = "${ApiPaths.APP}/**"
 		private const val APP_ADMIN_PATTERN = "${ApiPaths.APP_ADMIN}/**"

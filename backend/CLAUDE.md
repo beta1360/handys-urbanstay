@@ -58,7 +58,7 @@ urbanstay/
     - 요청 파라미터(쿼리·경로)의 `LocalDate`도 `YYYY-MM-DD`만 받는다. 모든 앱에 걸리는 전역 설정 `spring.mvc.format.date=iso`(`ISO_LOCAL_DATE`)가 지역 형식(`11/2/26`), 오프셋이 붙은 값(`2026-11-02+09:00`), `20261102`를 `validation.type`으로 막는다(`StayAppControllerTest`). 지금 날짜 파라미터는 게스트 앱 객실 유형 목록의 `checkInDate`·`checkOutDate`뿐이다.
   - `LocalTime`은 시와 분이 두 자리씩인 `HH:mm` 문자열(`00:00`~`23:59`, 예: `15:00`, `09:30`)만 받는다. 초가 붙은 값(`15:00:00`), 한 자리 시(`9:30`), `24:00`, 앞뒤 공백이 붙은 값, 숫자, 배열은 `validation.type`이다(`isoDateTimeModule`에 등록한 `ResolverStyle.STRICT`의 `HH:mm` 포매터). 응답도 같은 포매터의 `LocalTimeSerializer`(`isoDateTimeModule`에 등록)로 `HH:mm` 문자열이다. Jackson 기본 직렬화는 `15:00:00`이다.
     - 요청·응답의 `LocalTime` 필드에는 `@Schema(pattern = JacksonConfig.LOCAL_TIME_PATTERN, example = "15:00")`를 붙인다. springdoc 기본 스키마(`type: string`, `format: time-local`)에 pattern이 더해져 orval zod가 서버와 같은 규칙으로 검사한다.
-    - DB 컬럼은 `time`이고 CHECK 제약(`extract(second from 컬럼) = 0`)으로 초가 있는 값을 막는다. 엔티티도 분 단위로 잘라 저장한다(예: `Room`).
+    - DB 컬럼은 `time`이고 CHECK 제약(`extract(second from 컬럼) = 0`)으로 초가 있는 값을 막는다. 엔티티도 분 단위로 잘라 저장한다(예: `RoomType`).
   - Jackson의 스칼라 강제 변환은 끈다. 숫자·불리언을 문자열로, 문자열을 숫자·불리언으로, 실수를 정수로 바꾸지 않고 `validation.type`으로 응답한다. 문자열 대상은 `common/config/JacksonConfig`가, 나머지는 `application.properties`의 `spring.jackson.mapper.allow-coercion-of-scalars=false`, `spring.jackson.deserialization.accept-float-as-int=false`가 막는다.
   - 요청 파라미터(쿼리·경로 변수 등)의 불리언은 소문자 `true`, `false`만 받고, 그 밖의 값(`1`·`yes`·`on`·`TRUE`, 빈 값, 앞뒤 공백이 붙은 값)은 `validation.type`이다. `common/request/RequestParameterBindingAdvice`가 모든 컨트롤러의 `@InitBinder`에 `StrictBooleanEditor`를 등록한다(`Converter`로 등록하면 실패했을 때 Spring이 기본 `CustomBooleanEditor`로 다시 변환해 이 값들을 받아 버린다). 기본값이 있는 파라미터의 빈 값은 Spring이 변환 전에 기본값으로 바꾼다.
   - 필드 이름은 Bean Validation과 같은 경로 형식이다. 예: `name`, `address.city`, `rooms[0].name`. 요청 파라미터는 파라미터 이름이다.
@@ -76,7 +76,7 @@ urbanstay/
 ## 목록 조회
 
 - 목록 API는 `ApiResponse<PageResponse<T>>`(`common/response/PageResponse`)로 응답한다. 서비스가 돌려준 `Page`를 `PageResponse.from(page.map(...))`으로 바꾼다. 문서 스키마 이름은 `PageResponse{항목 스키마}`(예: `PageResponseHotelAppAdminResponse`)이고 모든 필드가 필수다.
-  - 예외: 게스트 앱 객실 유형 목록은 페이지 없이 `ApiResponse<List<T>>`로 전부 준다. 한 호텔의 유형 수가 적고 객실을 묶은 집계 결과라 화면이 한 번에 모두 보여주기 때문이다(게스트 앱 API 절).
+  - 예외: 게스트 앱 객실 유형 목록과 hotel-admin 객실 유형 목록은 페이지 없이 `ApiResponse<List<T>>`로 전부 준다. 한 호텔의 유형 수가 적고, 화면이 한 번에 모두 보여주거나(게스트 앱 API 절) 객실 생성·수정의 선택 상자와 거르기에 쓰기 때문이다(객실 유형 절).
 - `page`(0~99, 기본 0), `size`(1~100, 기본 10)는 `@RequestParam`으로 받고 `common/request/PageParams` 상수를 쓴다(`@Min`·`@Max`, 메시지 `validation.min`·`validation.max`). 범위를 벗어나면 메서드 검증으로 400 `INVALID_INPUT`이고 `fieldErrors`의 필드는 파라미터 이름이다. 100페이지 밖의 항목은 검색으로 좁혀 찾는다.
 - 정렬 기준은 서비스에서 정하고 operation 설명에 적는다.
 - 사람이 보는 이름으로 정렬하는 컬럼에는 ICU collation `natural_sort`(`provider = icu, locale = 'und-u-kn'`)를 지정한다. 예: `name varchar(50) collate natural_sort`(`V6__create_room.sql`이 collation을 만든다).
@@ -85,7 +85,7 @@ urbanstay/
   - 정렬 순서는 operation 설명에 적고, 숫자·영문 대소문자·한글이 섞인 이름으로 저장소 테스트와 API 테스트에서 확인한다.
   - 이름이 유일한 범위의 목록에도 id를 둘째 기준으로 둔다(예: 객실 목록은 이름 오름차순, 같으면 id 오름차순).
   - 예외: 호텔 이름(`hotel.name`)은 `natural_sort`가 아니다. 게스트 앱 호텔 목록은 DB 기본 collation의 이름순이다(게스트 앱 API 절).
-  - 객실 유형(`room.type`) 컬럼도 `natural_sort`가 아니다. 유형 이름순이 필요한 쿼리만 HQL `collate(r.type as natural_sort)`로 정렬한다(`RoomRepository.findByHotelIdInTypeOrder`). 컬럼 collation을 바꾸는 마이그레이션 없이 정렬 하나만 맞추기 위해서다.
+  - 객실 유형 이름(`room_type.name`)도 `natural_sort`다(`V11__create_room_type.sql`). 두 유형 목록은 이름 오름차순, 같으면 id 오름차순이다.
 - 부분 일치 검색은 Spring Data 파생 쿼리(예: `findByNameContainingIgnoreCase`)로 한다. 파생 쿼리는 `\`, `%`, `_`를 이스케이프하고 `escape '\'`를 붙여 입력을 글자 그대로 찾는다. `@Query`로 LIKE를 직접 쓰면 이스케이프되지 않는다.
 - 한 필드 검색과 선택 필터를 AND로만 묶는 목록은 조합마다 파생 쿼리를 두고 서비스가 고른다. 예: 객실 목록의 `findByHotelId`, `findByHotelIdAndStatus`, `findByHotelIdAndNameContainingIgnoreCase`, `findByHotelIdAndStatusAndNameContainingIgnoreCase`. 이스케이프와 서비스가 정한 정렬이 그대로 적용된다. 필터가 더 늘어 조합이 감당하기 어려워지면 `Specification`으로 옮긴다.
 - 여러 필드 중 하나에 들어 있으면 찾는 검색(OR)과 선택 필터가 함께 있어 파생 쿼리로 쓰기 어려우면 `Specification`(`JpaSpecificationExecutor`)으로 한다. 예: `account/repository/HotelAdminSpecifications.search`(이름 또는 아이디 검색 + 활성 여부 필터)
@@ -101,6 +101,7 @@ urbanstay/
   - `ApiPaths.APP_ADMIN`: `Role.APP_ADMIN`만, `ApiPaths.HOTEL_ADMIN`: `Role.HOTEL_ADMIN`만 쓴다.
   - 호텔 계정은 모두 `Role.HOTEL_ADMIN`을 받고, 마스터는 `Role.HOTEL_MASTER`도 받는다. 마스터만 쓰는 API는 `Role.HOTEL_MASTER`로 막는다.
     - 경로 규칙(`HOTEL_MASTER_PATTERN`)으로 막는다. 지금은 운영자 관리(`ApiPaths.HOTEL_ADMIN + ApiPaths.OPERATORS` 아래 전부)다. `HOTEL_ADMIN_PATTERN` 규칙보다 먼저 둔다(먼저 맞는 규칙을 쓴다). `/operators/**`는 `/operators`도 포함한다.
+    - 조회는 둘 다 쓰고 변경만 마스터가 쓰는 API는 메서드와 경로를 함께 적는 `SecurityConfig.HOTEL_MASTER_APIS`(`AdminApi(HTTP 메서드, 경로)`)로 막는다. 지금은 객실 유형 생성·수정(`POST /room-types`, `PUT /room-types/*`)과 객실 생성·수정(`POST /rooms`, `PUT /rooms/*`)이다. `*`는 경로 한 칸이라 객실 상태 변경(`PUT /rooms/{roomId}/status`)은 마스터·운영자 모두 쓴다.
     - 운영자 계정과 전체 어드민 계정은 403 `FORBIDDEN`, 로그인하지 않으면 401 `UNAUTHORIZED`다. 어드민 그룹 문서에 자동으로 붙는 401·403과 같으므로 문서에 따로 적을 에러는 없고, operation 설명에 마스터 전용임을 적는다.
   - 로그인 없이 여는 어드민 API는 `SecurityConfig.PUBLIC_ADMIN_APIS`(HTTP 메서드 + 경로)에만 적는다. 접근 규칙(permitAll)과 API 문서(401·403 자동 에러 제외)가 이 목록 하나를 함께 쓴다. 지금은 전체 어드민 로그인과 호텔 운영자 로그인이다. 열린 API에도 CSRF는 걸린다.
   - Swagger UI와 API 문서(`/swagger-ui.html`, `/swagger-ui/**`, `/v3/api-docs/**`): 로그인 없이 연다.
@@ -191,26 +192,45 @@ urbanstay/
 
 ## 객실
 
-- 객실은 `room` 도메인의 `room` 테이블(`Room`, `V6__create_room.sql`)에 저장한다. 한 호텔에 속하고(`hotel_id`, `Hotel`과 JPA 연관관계) 이름, 객실 유형, 최대 인원, 층(선택), 소개(선택), 체크인·체크아웃 시각, 상태(`status`, 객실 상태 절), 낙관적 잠금 버전(`version`)을 가진다.
+- 객실은 `room` 도메인의 `room` 테이블(`Room`, `V6__create_room.sql`)에 저장한다. 한 호텔에 속하고(`hotel_id`, `Hotel`과 JPA 연관관계) 이름, 객실 유형(`room_type_id`, `RoomType`과 JPA 연관관계, 객실 유형 절), 층(선택), 소개(선택), 상태(`status`, 객실 상태 절), 낙관적 잠금 버전(`version`)을 가진다. 최대 인원, 1박 요금, 체크인·체크아웃 시각은 유형에서 읽는다.
+  - 객실은 같은 호텔의 유형만 가리킨다. DB는 `room_type (id, hotel_id)` 유일 제약을 가리키는 복합 외래 키 `room_room_type_id_hotel_id_fkey (room_type_id, hotel_id)`로 막는다. 유형별 조회는 `room_room_type_id_idx`를 쓴다.
   - 객실 삭제는 아직 없다.
 - 값의 규칙
-  - 이름(호수)과 객실 유형은 앞뒤 공백을 지운 뒤 1~50자, 소개는 1000자 이하이고 비거나 공백만 있으면 null이다. 엔티티(`Room.normalize`)가 지워 저장한다.
-  - 최대 인원은 1~20, 층은 -10~200(지하는 음수, null 가능) 정수다. 요청은 `@Min`·`@Max`(`validation.min`·`validation.max`)로 검사하고 상수는 `Room.MIN_CAPACITY` 등이다.
-  - 체크인·체크아웃 시각은 `LocalTime`(`HH:mm`, 응답과 예외 절)이고 앞뒤를 비교하지 않는다. 체크아웃이 체크인보다 이르거나 같아도 된다.
-  - DB도 CHECK 제약으로 정리된 문자열, 인원·층 범위, 초가 0인 시각만 받는다.
+  - 이름(호수)은 앞뒤 공백을 지운 뒤 1~50자, 소개는 1000자 이하이고 비거나 공백만 있으면 null이다. 엔티티(`Room.normalize`)가 지워 저장한다.
+  - 층은 -10~200(지하는 음수, null 가능) 정수다. 요청은 `@Min`·`@Max`(`validation.min`·`validation.max`)로 검사하고 상수는 `Room.MIN_FLOOR` 등이다.
+  - 유형은 요청의 `roomTypeId`로 고른다. 같은 호텔에서만 찾고(`RoomTypeService.getRoomType`) 없는 id와 다른 호텔의 유형 id는 모두 404 `RoomErrorCode.ROOM_TYPE_NOT_FOUND`다.
+  - DB도 CHECK 제약으로 정리된 문자열과 층 범위만 받는다.
 - 이름 컬럼은 `natural_sort` collation이다(목록 조회 절). 목록의 이름순은 이 collation을 따른다.
 - 이름은 같은 호텔 안에서만 유일하다(`room_hotel_id_name_key unique (hotel_id, name)`, 앞뒤 공백을 지운 값을 대소문자 구분해 비교). 다른 호텔과는 같아도 된다.
   - 사전 확인(수정은 자기 자신을 빼고 `existsByHotelIdAndNameAndIdNot`)과 함께 이 제약 위반도 `RoomErrorCode.ROOM_DUPLICATED`(409)로 바꾼다.
   - 이 제약의 인덱스가 호텔별 목록의 `hotel_id` 조건에도 쓰여 따로 인덱스를 두지 않는다.
-- 객실 관리(`ApiPaths.HOTEL_ADMIN + "/rooms"`의 등록·목록·조회·수정과 `/{roomId}/status` 상태 변경, `/{roomId}/status-histories` 상태 이력 조회, `RoomHotelAdminController`)는 `RoomService`가 한다. 호텔 계정 모두(`Role.HOTEL_ADMIN`, 마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 보안 규칙은 따로 두지 않는다(`HOTEL_ADMIN_PATTERN`).
-  - 대상 호텔은 로그인한 계정의 `HotelAdminPrincipal.hotelId`다. 등록은 `HotelService.getHotel(hotelId)`로 호텔을 읽어 연관관계에 쓴다.
+- 객실 관리(`ApiPaths.HOTEL_ADMIN + ApiPaths.ROOMS`의 생성·목록·조회·수정과 `/{roomId}/status` 상태 변경, `/{roomId}/status-histories` 상태 이력 조회, `RoomHotelAdminController`)는 `RoomService`가 한다. 생성·수정은 마스터만(운영자는 403 `FORBIDDEN`, `HOTEL_MASTER_APIS`), 조회·상태 변경·이력 조회는 호텔 계정 모두(`Role.HOTEL_ADMIN`, 마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 성공 문구는 생성 `success.room.created`('객실을 생성했습니다.')다.
+  - 대상 호텔은 로그인한 계정의 `HotelAdminPrincipal.hotelId`다. 생성은 `HotelService.getHotel(hotelId)`로 호텔을 읽어 연관관계에 쓴다. 판단 순서는 호텔 → 유형(404 `ROOM_TYPE_NOT_FOUND`) → 이름 중복 → 저장이다.
   - 조회·수정할 객실은 같은 호텔에서만 찾는다(`findByIdAndHotelId`). 없는 id와 다른 호텔의 객실 id는 모두 404 `RoomErrorCode.ROOM_NOT_FOUND`다. 다른 호텔 객실의 존재를 알리지 않기 위해서다.
-  - 수정은 PUT으로 모든 항목을 바꾼다. 층과 소개를 보내지 않거나 null이면 null로 바뀐다. 순서는 객실 조회 → version 확인(`ROOM_MODIFIED`) → 이름 중복 확인 → 엔티티 변경 → `saveAndFlush`이고, 유일 제약 위반과 `OptimisticLockingFailureException`을 함께 변환한다. version 충돌과 이름 중복이 겹치면 version 충돌이 먼저다.
+  - 수정은 PUT으로 모든 항목을 바꾼다. 층과 소개를 보내지 않거나 null이면 null로 바뀐다. 순서는 객실 조회 → version 확인(`ROOM_MODIFIED`) → 유형 확인(`ROOM_TYPE_NOT_FOUND`) → 이름 중복 확인 → 엔티티 변경 → `saveAndFlush`이고, 유일 제약 위반과 `OptimisticLockingFailureException`을 함께 변환한다. version 충돌과 이름 중복이 겹치면 version 충돌이 먼저다.
   - 목록은 같은 호텔의 객실을 이름 오름차순, 같으면 id 오름차순으로 준다(목록 조회 절). `keyword`(선택, 100자)는 이름에서 대소문자 구분 없이 찾고, `status`(선택, 하나)는 그 상태의 객실만 거른다. 둘을 함께 보내면 AND다(조합별 파생 쿼리, 목록 조회 절). 상태 필터용 인덱스는 따로 두지 않는다(`hotel_id` 조건에 유일 제약의 인덱스를 쓴다).
-  - 객실 응답(`RoomHotelAdminResponse`)에는 지금 이용 `currentStay: { id, checkInDate, checkOutDate, guest: { id, name, phone } }`를 담고, 없으면 null이다. 지금 이용은 오늘(`Clock`, Asia/Seoul)이 [체크인, 체크아웃) 안에 있는 취소하지 않은 이용이며, 배제 제약 때문에 객실마다 많아야 하나다. 컨트롤러가 `StayService.getCurrentStays(roomIds)`로 조회해 붙인다. 목록은 페이지의 객실을 한 번에 조회하고(이용객은 `@EntityGraph`, 인덱스는 `stay_room_id_check_in_date_id_idx`), 조회·수정·상태 변경은 그 객실 하나를 조회한다. 등록 응답은 항상 null이다. 서비스 방향은 `StayService → RoomService` 그대로이고 `RoomService`는 이용 도메인을 쓰지 않는다.
+  - 객실 응답(`RoomHotelAdminResponse`)에는 유형 `roomType: { id, name, capacity, roomRate, checkInTime, checkOutTime }`(조회 시점의 유형 값)을 담는다. 응답은 트랜잭션 밖에서 만들므로 객실 조회(`findByIdAndHotelId`, 목록의 파생 쿼리)는 `@EntityGraph`로 유형을 함께 읽는다.
+  - 객실 응답에는 지금 이용 `currentStay: { id, checkInDate, checkOutDate, guest: { id, name, phone } }`를 담고, 없으면 null이다. 지금 이용은 오늘(`Clock`, Asia/Seoul)이 [체크인, 체크아웃) 안에 있는 취소하지 않은 이용이며, 배제 제약 때문에 객실마다 많아야 하나다. 컨트롤러가 `StayService.getCurrentStays(roomIds)`로 조회해 붙인다. 목록은 페이지의 객실을 한 번에 조회하고(이용객은 `@EntityGraph`, 인덱스는 `stay_room_id_check_in_date_id_idx`), 조회·수정·상태 변경은 그 객실 하나를 조회한다. 등록 응답은 항상 null이다. 서비스 방향은 `StayService → RoomService` 그대로이고 `RoomService`는 이용 도메인을 쓰지 않는다.
 - 테스트
-  - 마스터와 운영자가 모두 쓰는 API는 두 역할의 principal로 정상 흐름을 확인한다(`@EnumSource(HotelAdminRole::class)`, `RoomHotelAdminControllerTest`).
-  - 객실이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔 객실의 `room_status_history`, 그다음 `room`을 먼저 지운다. 이력은 바꾼 호텔 계정(`hotel_admin`)도 가리키므로, 여러 호텔을 지울 때는 모든 호텔의 이력을 먼저 지운 뒤 객실과 호텔 계정을 지운다.
+  - 마스터와 운영자가 모두 쓰는 API는 두 역할의 principal로 정상 흐름을 확인한다(`@EnumSource(HotelAdminRole::class)`, `RoomHotelAdminControllerTest`). 마스터 전용 API는 운영자 principal로 403과 바뀌지 않음을 확인한다.
+  - 객실이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔 객실의 `room_status_history`, 그다음 `room`, 그다음 `room_type`을 먼저 지운다. 테스트 객실은 저장한 유형으로 만든다(`RoomTypeRepository`). 이력은 바꾼 호텔 계정(`hotel_admin`)도 가리키므로, 여러 호텔을 지울 때는 모든 호텔의 이력을 먼저 지운 뒤 객실과 호텔 계정을 지운다.
+
+## 객실 유형
+
+- 객실 유형은 `room` 도메인의 `room_type` 테이블(`RoomType`, `V11__create_room_type.sql`)에 호텔마다 따로 저장한다. 한 호텔에 속하고(`hotel_id`) 이름, 최대 인원(`capacity`), 1박 요금(`room_rate`, 원 정수), 체크인·체크아웃 시각, 낙관적 잠금 버전(`version`)을 가진다. 삭제는 없다.
+- 값의 규칙
+  - 이름은 앞뒤 공백을 지운 뒤 1~50자(`RoomType.normalize`), 최대 인원은 1~20, 1박 요금은 0~10,000,000이다(`RoomType.MIN_ROOM_RATE`·`MAX_ROOM_RATE`). 금액이 박 수(최대 30)와 곱해도 `integer` 범위 안이다.
+  - 체크인·체크아웃 시각은 `LocalTime`(`HH:mm`, 응답과 예외 절)이고 앞뒤를 비교하지 않는다. 체크아웃이 체크인보다 이르거나 같아도 된다.
+  - DB도 CHECK 제약으로 정리된 이름, 인원·요금 범위, 초가 0인 시각만 받는다.
+- 이름은 같은 호텔 안에서만 유일하다(`room_type_hotel_id_name_key`, 대소문자 구분). 사전 확인(수정은 자기 자신을 뺀다)과 제약 위반 모두 409 `RoomErrorCode.ROOM_TYPE_DUPLICATED`다. 이름 컬럼은 `natural_sort`다.
+- 유형 관리(`ApiPaths.HOTEL_ADMIN + ApiPaths.ROOM_TYPES`의 생성·목록·조회·수정, `RoomTypeHotelAdminController`)는 `RoomTypeService`가 한다. 태그는 객실과 같은 `room`이다.
+  - 생성·수정은 마스터만 쓰고(운영자 403, `HOTEL_MASTER_APIS`), 목록·조회는 마스터·운영자 모두 쓴다(객실 생성 선택 상자·거르기).
+  - 대상 호텔은 로그인한 계정의 호텔이다. 없는 id와 다른 호텔의 유형 id는 모두 404 `ROOM_TYPE_NOT_FOUND`다.
+  - 목록은 그 호텔 유형 전부를 페이지 없이 이름 오름차순, 같으면 id 오름차순으로 준다(목록 조회 절).
+  - 수정은 PUT으로 모든 항목을 바꾼다. 순서는 유형 조회 → version 확인(`ROOM_TYPE_MODIFIED`) → 이름 중복 확인 → 엔티티 변경 → `saveAndFlush`다. 바꾼 값은 그 유형의 모든 객실에 바로 적용되고, 1박 요금은 그 뒤의 예약부터 쓰인다(이미 한 예약의 금액은 이용에 저장돼 그대로다, 이용 절).
+  - 성공 문구는 `success.room-type.created`, `success.room-type.updated`다.
+- 기존 객실 이전(`V11`): 호텔마다 객실의 `type` 글자값별로 유형을 만들었다. 최대 인원은 그 유형 객실의 최댓값, 시각은 id가 가장 작은 객실의 값, 1박 요금은 100000원이다. 객실에 `room_type_id`를 채운 뒤 `type`·`capacity`·`check_in_time`·`check_out_time` 컬럼을 지웠다. 규칙은 마이그레이션 주석에도 적었다.
+- 테스트: 이전 규칙은 별도 스키마에 V10까지 적용해 객실을 넣은 뒤 V11을 적용해 확인한다(`RoomTypeMigrationTest`, 객실 상태 절의 방식).
 
 ## 객실 상태
 
@@ -266,11 +286,16 @@ urbanstay/
 - 이용은 `stay` 도메인의 `stay` 테이블(`Stay`, `V9__create_stay.sql`)에 저장한다. 객실(`room_id`, `Room`)과 이용객(`guest_id`, `Guest`)을 JPA 연관관계로 가리키고 체크인 날짜, 체크아웃 날짜(`LocalDate`, `date`), 인원을 가진다.
   - 호텔 컬럼은 두지 않는다. 호텔은 객실로 정해지고(객실의 호텔은 바뀌지 않는다) 객실과 이용객이 같은 호텔인지는 서비스가 확인한다.
   - 수정이 없어 `version`을 두지 않고 응답에도 싣지 않는다. 취소는 같은 행의 취소 컬럼에 기록한다(취소 절).
+- 예약 비용은 이용에 저장한다(`V12__add_stay_amount.sql`): 1박 요금(`room_rate`, 예약할 때 그 유형의 요금), 박 수(`nights`), 기본 금액(`base_amount` = 1박 요금 × 박 수), 할인 금액(`discount_amount`, 지금은 0), 최종 금액(`total_amount` = 기본 − 할인). 나중에 유형 요금이 바뀌어도 지난 이용 금액은 그대로다.
+  - 엔티티(`Stay` 생성자에 1박 요금을 넘긴다)가 박 수와 금액을 계산한다. DB는 `stay_amount_check`(금액 ≥ 0, 박 수 = 체크아웃 − 체크인, 기본 = 요금 × 박 수, 최종 = 기본 − 할인)로 막는다.
+  - 기존 이용은 마이그레이션이 그 객실 유형의 요금으로 채웠다(할인 0, `StayAmountMigrationTest`).
+  - 이용 응답(게스트 앱 예약, hotel-admin 목록·조회·취소)에 `roomRate, nights, baseAmount, discountAmount, totalAmount`를 담는다. 취소한 이용도 금액은 그대로 담는다.
+  - CHECK 제약은 이름 알파벳순으로 검사하므로 여러 제약을 함께 어기면 `stay_amount_check`가 먼저 보일 수 있다(저장소 테스트는 요금 0으로 기간 제약만 어기게 만든다).
 - 기간은 날짜 단위의 반열린 구간 [체크인, 체크아웃)이다. 체크아웃 날은 비어 있다고 보아 1일~3일과 3일~5일은 겹치지 않는다.
 - 값의 규칙. 어기면 400 `INVALID_INPUT`이고 틀린 항목을 모두 `fieldErrors`에 담는다(응답과 예외 절).
   - 체크인 날짜는 오늘(`Clock` 빈, Asia/Seoul)이거나 그 뒤다. `checkInDate`, `validation.today-or-later`
   - 체크아웃 날짜는 체크인 날짜보다 뒤이고(최소 1박) 최대 30박이다(`Stay.MAX_NIGHTS`). `checkOutDate`, `validation.after-check-in` 또는 `validation.max-nights`
-  - 인원은 1 이상(요청의 `@Min`, `validation.min`)이다. 최대 인원이 인원보다 작은 객실에는 배정하지 않는다(예약할 수 있는 객실이 없으면 409, 게스트 앱 API 절).
+  - 인원은 1 이상(요청의 `@Min`, `validation.min`)이다. 유형의 최대 인원이 인원보다 작으면 배정하지 않는다(예약할 수 있는 객실이 없으면 409, 게스트 앱 API 절).
   - DB도 CHECK로 1~30박, 1~20명만 받는다. 오늘 규칙은 DB가 막지 않는다.
 - 같은 객실에 기간이 겹치는 취소하지 않은 이용은 둘 수 없다. 예약은 그 유형 객실을 잠근 뒤 겹치는 이용이 없는 객실만 고르고(`StayRepository.findOverlappedRoomIds`, 게스트 앱 API 절), 배제 제약(`stay_room_id_period_excl`, `btree_gist`로 `room_id WITH =`, `daterange(check_in_date, check_out_date, '[)') WITH &&`, `where (canceled_at is null)`)이 안전망으로 막는다. 제약 위반은 409 `StayErrorCode.STAY_PERIOD_OVERLAPPED`다(동시성과 충돌 절). 취소한 이용과는 겹쳐도 된다.
   - 배제 제약은 `V10__add_stay_cancellation.sql`이 같은 이름으로 다시 만들어 취소하지 않은 이용에만 건다.
@@ -279,7 +304,7 @@ urbanstay/
 - 이용 관리(`ApiPaths.HOTEL_ADMIN + "/stays"`의 목록·조회와 `/{stayId}/cancel` 취소, `StayHotelAdminController`)는 `StayService`가 한다. 호텔 계정 모두(마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 등록과 수정은 없다.
   - 조회할 이용은 객실의 호텔로 찾는다(`findByIdAndRoomHotelId`). 없는 id와 다른 호텔의 이용 id는 모두 404 `STAY_NOT_FOUND`다.
   - 목록은 같은 호텔의 이용을 취소한 이용까지 체크인 날짜 내림차순, 같으면 id 내림차순으로 준다. `roomId`·`guestId`·`canceled`(선택)로 거르고 함께 보내면 AND다. 조합이 여덟 가지라 파생 쿼리 대신 `StaySpecifications.search`로 거른다(목록 조회 절). 없거나 다른 호텔의 id로 거르면 빈 목록이다.
-  - 응답은 객실 `{ id, name }`, 이용객 `{ id, name, phone }`을 조회 시점의 값으로 담고, 취소 정보 `cancellation: { canceledAt, canceledBy: { id, name }, reason }`(취소하지 않았으면 null)을 담는다. 목록(`findAll(Specification, Pageable)`을 다시 선언)과 조회는 `@EntityGraph`로 객실과 이용객을 함께 읽는다.
+  - 응답은 객실 `{ id, name }`, 이용객 `{ id, name, phone }`을 조회 시점의 값으로 담고, 저장한 금액(이용 절)과 취소 정보 `cancellation: { canceledAt, canceledBy: { id, name }, reason }`(취소하지 않았으면 null)을 담는다. 목록(`findAll(Specification, Pageable)`을 다시 선언)과 조회는 `@EntityGraph`로 객실과 이용객을 함께 읽는다.
 - 취소(`POST ApiPaths.HOTEL_ADMIN + "/stays/{stayId}/cancel"`, 본문 `{ reason? }`, `StayService.cancel`)는 되돌릴 수 없다. 성공하면 취소 정보가 담긴 이용 응답을 준다.
   - 판단 순서는 이용 조회(404 `STAY_NOT_FOUND`) → 이미 취소(409 `STAY_ALREADY_CANCELED`) → 끝난 이용(409 `STAY_ALREADY_ENDED`) → 조건부 UPDATE다. 끝나지 않은 이용은 체크아웃 날짜가 오늘(`Clock`, Asia/Seoul)보다 뒤인 이용이다. 이미 취소했으면서 끝난 이용은 `STAY_ALREADY_CANCELED`다.
   - 취소 시각(`canceled_at`), 처리한 호텔 계정(`canceled_by_id`)과 그때의 이름(`canceled_by_name`), 사유(`cancel_reason`)는 `StayRepository.cancel`이 `where id = :id and canceled_at is null`로 한 번에 쓴다. 바뀐 행이 없으면 409 `STAY_ALREADY_CANCELED`다. 동시에 두 번 취소하면 늦은 쪽은 먼저 커밋된 취소를 기다렸다가 0행이 되어 기록은 하나만 남는다. 벌크 UPDATE의 `updated_at`과 다시 읽기는 객실 상태 변경과 같다(객실 상태 절).
@@ -295,25 +320,26 @@ urbanstay/
 ## 게스트 앱 API
 
 - 게스트 앱 API(`ApiPaths.APP`)는 로그인 없이 쓰고 CSRF와 세션이 없다(보안 절). 컨트롤러는 도메인마다 `controller/app`(`HotelAppController`, `StayAppController`), DTO는 `dto/app`에 둔다. 문서는 `app` 그룹이고 401·403 자동 에러가 붙지 않는다.
-- 예약 흐름은 호텔 → 날짜·인원 → 객실 유형 → 이용객 정보 → 예약이고 게스트는 객실(호수)을 고르지 않는다. 객실 유형은 같은 호텔에서 `room.type` 글자가 똑같은(대소문자 구분) 객실들이다. 게스트 앱의 객실 목록·예약된 기간 API는 없앴다.
-- 예약할 수 있는 객실은 그 유형이고, 최대 인원이 인원 이상이고, 그 기간에 취소하지 않은 이용과 겹치지 않는 객실이다(객실 상태 무관). 유형 목록과 예약이 같은 계산(`StayService.availableRooms`)을 쓴다. 겹치는 객실은 `StayRepository.findOverlappedRoomIds`(후보 객실 id 안에서 취소하지 않았고 `check_in_date < 체크아웃 and check_out_date > 체크인`인 이용의 객실 id)로 한 번에 찾는다.
+- 예약 흐름은 호텔 → 날짜·인원 → 객실 유형 → 이용객 정보 → 예약이고 게스트는 객실(호수)을 고르지 않는다. 객실 유형은 마스터가 만든 그 호텔의 유형(객실 유형 절)이다. 게스트 앱의 객실 목록·예약된 기간 API는 없앴다.
+- 예약할 수 있는 객실은 그 유형이고, 유형의 최대 인원이 인원 이상이고, 그 기간에 취소하지 않은 이용과 겹치지 않는 객실이다(객실 상태 무관). 유형 목록과 예약이 같은 계산(`StayService.availableRooms`)을 쓴다. 겹치는 객실은 `StayRepository.findOverlappedRoomIds`(후보 객실 id 안에서 취소하지 않았고 `check_in_date < 체크아웃 and check_out_date > 체크인`인 이용의 객실 id)로 한 번에 찾는다.
 - 호텔 목록(`GET ApiPaths.APP + "/hotels"`, `HotelService.getHotelsByName`)은 모든 호텔의 `{ id, name, address }`를 이름 오름차순, 같으면 id 오름차순으로 준다. 검색은 없다.
   - `hotel.name`은 `natural_sort`가 아니라 DB 기본 collation으로 정렬한다. 이름 속 숫자는 글자 순서로 비교해(`1001`이 `101`보다 앞) 객실 목록의 이름순과 다를 수 있고, operation 설명에 적는다. collation을 바꾸는 마이그레이션은 유일 제약·전체 어드민 검색까지 바뀌어 게스트 앱 정렬 하나로는 과하다고 보고 하지 않았다.
-- 객실 유형 목록(`GET ApiPaths.APP + "/hotels/{hotelId}/room-types?checkInDate=&checkOutDate=&guestCount="`, `StayService.getRoomTypes`)은 그 호텔 유형마다 `{ type, roomCount, maxGuests, availableCount }`를 유형 이름순(`collate natural_sort`, 목록 조회 절)으로 준다. `maxGuests`는 그 유형 객실 최대 인원 중 가장 큰 값, `availableCount`는 그 기간·인원으로 예약할 수 있는 객실 수이고 0이면 화면이 '예약불가'로 보여준다. 페이지 없이 전부 준다(목록 조회 절).
-  - 판단 순서는 파라미터(400: 세 파라미터 필수, 날짜 형식(응답과 예외 절), 인원 `@Min(1)`) → 기간(400, 이용 절의 날짜 규칙, `checkInDate`·`checkOutDate`를 모아 한 번에) → 호텔(`RoomService.getHotelRoomsInTypeOrder`가 `HotelService.getHotel`로 확인, 404 `HOTEL_NOT_FOUND`)이다. 객실이 없는 호텔은 빈 목록이다.
-  - 그 호텔 객실을 유형순으로 한 번 읽고(`findByHotelIdInTypeOrder`) 겹치는 객실 id를 한 번 찾아(`findOverlappedRoomIds`) 서비스가 유형별로 묶는다. 이용 겹침이 필요해 `stay` 도메인(`StayService → RoomService`)에 둔다.
-- 예약(`POST ApiPaths.APP + "/stays"`, 본문 `{ hotelId, roomType, checkInDate, checkOutDate, guestCount, guest: { name, phone, email } }`, `StayService.reserve`)은 서버가 객실을 배정하고 201과 `success.stay.reserved`로 응답한다.
-  - `roomType`은 앞뒤 공백을 지운 뒤 1~50자(`TrimmedStringDeserializer`, `@NotBlank`, `@Length`)이고 저장된 유형과 글자 그대로 비교한다.
-  - 판단 순서는 요청 검증(400, 이용객 칸은 중첩 `@Valid`로 `guest.name` 같은 경로) → 기간(400, 이용 절의 날짜 규칙) → 그 호텔·유형 객실 잠금(`RoomService.lockRoomsByType`, 하나도 없으면 404 `RoomErrorCode.ROOM_TYPE_NOT_FOUND`) → 예약할 수 있는 객실 중 이름순(`natural_sort`, 같으면 id) 첫 객실(없으면 409 `RoomErrorCode.ROOM_TYPE_UNAVAILABLE`) → 이용객 찾기·만들기 → 이용 `saveAndFlush`(배제 제약 위반 409 `STAY_PERIOD_OVERLAPPED`)다. 한 트랜잭션이라 이용 저장이 실패하면 새로 만든 이용객도 남지 않는다.
-  - 없는 호텔도 그 호텔에 그 유형의 객실이 없는 것이므로 `ROOM_TYPE_NOT_FOUND`로 묶는다(호텔을 따로 조회하지 않는다).
-  - 인원이 그 유형 모든 객실의 최대 인원보다 커도 예약할 수 있는 객실이 없는 것이므로 409 `ROOM_TYPE_UNAVAILABLE`이다. 유형 목록의 `availableCount`가 0인 경우와 같은 규칙이다.
-  - 잠금: `RoomRepository.lockByHotelIdAndType`(`@Lock(PESSIMISTIC_WRITE)`, Hibernate의 PostgreSQL 방언은 `for no key update`)이 그 호텔·유형 객실 행을 id 오름차순으로 잠근다. 같은 유형 예약끼리는 순서가 같아 교착 없이 줄을 서고, 다른 유형 예약은 서로 기다리지 않는다. 잠근 뒤 `findByIdIn(잠근 id, 이름순)`(`@EntityGraph`로 호텔 함께)으로 다시 읽고, 겹침 조회는 그다음 문장이라 READ COMMITTED에서 먼저 커밋된 예약의 이용을 본다. 잠근 행만 후보로 써서 그사이 유형이 바뀌어 들어온 객실은 고르지 않는다.
+- 객실 유형 목록(`GET ApiPaths.APP + "/hotels/{hotelId}/room-types?checkInDate=&checkOutDate=&guestCount="`, `StayService.getRoomTypes`)은 그 호텔 유형마다 `{ id, name, capacity, roomRate, checkInTime, checkOutTime, roomCount, availableCount }`를 유형 이름순(같으면 id, 목록 조회 절)으로 준다. 객실이 없는 유형도 `roomCount` 0, `availableCount` 0으로 나온다. `availableCount`는 그 기간·인원으로 예약할 수 있는 객실 수이고 0이면 화면이 '예약불가'로 보여준다. 페이지 없이 전부 준다(목록 조회 절).
+  - 판단 순서는 파라미터(400: 세 파라미터 필수, 날짜 형식(응답과 예외 절), 인원 `@Min(1)`) → 기간(400, 이용 절의 날짜 규칙, `checkInDate`·`checkOutDate`를 모아 한 번에) → 호텔(`RoomTypeService.getRoomTypes`가 `HotelService.getHotel`로 확인, 404 `HOTEL_NOT_FOUND`)이다. 유형이 없는 호텔은 빈 목록이다.
+  - 그 호텔 유형을 한 번, 객실을 유형과 함께 한 번 읽고(`findAllByHotelId`, `@EntityGraph`) 겹치는 객실 id를 한 번 찾아(`findOverlappedRoomIds`) 서비스가 유형 id별로 묶는다. 이용 겹침이 필요해 `stay` 도메인(`StayService → RoomService`)에 둔다.
+- 예약(`POST ApiPaths.APP + "/stays"`, 본문 `{ hotelId, roomTypeId, checkInDate, checkOutDate, guestCount, guest: { name, phone, email } }`, `StayService.reserve`)은 서버가 객실을 배정하고 201과 `success.stay.reserved`로 응답한다.
+  - `roomTypeId`는 유형 목록의 `id`다. 그 호텔의 유형이어야 한다.
+  - 판단 순서는 요청 검증(400, 이용객 칸은 중첩 `@Valid`로 `guest.name` 같은 경로) → 기간(400, 이용 절의 날짜 규칙) → 유형 확인(`RoomTypeService.getRoomType(hotelId, roomTypeId)`, 없거나 다른 호텔의 유형이면 404 `RoomErrorCode.ROOM_TYPE_NOT_FOUND`) → 그 유형 객실 잠금(`RoomService.lockRoomsByType`) → 예약할 수 있는 객실 중 이름순(`natural_sort`, 같으면 id) 첫 객실(없으면 409 `RoomErrorCode.ROOM_TYPE_UNAVAILABLE`) → 이용객 찾기·만들기 → 이용 `saveAndFlush`(배제 제약 위반 409 `STAY_PERIOD_OVERLAPPED`)다. 한 트랜잭션이라 이용 저장이 실패하면 새로 만든 이용객도 남지 않는다.
+  - 없는 호텔도 그 호텔에 그 유형이 없는 것이므로 `ROOM_TYPE_NOT_FOUND`로 묶는다(호텔을 따로 조회하지 않는다).
+  - 인원이 유형의 최대 인원보다 크거나 유형에 객실이 없어도 예약할 수 있는 객실이 없는 것이므로 409 `ROOM_TYPE_UNAVAILABLE`이다. 유형 목록의 `availableCount`가 0인 경우와 같은 규칙이다.
+  - 이용은 그 유형의 1박 요금으로 금액을 계산해 저장한다(이용 절).
+  - 잠금: `RoomRepository.lockByRoomTypeId`(`@Lock(PESSIMISTIC_WRITE)`, Hibernate의 PostgreSQL 방언은 `for no key update`)이 그 유형 객실 행을 id 오름차순으로 잠근다. 같은 유형 예약끼리는 순서가 같아 교착 없이 줄을 서고, 다른 유형 예약은 서로 기다리지 않는다. 잠근 뒤 `findByIdIn(잠근 id, 이름순)`(`@EntityGraph`로 호텔·유형 함께)으로 다시 읽고, 겹침 조회는 그다음 문장이라 READ COMMITTED에서 먼저 커밋된 예약의 이용을 본다. 잠근 행만 후보로 써서 그사이 유형이 바뀌어 들어온 객실은 고르지 않는다.
     - `for no key update`는 자기끼리와 객실 UPDATE(상태 변경·수정)와는 충돌하지만 이용 INSERT의 외래 키 확인(`for key share`)과는 충돌하지 않는다. 그래서 잠금을 거치지 않은 이용 INSERT가 있으면 배제 제약이 마지막으로 막는다(테스트로 확인).
   - 이용객 찾기·만들기(`GuestService.getOrCreate`): 그 호텔에서 숫자가 같은 전화번호의 이용객을 찾아(`GuestSpecifications.samePhone`) 있으면 그 이용객으로 예약하고 이름·이메일은 바꾸지 않는다. 없으면 `GuestRepository.insertIfPhoneAbsent`(`insert ... on conflict (hotel_id, (replace(phone, '-', ''))) do nothing`)로 넣은 뒤 다시 찾는다.
     - 이유: 같은 새 이용객의 예약이 동시에 오면 둘 다 찾지 못한다. JPA 저장의 유일 인덱스 위반은 트랜잭션을 깨뜨려(PostgreSQL은 오류 뒤 같은 트랜잭션의 문장을 받지 않는다) 다시 찾거나 이용을 저장할 수 없다. `on conflict do nothing`은 늦은 쪽이 먼저 넣은 행의 커밋을 기다렸다가 아무것도 넣지 않고, READ COMMITTED라 다음 조회가 커밋된 행을 본다. 먼저 쪽이 롤백되면 늦은 쪽이 넣는다.
     - 네이티브 INSERT는 JPA Auditing과 엔티티 정규화를 거치지 않으므로 서비스가 `Guest.normalize`한 값과 `Instant.now(clock)`을 넘기고 version은 0이다.
     - 알려진 경합: 찾은 뒤 그 이용객의 전화번호가 hotel-admin 수정으로 바뀌어 커밋되면 다시 찾기가 비어 500이 된다. 드물어 다루지 않았다.
-  - 응답은 `{ id, hotel: { id, name }, roomType, checkInDate, checkOutDate, guestCount, guest: { name } }`이다. 배정한 객실(호수)은 싣지 않는다. 객실은 `findByIdIn`이 호텔과 함께 읽어 트랜잭션 밖에서 응답을 만든다.
+  - 응답은 `{ id, hotel: { id, name }, roomType: { id, name }, checkInDate, checkOutDate, guestCount, roomRate, nights, baseAmount, discountAmount, totalAmount, guest: { name } }`이다. 배정한 객실(호수)은 싣지 않는다. 객실은 `findByIdIn`이 호텔과 함께 읽어 트랜잭션 밖에서 응답을 만든다.
 - 테스트는 로그인·CSRF 토큰 없이 요청하고 세션·쿠키가 생기지 않는지 확인한다(`StayAppControllerTest`). 지운 두 API가 404 `NOT_FOUND`이고 문서에 없는 것도 확인한다. 호텔 목록은 다른 테스트의 호텔이 있을 수 있어 `size=100`으로 받아 자기 호텔만 골라 순서를 본다(`HotelAppControllerTest`).
 
 ## 상수
@@ -358,7 +384,7 @@ urbanstay/
 - 동시 수정은 낙관적 잠금으로 막는다. 엔티티에 `@Version var version: Long`(`version bigint not null`)을 두고 응답에 `version`을 싣고, 수정 요청은 `version`을 필수로 받는다.
   - 서비스는 읽은 엔티티의 version이 요청과 다르면 도메인 409를 던진다.
   - 같은 version으로 동시에 들어온 수정은 flush 때 JPA가 막는다. flush를 서비스 안(`saveAndFlush`)에서 해 `OptimisticLockingFailureException`도 같은 도메인 409로 바꾼다. 커밋 때 터지면 서비스 밖이라 500이 된다.
-  - 지금 낙관적 잠금을 쓰는 엔티티는 `Hotel`(`HOTEL_MODIFIED`), `HotelAdmin`(`HOTEL_ADMIN_MODIFIED`), `Room`(`ROOM_MODIFIED`), `Guest`(`GUEST_MODIFIED`)이다. version을 받지 않는 변경(예: 비밀번호 재설정, 활성 상태 변경)도 같은 엔티티를 바꾸면 같은 변환을 거친다.
+  - 지금 낙관적 잠금을 쓰는 엔티티는 `Hotel`(`HOTEL_MODIFIED`), `HotelAdmin`(`HOTEL_ADMIN_MODIFIED`), `Room`(`ROOM_MODIFIED`), `RoomType`(`ROOM_TYPE_MODIFIED`), `Guest`(`GUEST_MODIFIED`)이다. version을 받지 않는 변경(예: 비밀번호 재설정, 활성 상태 변경)도 같은 엔티티를 바꾸면 같은 변환을 거친다.
 - version과 따로 움직여야 하는 값(예: 객실 상태)은 요청에 화면에서 본 값을 함께 받아 "지금 값이 그것일 때만" 바꾸는 조건부 UPDATE로 막는다. 바뀐 행이 없으면 도메인 409다(`ROOM_STATUS_CHANGED`, 객실 상태 절).
 - 한 번만 일어나야 하는 변경(예: 이용 취소)도 "아직 일어나지 않았을 때만" 바꾸는 조건부 UPDATE로 막는다. 바뀐 행이 없으면 도메인 409다(`STAY_ALREADY_CANCELED`, 이용 절).
 - 유일한 키로 "있으면 쓰고 없으면 만드는" 행(예: 예약의 이용객)은 `insert ... on conflict (유일 인덱스) do nothing` 뒤 다시 조회한다. 유일 제약 위반을 잡아 바꾸는 방식은 트랜잭션이 깨져 이어서 쓸 수 없다(게스트 앱 API 절).

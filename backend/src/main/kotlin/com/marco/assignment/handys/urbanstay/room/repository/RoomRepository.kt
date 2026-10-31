@@ -13,30 +13,37 @@ import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import java.time.Instant
 
+private const val ROOM_TYPE = "roomType"
+
 interface RoomRepository : JpaRepository<Room, Long> {
 
 	fun existsByHotelIdAndName(hotelId: Long, name: String): Boolean
 
 	fun existsByHotelIdAndNameAndIdNot(hotelId: Long, name: String, id: Long): Boolean
 
+	@EntityGraph(attributePaths = [ROOM_TYPE])
 	fun findByIdAndHotelId(id: Long, hotelId: Long): Room?
 
+	@EntityGraph(attributePaths = [ROOM_TYPE])
 	fun findByHotelId(hotelId: Long, pageable: Pageable): Page<Room>
 
+	@EntityGraph(attributePaths = [ROOM_TYPE])
 	fun findByHotelIdAndNameContainingIgnoreCase(hotelId: Long, keyword: String, pageable: Pageable): Page<Room>
 
+	@EntityGraph(attributePaths = [ROOM_TYPE])
 	fun findByHotelIdAndStatus(hotelId: Long, status: RoomStatus, pageable: Pageable): Page<Room>
 
+	@EntityGraph(attributePaths = [ROOM_TYPE])
 	fun findByHotelIdAndStatusAndNameContainingIgnoreCase(hotelId: Long, status: RoomStatus, keyword: String, pageable: Pageable): Page<Room>
 
-	@Query("select r from Room r where r.hotel.id = :hotelId order by collate(r.type as natural_sort), r.id")
-	fun findByHotelIdInTypeOrder(hotelId: Long): List<Room>
+	@EntityGraph(attributePaths = [ROOM_TYPE])
+	fun findAllByHotelId(hotelId: Long): List<Room>
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
-	@Query("select r from Room r where r.hotel.id = :hotelId and r.type = :type order by r.id")
-	fun lockByHotelIdAndType(hotelId: Long, type: String): List<Room>
+	@Query("select r from Room r where r.roomType.id = :roomTypeId order by r.id")
+	fun lockByRoomTypeId(roomTypeId: Long): List<Room>
 
-	@EntityGraph(attributePaths = ["hotel"])
+	@EntityGraph(attributePaths = ["hotel", ROOM_TYPE])
 	fun findByIdIn(ids: Collection<Long>, sort: Sort): List<Room>
 
 	@Modifying(flushAutomatically = true, clearAutomatically = true)
