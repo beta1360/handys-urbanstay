@@ -14,6 +14,9 @@ export const API_ERROR_CODES = {
   guestNotFound: "GUEST_NOT_FOUND",
   guestPhoneDuplicated: "GUEST_PHONE_DUPLICATED",
   guestModified: "GUEST_MODIFIED",
+  operatorNotFound: "HOTEL_OPERATOR_NOT_FOUND",
+  operatorModified: "HOTEL_ADMIN_MODIFIED",
+  loginIdDuplicated: "LOGIN_ID_DUPLICATED",
 } as const;
 
 export const getApiError = createApiErrorReader(ErrorApiResponse);

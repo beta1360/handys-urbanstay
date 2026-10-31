@@ -27,6 +27,30 @@ export type {
   UpdateGuestBody,
 } from "./guest";
 export {
+  createOperator,
+  createOperatorBodySchema,
+  fetchOperator,
+  fetchOperators,
+  operatorListParamsSchema,
+  operatorListQueryKey,
+  operatorParamsSchema,
+  operatorQueryKey,
+  resetOperatorPassword,
+  resetOperatorPasswordBodySchema,
+  updateOperator,
+  updateOperatorActive,
+  updateOperatorBodySchema,
+} from "./operator";
+export type {
+  CreateOperatorBody,
+  Operator,
+  OperatorListParams,
+  OperatorPage,
+  ResetOperatorPasswordBody,
+  UpdateOperatorActiveBody,
+  UpdateOperatorBody,
+} from "./operator";
+export {
   createRoom,
   createRoomBodySchema,
   fetchRoom,

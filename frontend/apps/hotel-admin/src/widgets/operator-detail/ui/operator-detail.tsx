@@ -1,0 +1,49 @@
+import {
+  OperatorInformation,
+  OperatorLoadFailed,
+  OperatorLoading,
+  OperatorNotFound,
+  useOperator,
+} from "@/entities/operator";
+import { OperatorActiveChange } from "@/features/operator-active-change";
+import { OperatorPasswordReset } from "@/features/operator-password-reset";
+import { OperatorDetailActions } from "./operator-detail-actions";
+
+type OperatorDetailProps = {
+  operatorId: number;
+};
+
+export function OperatorDetail({ operatorId }: OperatorDetailProps) {
+  const state = useOperator(operatorId);
+
+  switch (state.status) {
+    case "notFound":
+      return <OperatorNotFound />;
+    case "loading":
+      return (
+        <>
+          <OperatorDetailActions />
+          <OperatorLoading />
+        </>
+      );
+    case "failed":
+      return (
+        <>
+          <OperatorDetailActions />
+          <OperatorLoadFailed onRetry={state.retry} />
+        </>
+      );
+    case "ready":
+      return (
+        <>
+          <OperatorDetailActions editOperatorId={state.operator.id} />
+          <OperatorInformation operator={state.operator} />
+          <OperatorPasswordReset
+            key={state.operator.id}
+            operatorId={state.operator.id}
+          />
+          <OperatorActiveChange operator={state.operator} />
+        </>
+      );
+  }
+}
