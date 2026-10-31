@@ -9,6 +9,11 @@ export type AdminMenuItem = {
 
 export const ADMIN_MENU_ITEMS: readonly AdminMenuItem[] = [
   { to: "/rooms", label: ADMIN_LAYOUT_MESSAGES.roomMenuLabel },
+  {
+    to: "/room-types",
+    label: ADMIN_LAYOUT_MESSAGES.roomTypeMenuLabel,
+    masterOnly: true,
+  },
   { to: "/guests", label: ADMIN_LAYOUT_MESSAGES.guestMenuLabel },
   { to: "/stays", label: ADMIN_LAYOUT_MESSAGES.stayMenuLabel },
   {

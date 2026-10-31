@@ -76,6 +76,22 @@ export type {
   UpdateRoomStatusBody,
 } from "./room";
 export {
+  createRoomType,
+  createRoomTypeBodySchema,
+  fetchRoomType,
+  fetchRoomTypes,
+  roomTypeListQueryKey,
+  roomTypeParamsSchema,
+  roomTypeQueryKey,
+  updateRoomType,
+  updateRoomTypeBodySchema,
+} from "./room-type";
+export type {
+  CreateRoomTypeBody,
+  RoomType,
+  UpdateRoomTypeBody,
+} from "./room-type";
+export {
   cancelStay,
   cancelStayBodySchema,
   fetchStay,

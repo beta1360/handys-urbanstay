@@ -13,18 +13,8 @@ export interface RoomUpdateHotelAdminRequest {
      * @maxLength 50
      */
   name: string;
-  /**
-     * 객실 유형. 예: 스탠다드, 디럭스. 앞뒤 공백을 지운 뒤 1~50자.
-     * @minLength 1
-     * @maxLength 50
-     */
-  type: string;
-  /**
-     * 최대 인원. 1~20 정수.
-     * @minimum 1
-     * @maximum 20
-     */
-  capacity: number;
+  /** 객실 유형 ID. 같은 호텔의 객실 유형 목록에서 고릅니다. 없는 유형이나 다른 호텔의 유형이면 404 ROOM_TYPE_NOT_FOUND입니다. */
+  roomTypeId: number;
   /**
      * 층(선택). -10~200 정수이고 지하는 음수입니다. 없거나 null이면 층을 비웁니다(null로 저장).
      * @minimum -10
@@ -39,16 +29,6 @@ export interface RoomUpdateHotelAdminRequest {
      * @nullable
      */
   description?: string | null;
-  /**
-     * 체크인 시각. "HH:mm" 형식(00:00~23:59, 분 단위)의 문자열. 초를 붙이거나 한 자리 시로 보내면 400입니다. 체크아웃 시각과 앞뒤를 비교하지 않습니다.
-     * @pattern ^([01][0-9]|2[0-3]):[0-5][0-9]$
-     */
-  checkInTime: string;
-  /**
-     * 체크아웃 시각. "HH:mm" 형식(00:00~23:59, 분 단위)의 문자열. 초를 붙이거나 한 자리 시로 보내면 400입니다. 보통 다음 날이라 체크인 시각보다 이르거나 같아도 됩니다.
-     * @pattern ^([01][0-9]|2[0-3]):[0-5][0-9]$
-     */
-  checkOutTime: string;
   /** 조회할 때 받은 version. 현재 version과 다르면 409 ROOM_MODIFIED입니다. */
   version: number;
 }

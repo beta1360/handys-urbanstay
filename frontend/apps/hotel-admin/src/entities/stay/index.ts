@@ -21,7 +21,6 @@ export {
   STAY_LIST_FIRST_PAGE,
   toApiPage,
 } from "./lib/stay-page";
-export { countNights } from "./lib/stay-period";
 export {
   STAY_ROOM_OPTIONS_PARAMS,
   toStayRoomOptions,

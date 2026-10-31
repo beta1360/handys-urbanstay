@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { flushSync } from "react-dom";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -18,6 +18,7 @@ import {
   ROOM_LOAD_MESSAGES,
   useRefetchRoom,
 } from "@/entities/room";
+import { useRoomTypeOptions } from "@/entities/room-type";
 import { API_ERROR_CODES, getApiError } from "@/shared/api";
 import type { Room } from "@/shared/api";
 import { useUpdateRoom } from "../api/use-update-room";
@@ -42,6 +43,7 @@ export function useRoomUpdateForm(roomId: number, initialRoom: Room) {
   const navigate = useNavigate();
   const errorToast = useFormErrorToast();
   const reloadButtonRef = useRef<HTMLButtonElement>(null);
+  const { roomTypeOptions, roomTypeHint } = useRoomTypeOptions();
   const form = useForm({
     ...SUBMIT_ONLY_VALIDATION,
     resolver: zodResolver(roomUpdateFormSchema),
@@ -50,6 +52,7 @@ export function useRoomUpdateForm(roomId: number, initialRoom: Room) {
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const { formState } = form;
   const fields = toFieldPropsMap(form, ROOM_INFO_FIELDS);
+  const roomTypeId = useWatch({ control: form.control, name: "roomTypeId" });
   const formAlert = formState.errors.root?.server;
   const alert =
     formAlert?.type === API_ERROR_CODES.roomModified ||
@@ -83,7 +86,10 @@ export function useRoomUpdateForm(roomId: number, initialRoom: Room) {
             showSubmitError(getApiError(error), {
               fields: ROOM_INFO_FIELDS,
               setError: form.setError,
-              fieldOfCode: { [API_ERROR_CODES.roomDuplicated]: "name" },
+              fieldOfCode: {
+                [API_ERROR_CODES.roomDuplicated]: "name",
+                [API_ERROR_CODES.roomTypeNotFound]: "roomTypeId",
+              },
               onAlert: toastFormAlert,
             });
             resolve();
@@ -128,7 +134,12 @@ export function useRoomUpdateForm(roomId: number, initialRoom: Room) {
   }
 
   return {
-    fields,
+    fields: {
+      ...fields,
+      roomTypeId: { ...fields.roomTypeId, value: roomTypeId },
+    },
+    roomTypeOptions,
+    roomTypeHint,
     alert,
     status,
     reloadButtonRef,

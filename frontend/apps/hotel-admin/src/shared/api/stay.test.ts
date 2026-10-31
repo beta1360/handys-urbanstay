@@ -32,6 +32,11 @@ const STAY = {
   checkInDate: "2026-11-02",
   checkOutDate: "2026-11-04",
   guestCount: 2,
+  roomRate: 100000,
+  nights: 2,
+  baseAmount: 200000,
+  discountAmount: 0,
+  totalAmount: 200000,
   cancellation: null,
 };
 

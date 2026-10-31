@@ -22,6 +22,16 @@ export interface StayHotelAdminResponse {
   checkOutDate: string;
   /** 인원 */
   guestCount: number;
+  /** 예약할 때의 1박 요금(원). 나중에 유형의 요금이 바뀌어도 그대로입니다. */
+  roomRate: number;
+  /** 박 수(체크아웃 날짜 - 체크인 날짜) */
+  nights: number;
+  /** 기본 금액(원). 1박 요금 × 박 수 */
+  baseAmount: number;
+  /** 할인 금액(원). 지금은 항상 0입니다. */
+  discountAmount: number;
+  /** 최종 금액(원). 기본 금액 - 할인 금액. 취소한 이용도 금액은 그대로 담깁니다. */
+  totalAmount: number;
   /** 취소 정보. 취소하지 않은 이용이면 null */
   cancellation: StayCancellationHotelAdminResponse | null;
 }

@@ -6,10 +6,15 @@ const roomDetailRoute = getRouteApi("/_authenticated/rooms/$roomId");
 
 export function RoomDetailPage() {
   const { roomId } = roomDetailRoute.useParams();
+  const { isMaster } = roomDetailRoute.useRouteContext();
 
   return (
     <div className="flex flex-col gap-4">
-      {roomId === undefined ? <RoomNotFound /> : <RoomDetail roomId={roomId} />}
+      {roomId === undefined ? (
+        <RoomNotFound />
+      ) : (
+        <RoomDetail roomId={roomId} canEdit={isMaster} />
+      )}
     </div>
   );
 }

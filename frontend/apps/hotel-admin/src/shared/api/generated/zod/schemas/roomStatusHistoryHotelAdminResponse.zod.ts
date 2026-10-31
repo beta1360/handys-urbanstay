@@ -10,7 +10,7 @@ import { RoomStatusHistoryChangedByHotelAdminResponse } from './roomStatusHistor
 
 export const RoomStatusHistoryHotelAdminResponse = zod.object({
   "id": zod.int().describe('상태 이력 ID'),
-  "fromStatus": zod.union([zod.literal('VACANT'),zod.literal('RESERVED'),zod.literal('OCCUPIED'),zod.literal('MAINTENANCE'),zod.literal(null)]).nullable().describe('이전 상태. VACANT, RESERVED, OCCUPIED, MAINTENANCE 중 하나이고, 객실 등록 때 남긴 이력이면 null'),
+  "fromStatus": zod.union([zod.literal('VACANT'),zod.literal('RESERVED'),zod.literal('OCCUPIED'),zod.literal('MAINTENANCE'),zod.literal(null)]).nullable().describe('이전 상태. VACANT, RESERVED, OCCUPIED, MAINTENANCE 중 하나이고, 객실 생성 때 남긴 이력이면 null'),
   "toStatus": zod.enum(['VACANT', 'RESERVED', 'OCCUPIED', 'MAINTENANCE']).describe('바뀐 상태. VACANT, RESERVED, OCCUPIED, MAINTENANCE 중 하나'),
   "changedBy": RoomStatusHistoryChangedByHotelAdminResponse.describe('상태를 바꾼 호텔 계정(바꿀 때의 이름)'),
   "changedAt": zod.iso.datetime({"offset":true}).describe('바꾼 시각. UTC의 ISO 8601 문자열(예: "2026-10-30T06:59:32.123456Z")')

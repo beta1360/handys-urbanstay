@@ -27,12 +27,15 @@ import {
 } from "@/entities/room";
 import type { RoomInfoField } from "@/entities/room";
 import { API_ERROR_CODES, roomQueryKey, updateRoom } from "@/shared/api";
-import type { Room } from "@/shared/api";
-import { COMMON_MESSAGES } from "@/shared/config";
+import type { Room, RoomType } from "@/shared/api";
+import { ACCESS_MESSAGES, COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { RoomEditPage } from "./room-edit-page";
 
-const { fetchRoom } = vi.hoisted(() => ({ fetchRoom: vi.fn() }));
+const { fetchRoom, fetchRoomTypes } = vi.hoisted(() => ({
+  fetchRoom: vi.fn(),
+  fetchRoomTypes: vi.fn(),
+}));
 
 vi.mock("@/shared/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/api")>();
@@ -40,6 +43,7 @@ vi.mock("@/shared/api", async (importOriginal) => {
     ...actual,
     updateRoom: vi.fn(),
     fetchRoom: (roomId: number) => fetchRoom(roomId),
+    fetchRoomTypes: () => fetchRoomTypes(),
   };
 });
 
@@ -58,16 +62,41 @@ const DETAIL_PAGE_TEXT = "객실 상세 화면";
 const ROOM: Room = {
   id: 1,
   name: "101",
-  type: "스탠다드",
-  capacity: 2,
+  roomType: {
+    id: 1,
+    name: "스탠다드",
+    capacity: 2,
+    roomRate: 100000,
+    checkInTime: "15:00",
+    checkOutTime: "11:00",
+  },
   floor: null,
   description: "창가 객실입니다.",
-  checkInTime: "15:00",
-  checkOutTime: "11:00",
   status: "OCCUPIED",
   currentStay: null,
   version: 3,
 };
+
+const ROOM_TYPES: RoomType[] = [
+  {
+    id: 1,
+    name: "스탠다드",
+    capacity: 2,
+    roomRate: 100000,
+    checkInTime: "15:00",
+    checkOutTime: "11:00",
+    version: 0,
+  },
+  {
+    id: 2,
+    name: "스위트",
+    capacity: 4,
+    roomRate: 250000,
+    checkInTime: "16:00",
+    checkOutTime: "12:00",
+    version: 0,
+  },
+];
 
 const LATEST_ROOM: Room = {
   ...ROOM,
@@ -80,11 +109,8 @@ const LATEST_ROOM: Room = {
 function valuesOf(room: Room): Record<RoomInfoField, string> {
   return {
     name: room.name,
-    type: room.type,
-    capacity: String(room.capacity),
+    roomTypeId: String(room.roomType.id),
     floor: room.floor === null ? "" : String(room.floor),
-    checkInTime: room.checkInTime,
-    checkOutTime: room.checkOutTime,
     description: room.description ?? "",
   };
 }
@@ -92,11 +118,8 @@ function valuesOf(room: Room): Record<RoomInfoField, string> {
 function bodyOf(room: Room) {
   return {
     name: room.name,
-    type: room.type,
-    capacity: room.capacity,
+    roomTypeId: room.roomType.id,
     floor: room.floor,
-    checkInTime: room.checkInTime,
-    checkOutTime: room.checkOutTime,
     description: room.description,
     version: room.version,
   };
@@ -119,7 +142,7 @@ function createApiError(status: number, code: string, message = "서버 문구")
   );
 }
 
-function renderRoomEditPage(roomId = String(ROOM.id)) {
+function renderRoomEditPage(roomId = String(ROOM.id), isMaster = true) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
     mutationCache: new MutationCache({ onError: vi.fn() }),
@@ -136,6 +159,7 @@ function renderRoomEditPage(roomId = String(ROOM.id)) {
       parse: parseRoomPathParams,
       stringify: stringifyRoomPathParams,
     },
+    beforeLoad: () => ({ isMaster }),
   });
   const router = createRouter({
     routeTree: rootRoute.addChildren([
@@ -174,6 +198,7 @@ function renderRoomEditPage(roomId = String(ROOM.id)) {
 async function renderLoadedRoomEditPage() {
   const rendered = renderRoomEditPage();
   await screen.findByRole("group", { name: ROOM_INFO_MESSAGES.legend });
+  await screen.findByRole("option", { name: ROOM_TYPES[1].name });
   return rendered;
 }
 
@@ -184,11 +209,8 @@ function getFields(): Record<RoomInfoField, HTMLElement> {
   const optional = (label: string) => `${label} ${ROOM_INFO_MESSAGES.optional}`;
   return {
     name: group.getByLabelText(ROOM_FIELD_LABELS.name),
-    type: group.getByLabelText(ROOM_FIELD_LABELS.type),
-    capacity: group.getByLabelText(ROOM_FIELD_LABELS.capacity),
+    roomTypeId: group.getByLabelText(ROOM_FIELD_LABELS.roomType),
     floor: group.getByLabelText(optional(ROOM_FIELD_LABELS.floor)),
-    checkInTime: group.getByLabelText(ROOM_FIELD_LABELS.checkInTime),
-    checkOutTime: group.getByLabelText(ROOM_FIELD_LABELS.checkOutTime),
     description: group.getByLabelText(optional(ROOM_FIELD_LABELS.description)),
   };
 }
@@ -225,6 +247,7 @@ async function replaceName(user: UserEvent, value: string) {
 
 beforeEach(() => {
   fetchRoom.mockResolvedValue(ROOM);
+  fetchRoomTypes.mockResolvedValue(ROOM_TYPES);
 });
 
 afterEach(() => {
@@ -237,6 +260,29 @@ describe("RoomEditPage 불러오기", () => {
 
     expectFormValues(valuesOf(ROOM));
     expect(fetchRoom).toHaveBeenCalledExactlyOnceWith(ROOM.id);
+  });
+
+  it("마스터가 아니면 조회하지 않고 권한이 없다는 문구만 보여준다", async () => {
+    renderRoomEditPage(String(ROOM.id), false);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      ACCESS_MESSAGES.forbidden,
+    );
+    expect(screen.queryByRole("group")).not.toBeInTheDocument();
+    expect(fetchRoom).not.toHaveBeenCalled();
+  });
+
+  it("유형을 다른 유형으로 고르면 그 유형 id로 저장을 요청한다", async () => {
+    vi.mocked(updateRoom).mockReturnValue(new Promise<never>(() => {}));
+    const { user } = await renderLoadedRoomEditPage();
+
+    await user.selectOptions(getFields().roomTypeId, ROOM_TYPES[1].name);
+    await user.click(getSubmitButton());
+
+    expect(vi.mocked(updateRoom).mock.lastCall).toEqual([
+      ROOM.id,
+      { ...bodyOf(ROOM), roomTypeId: ROOM_TYPES[1].id },
+    ]);
   });
 
   it("id가 잘못되면 조회하지 않고 찾을 수 없음을 보여준다", async () => {

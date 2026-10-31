@@ -2,12 +2,9 @@ import type { RoomStatus } from "@/shared/api";
 
 export const ROOM_FIELD_LABELS = {
   name: "이름",
-  type: "유형",
-  capacity: "최대 인원",
+  roomType: "유형",
   floor: "층",
   description: "소개",
-  checkInTime: "체크인 시각",
-  checkOutTime: "체크아웃 시각",
   status: "상태",
 } as const;
 
@@ -34,8 +31,6 @@ export const ROOM_NOT_FOUND_MESSAGES = {
 export const ROOM_INFO_MESSAGES = {
   legend: "객실 정보",
   optional: "(선택)",
-  capacityHint: (min: number | null, max: number | null) =>
-    `${min}~${max}명`,
   floorHint: (min: number | null, max: number | null) =>
     `${min}~${max}. 지하는 음수`,
 } as const;

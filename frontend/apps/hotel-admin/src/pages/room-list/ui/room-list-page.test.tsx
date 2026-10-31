@@ -15,6 +15,7 @@ import {
   ROOM_INFORMATION_MESSAGES,
   ROOM_STATUS_LABELS,
 } from "@/entities/room";
+import { ROOM_TYPE_FIELD_LABELS } from "@/entities/room-type";
 import { ROOM_SEARCH_FORM_MESSAGES } from "@/features/room-search";
 import type { Room, RoomPage } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
@@ -45,12 +46,16 @@ const ROOMS: Room[] = [
   {
     id: 2,
     name: "101",
-    type: "스탠다드",
-    capacity: 2,
+    roomType: {
+      id: 1,
+      name: "스탠다드",
+      capacity: 2,
+      roomRate: 100000,
+      checkInTime: "15:00",
+      checkOutTime: "11:00",
+    },
     floor: 1,
     description: null,
-    checkInTime: "15:00",
-    checkOutTime: "11:00",
     status: "VACANT",
     currentStay: {
       id: 5,
@@ -63,12 +68,16 @@ const ROOMS: Room[] = [
   {
     id: 1,
     name: "스위트 A",
-    type: "스위트",
-    capacity: 4,
+    roomType: {
+      id: 2,
+      name: "스위트",
+      capacity: 4,
+      roomRate: 100000,
+      checkInTime: "16:00",
+      checkOutTime: "12:00",
+    },
     floor: null,
     description: "바다가 보이는 객실입니다.",
-    checkInTime: "16:00",
-    checkOutTime: "12:00",
     status: "MAINTENANCE",
     currentStay: null,
     version: 3,
@@ -99,7 +108,7 @@ function roomsPath(search: Record<string, string> = {}) {
   return searchString ? `/rooms?${searchString}` : "/rooms";
 }
 
-function renderRoomListPage(initialPath = roomsPath()) {
+function renderRoomListPage(initialPath = roomsPath(), isMaster = true) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -113,6 +122,7 @@ function renderRoomListPage(initialPath = roomsPath()) {
     path: "rooms/",
     validateSearch: roomListSearchSchema,
     search: { middlewares: [stripSearchParams(ROOM_LIST_DEFAULT_SEARCH)] },
+    beforeLoad: () => ({ isMaster }),
     component: RoomListPage,
   });
   const router = createRouter({
@@ -126,7 +136,7 @@ function renderRoomListPage(initialPath = roomsPath()) {
         }),
         createRoute({
           getParentRoute: () => layoutRoute,
-          path: "stays/$stayId",
+          path: "guests/$guestId",
         }),
       ]),
     ]),
@@ -182,9 +192,9 @@ describe("RoomListPage 목록", () => {
         .map((header) => header.textContent),
     ).toEqual([
       ROOM_FIELD_LABELS.name,
-      ROOM_FIELD_LABELS.type,
+      ROOM_FIELD_LABELS.roomType,
       ROOM_FIELD_LABELS.floor,
-      ROOM_FIELD_LABELS.capacity,
+      ROOM_TYPE_FIELD_LABELS.capacity,
       ROOM_FIELD_LABELS.status,
       ROOM_TABLE_MESSAGES.currentGuest,
     ]);
@@ -203,12 +213,12 @@ describe("RoomListPage 목록", () => {
     expect(fetchRooms).toHaveBeenCalledExactlyOnceWith({ page: 0 });
   });
 
-  it("지금 이용객 이름은 그 이용의 상세 화면으로 가는 링크다", async () => {
+  it("지금 이용객 이름은 그 이용객의 상세 화면으로 가는 링크다", async () => {
     renderRoomListPage();
 
     expect(
       await screen.findByRole("link", { name: "김이용" }),
-    ).toHaveAttribute("href", "/stays/5");
+    ).toHaveAttribute("href", "/guests/9");
   });
 
   it("객실 이름은 그 객실의 상세 화면으로 가는 링크다", async () => {
@@ -224,7 +234,19 @@ describe("RoomListPage 목록", () => {
     });
   });
 
-  it("객실 등록 버튼을 누르면 객실 등록 화면으로 이동한다", async () => {
+  it("운영자에게는 객실 생성 버튼 없이 객실 목록을 그대로 보여준다", async () => {
+    renderRoomListPage(roomsPath(), false);
+
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: ROOMS[0].name }),
+    ).toHaveAttribute("href", `/rooms/${ROOMS[0].id}`);
+    expect(
+      screen.queryByRole("link", { name: ROOM_LIST_MESSAGES.create }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("객실 생성 버튼을 누르면 객실 생성 화면으로 이동한다", async () => {
     const { router, user } = renderRoomListPage();
 
     const createLink = await screen.findByRole("link", {

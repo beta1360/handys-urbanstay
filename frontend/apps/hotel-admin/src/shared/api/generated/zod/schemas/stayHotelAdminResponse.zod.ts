@@ -17,6 +17,11 @@ export const StayHotelAdminResponse = zod.object({
   "checkInDate": zod.iso.date().describe('체크인 날짜("YYYY-MM-DD")'),
   "checkOutDate": zod.iso.date().describe('체크아웃 날짜("YYYY-MM-DD"). 이 날은 묵지 않습니다.'),
   "guestCount": zod.int().describe('인원'),
+  "roomRate": zod.int().describe('예약할 때의 1박 요금(원). 나중에 유형의 요금이 바뀌어도 그대로입니다.'),
+  "nights": zod.int().describe('박 수(체크아웃 날짜 - 체크인 날짜)'),
+  "baseAmount": zod.int().describe('기본 금액(원). 1박 요금 × 박 수'),
+  "discountAmount": zod.int().describe('할인 금액(원). 지금은 항상 0입니다.'),
+  "totalAmount": zod.int().describe('최종 금액(원). 기본 금액 - 할인 금액. 취소한 이용도 금액은 그대로 담깁니다.'),
   "cancellation": zod.union([StayCancellationHotelAdminResponse,zod.null()]).describe('취소 정보. 취소하지 않은 이용이면 null')
 });
 

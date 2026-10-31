@@ -32,7 +32,7 @@ export function OperatorCreateFormView({
       </OperatorInfoFields>
       <div className="flex gap-2">
         <Button type="submit" variant="primary" loading={isSubmitting}>
-          {COMMON_MESSAGES.create}
+          {COMMON_MESSAGES.register}
         </Button>
         <ButtonLink
           to="/operators"

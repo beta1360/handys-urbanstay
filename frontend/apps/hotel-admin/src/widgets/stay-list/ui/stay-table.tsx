@@ -3,6 +3,7 @@ import type { TableColumn } from "@repo/ui/table";
 import { TextLink } from "@repo/admin-kit/link";
 import { STAY_CANCELED_LABELS, STAY_FIELD_LABELS } from "@/entities/stay";
 import type { Stay } from "@/shared/api";
+import { formatWon } from "@/shared/lib/money";
 import { STAY_LIST_CONTENT_MESSAGES } from "../config/messages";
 
 const STAY_COLUMNS: readonly TableColumn<Stay>[] = [
@@ -35,6 +36,11 @@ const STAY_COLUMNS: readonly TableColumn<Stay>[] = [
     key: "guestCount",
     header: STAY_FIELD_LABELS.guestCount,
     cell: (stay) => stay.guestCount,
+  },
+  {
+    key: "amount",
+    header: STAY_FIELD_LABELS.amount,
+    cell: (stay) => formatWon(stay.totalAmount),
   },
   {
     key: "canceled",
