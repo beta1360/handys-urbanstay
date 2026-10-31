@@ -149,18 +149,19 @@ describe("AdminLayout", () => {
     expect(screen.getByText(APP_INFO.name)).toBeInTheDocument();
   });
 
-  it("메뉴에는 /hotels로 가는 호텔 메뉴 하나만 둔다", async () => {
+  it("메뉴에는 /hotels로 가는 호텔 메뉴와 /members로 가는 회원 메뉴를 둔다", async () => {
     renderAdminLayout("/hotels");
 
     const navigation = await screen.findByRole("navigation", {
       name: ADMIN_LAYOUT_MESSAGES.sidebarLabel,
     });
     const links = within(navigation).getAllByRole("link");
-    expect(links).toHaveLength(1);
-    expect(links[0]).toHaveAccessibleName(
-      ADMIN_LAYOUT_MESSAGES.hotelMenuLabel,
-    );
-    expect(links[0]).toHaveAttribute("href", "/hotels");
+    expect(
+      links.map((link) => [link.textContent, link.getAttribute("href")]),
+    ).toEqual([
+      [ADMIN_LAYOUT_MESSAGES.hotelMenuLabel, "/hotels"],
+      [ADMIN_LAYOUT_MESSAGES.memberMenuLabel, "/members"],
+    ]);
   });
 
   it.each(["/hotels", "/hotels/new", "/hotels/1", "/hotels/1/edit"])(

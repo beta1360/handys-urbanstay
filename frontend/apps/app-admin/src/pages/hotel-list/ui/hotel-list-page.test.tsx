@@ -136,15 +136,15 @@ function findKeywordInput() {
 }
 
 function getSearchButton() {
-  return screen.getByRole("button", { name: HOTEL_SEARCH_FORM_MESSAGES.search });
+  return screen.getByRole("button", { name: COMMON_MESSAGES.search });
 }
 
 function getPreviousButton() {
-  return screen.getByRole("button", { name: HOTEL_LIST_CONTENT_MESSAGES.previousPage });
+  return screen.getByRole("button", { name: COMMON_MESSAGES.previousPage });
 }
 
 function getNextButton() {
-  return screen.getByRole("button", { name: HOTEL_LIST_CONTENT_MESSAGES.nextPage });
+  return screen.getByRole("button", { name: COMMON_MESSAGES.nextPage });
 }
 
 function createDeferred<T>() {
@@ -209,7 +209,7 @@ describe("HotelListPage 목록", () => {
     );
     expect(table).not.toHaveAttribute("aria-busy");
     expect(
-      screen.getByText(HOTEL_LIST_CONTENT_MESSAGES.pageStatus(1, 1)),
+      screen.getByText(COMMON_MESSAGES.pageStatus(1, 1)),
     ).toBeInTheDocument();
     expect(fetchHotels).toHaveBeenCalledExactlyOnceWith({ page: 0 });
   });
@@ -259,7 +259,7 @@ describe("HotelListPage 목록", () => {
     renderHotelListPage(hotelsPath({ keyword: KEYWORD, page: "3" }));
 
     expect(
-      await screen.findByText(HOTEL_LIST_CONTENT_MESSAGES.pageStatus(3, 5)),
+      await screen.findByText(COMMON_MESSAGES.pageStatus(3, 5)),
     ).toBeInTheDocument();
     expect(await findKeywordInput()).toHaveValue(KEYWORD);
     expect(fetchHotels).toHaveBeenCalledExactlyOnceWith({
@@ -344,7 +344,7 @@ describe("HotelListPage 페이지 이동", () => {
     expect(screen.getByRole("table")).toHaveAttribute("aria-busy", "true");
     expect(screen.getByText(HOTELS[0].name)).toBeInTheDocument();
     expect(
-      screen.getByText(HOTEL_LIST_CONTENT_MESSAGES.pageStatus(2, 3)),
+      screen.getByText(COMMON_MESSAGES.pageStatus(2, 3)),
     ).toBeInTheDocument();
   });
 
@@ -405,7 +405,7 @@ describe("HotelListPage 빈 상태", () => {
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("navigation", {
-        name: HOTEL_LIST_CONTENT_MESSAGES.paginationLabel,
+        name: COMMON_MESSAGES.paginationLabel,
       }),
     ).not.toBeInTheDocument();
   });
@@ -415,7 +415,7 @@ describe("HotelListPage 빈 상태", () => {
     renderHotelListPage(hotelsPath({ keyword: KEYWORD }));
 
     expect(
-      await screen.findByText(HOTEL_LIST_CONTENT_MESSAGES.emptySearchResult),
+      await screen.findByText(COMMON_MESSAGES.emptySearchResult),
     ).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
@@ -424,7 +424,7 @@ describe("HotelListPage 빈 상태", () => {
 describe("HotelListPage 마지막 페이지를 넘은 페이지", () => {
   it("검색어를 유지한 채 마지막 페이지로 방문 기록을 바꿔 이동하고 그동안 빈 상태 문구 대신 불러오는 중 문구를 보여준다", async () => {
     const wasEmptyTextAdded = recordAddedText(
-      HOTEL_LIST_CONTENT_MESSAGES.emptySearchResult,
+      COMMON_MESSAGES.emptySearchResult,
     );
     const lastPage = createDeferred<HotelPage>();
     fetchHotels
@@ -451,7 +451,7 @@ describe("HotelListPage 마지막 페이지를 넘은 페이지", () => {
 
     expect(await screen.findByRole("table")).toBeInTheDocument();
     expect(
-      screen.getByText(HOTEL_LIST_CONTENT_MESSAGES.pageStatus(2, 2)),
+      screen.getByText(COMMON_MESSAGES.pageStatus(2, 2)),
     ).toBeInTheDocument();
     expect(wasEmptyTextAdded()).toBe(false);
   });

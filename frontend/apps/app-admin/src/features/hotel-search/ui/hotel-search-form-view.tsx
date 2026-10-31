@@ -3,6 +3,7 @@ import { Button } from "@repo/ui/button";
 import { TextField } from "@repo/ui/text-field";
 import type { FormFieldProps } from "@repo/admin-kit/form";
 import { HOTEL_KEYWORD_MAX_LENGTH } from "@/entities/hotel";
+import { COMMON_MESSAGES } from "@/shared/config";
 import { HOTEL_SEARCH_FORM_MESSAGES } from "../config/messages";
 
 type HotelSearchFormViewProps = {
@@ -24,7 +25,7 @@ export function HotelSearchFormView({
         {...keywordField}
       />
       <Button type="submit" variant="secondary">
-        {HOTEL_SEARCH_FORM_MESSAGES.search}
+        {COMMON_MESSAGES.search}
       </Button>
     </form>
   );
