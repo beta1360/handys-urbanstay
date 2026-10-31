@@ -1,8 +1,9 @@
 import type { z } from "zod";
-import { passwordSchema, requiredTextSchema } from "@repo/admin-kit/form";
+import { passwordSchema } from "@repo/admin-kit/form";
 import { FORM_VALIDATION_MESSAGES } from "@repo/admin-kit/config";
 import { createHotelInfoFormShape, HOTEL_INFO_FIELDS } from "@/entities/hotel";
 import type { HotelInfoField } from "@/entities/hotel";
+import { createHotelMasterInfoFormShape } from "@/entities/hotel-master";
 import { createHotelBodySchema } from "@/shared/api";
 
 const masterRules = createHotelBodySchema.shape.master;
@@ -17,11 +18,7 @@ export const MASTER_PASSWORD_LENGTH = {
 export const hotelCreateFormSchema = createHotelBodySchema.extend({
   ...createHotelInfoFormShape(createHotelBodySchema.shape),
   master: masterRules.extend({
-    loginId: requiredTextSchema(
-      masterRules.shape.loginId,
-      FORM_VALIDATION_MESSAGES.emailFormat,
-    ),
-    name: requiredTextSchema(masterRules.shape.name),
+    ...createHotelMasterInfoFormShape(masterRules.shape),
     password: passwordSchema(
       passwordRule,
       FORM_VALIDATION_MESSAGES.passwordRule(

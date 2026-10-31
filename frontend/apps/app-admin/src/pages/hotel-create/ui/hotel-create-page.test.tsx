@@ -101,7 +101,7 @@ const PASSWORD_RULE = FORM_VALIDATION_MESSAGES.passwordRule(8, 64);
 
 const FIELD_HINTS: Partial<Record<InputField, string>> = {
   phone: HOTEL_INFO_MESSAGES.phoneHint,
-  loginId: HOTEL_CREATE_FORM_MESSAGES.masterLoginIdHint,
+  loginId: HOTEL_MASTER_INFO_MESSAGES.loginIdHint,
   password: PASSWORD_HINT,
 };
 
@@ -195,7 +195,7 @@ function getFields(): Record<InputField, HTMLElement> {
     description: hotelInfo.getByLabelText(
       `${HOTEL_FIELD_LABELS.description} ${HOTEL_INFO_MESSAGES.optional}`,
     ),
-    loginId: master.getByLabelText(HOTEL_CREATE_FORM_MESSAGES.masterLoginIdLabel),
+    loginId: master.getByLabelText(HOTEL_MASTER_INFO_MESSAGES.loginIdLabel),
     masterName: master.getByLabelText(HOTEL_MASTER_FIELD_LABELS.name),
     password: master.getByLabelText(HOTEL_CREATE_FORM_MESSAGES.masterPasswordLabel),
   };

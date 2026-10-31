@@ -1,8 +1,23 @@
 import { z } from "zod";
 import { parseRequest, parseResponseBody } from "@repo/admin-kit/api";
 import * as generated from "./generated";
-import { GetHotelMasterParams, GetHotelMasterResponse } from "./generated/zod";
-import { AccountHotelMasterAppAdminResponse } from "./generated/zod/schemas";
+import {
+  GetHotelMasterParams,
+  GetHotelMasterResponse,
+  UpdateHotelMasterParams,
+  UpdateHotelMasterResponse,
+} from "./generated/zod";
+import {
+  AccountHotelMasterAppAdminResponse,
+  AccountHotelMasterUpdateAppAdminRequest,
+} from "./generated/zod/schemas";
+
+export const updateHotelMasterBodySchema =
+  AccountHotelMasterUpdateAppAdminRequest;
+
+export type UpdateHotelMasterBody = z.input<
+  typeof AccountHotelMasterUpdateAppAdminRequest
+>;
 
 export type HotelMaster = z.output<typeof AccountHotelMasterAppAdminResponse>;
 
@@ -14,6 +29,11 @@ const HOTEL_MASTER_SUCCESS_SHAPE = {
 const GetHotelMasterSuccessResponse = GetHotelMasterResponse.extend(
   HOTEL_MASTER_SUCCESS_SHAPE,
 );
+
+const UpdateHotelMasterSuccessResponse = UpdateHotelMasterResponse.extend({
+  ...HOTEL_MASTER_SUCCESS_SHAPE,
+  message: z.string(),
+});
 
 type RequestOptions = {
   signal?: AbortSignal;
@@ -40,4 +60,30 @@ export async function fetchHotelMaster(
     GetHotelMasterSuccessResponse,
     response,
   ).data;
+}
+
+export async function updateHotelMaster(
+  hotelId: number,
+  body: UpdateHotelMasterBody,
+) {
+  const validParams = parseRequest(
+    "updateHotelMaster",
+    UpdateHotelMasterParams,
+    { hotelId },
+  );
+  const validBody = parseRequest(
+    "updateHotelMaster",
+    AccountHotelMasterUpdateAppAdminRequest,
+    body,
+  );
+  const response = await generated.updateHotelMaster(
+    validParams.hotelId,
+    validBody,
+  );
+  const { data, message } = parseResponseBody(
+    "updateHotelMaster",
+    UpdateHotelMasterSuccessResponse,
+    response,
+  );
+  return { data, message };
 }

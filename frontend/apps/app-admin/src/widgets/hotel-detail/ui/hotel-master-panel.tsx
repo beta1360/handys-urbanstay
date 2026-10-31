@@ -1,5 +1,7 @@
+import { ButtonLink } from "@repo/admin-kit/link";
 import { HotelNotFound } from "@/entities/hotel";
 import {
+  HOTEL_MASTER_INFO_MESSAGES,
   HotelMasterInformation,
   HotelMasterLoadFailed,
   HotelMasterLoading,
@@ -31,7 +33,17 @@ export function HotelMasterPanel({ hotelId }: HotelMasterPanelProps) {
       );
     case "ready":
       return (
-        <HotelMasterSection>
+        <HotelMasterSection
+          action={
+            <ButtonLink
+              to="/hotels/$hotelId/master/edit"
+              params={{ hotelId }}
+              variant="secondary"
+            >
+              {HOTEL_MASTER_INFO_MESSAGES.edit}
+            </ButtonLink>
+          }
+        >
           <HotelMasterInformation master={state.master} />
         </HotelMasterSection>
       );

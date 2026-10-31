@@ -17,6 +17,7 @@ import { Route as AuthenticatedHotelsHotelIdRouteRouteImport } from "./../routes
 import { Route as AuthenticatedHotelsNewRouteImport } from "./../routes/_authenticated/hotels/new";
 import { Route as AuthenticatedHotelsHotelIdIndexRouteImport } from "./../routes/_authenticated/hotels/$hotelId/index";
 import { Route as AuthenticatedHotelsHotelIdEditRouteImport } from "./../routes/_authenticated/hotels/$hotelId/edit";
+import { Route as AuthenticatedHotelsHotelIdMasterEditRouteImport } from "./../routes/_authenticated/hotels/$hotelId/master/edit";
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: "/_authenticated",
@@ -61,6 +62,12 @@ const AuthenticatedHotelsHotelIdEditRoute =
     path: "/edit",
     getParentRoute: () => AuthenticatedHotelsHotelIdRouteRoute,
   } as any);
+const AuthenticatedHotelsHotelIdMasterEditRoute =
+  AuthenticatedHotelsHotelIdMasterEditRouteImport.update({
+    id: "/master/edit",
+    path: "/master/edit",
+    getParentRoute: () => AuthenticatedHotelsHotelIdRouteRoute,
+  } as any);
 
 export interface FileRoutesByFullPath {
   "/": typeof AuthenticatedIndexRoute;
@@ -70,6 +77,7 @@ export interface FileRoutesByFullPath {
   "/hotels/": typeof AuthenticatedHotelsIndexRoute;
   "/hotels/$hotelId/edit": typeof AuthenticatedHotelsHotelIdEditRoute;
   "/hotels/$hotelId/": typeof AuthenticatedHotelsHotelIdIndexRoute;
+  "/hotels/$hotelId/master/edit": typeof AuthenticatedHotelsHotelIdMasterEditRoute;
 }
 export interface FileRoutesByTo {
   "/login": typeof LoginRoute;
@@ -78,6 +86,7 @@ export interface FileRoutesByTo {
   "/hotels": typeof AuthenticatedHotelsIndexRoute;
   "/hotels/$hotelId/edit": typeof AuthenticatedHotelsHotelIdEditRoute;
   "/hotels/$hotelId": typeof AuthenticatedHotelsHotelIdIndexRoute;
+  "/hotels/$hotelId/master/edit": typeof AuthenticatedHotelsHotelIdMasterEditRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
@@ -89,6 +98,7 @@ export interface FileRoutesById {
   "/_authenticated/hotels/": typeof AuthenticatedHotelsIndexRoute;
   "/_authenticated/hotels/$hotelId/edit": typeof AuthenticatedHotelsHotelIdEditRoute;
   "/_authenticated/hotels/$hotelId/": typeof AuthenticatedHotelsHotelIdIndexRoute;
+  "/_authenticated/hotels/$hotelId/master/edit": typeof AuthenticatedHotelsHotelIdMasterEditRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
@@ -99,7 +109,8 @@ export interface FileRouteTypes {
     | "/hotels/new"
     | "/hotels/"
     | "/hotels/$hotelId/edit"
-    | "/hotels/$hotelId/";
+    | "/hotels/$hotelId/"
+    | "/hotels/$hotelId/master/edit";
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/login"
@@ -107,7 +118,8 @@ export interface FileRouteTypes {
     | "/hotels/new"
     | "/hotels"
     | "/hotels/$hotelId/edit"
-    | "/hotels/$hotelId";
+    | "/hotels/$hotelId"
+    | "/hotels/$hotelId/master/edit";
   id:
     | "__root__"
     | "/_authenticated"
@@ -117,7 +129,8 @@ export interface FileRouteTypes {
     | "/_authenticated/hotels/new"
     | "/_authenticated/hotels/"
     | "/_authenticated/hotels/$hotelId/edit"
-    | "/_authenticated/hotels/$hotelId/";
+    | "/_authenticated/hotels/$hotelId/"
+    | "/_authenticated/hotels/$hotelId/master/edit";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
@@ -183,18 +196,28 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthenticatedHotelsHotelIdEditRouteImport;
       parentRoute: typeof AuthenticatedHotelsHotelIdRouteRoute;
     };
+    "/_authenticated/hotels/$hotelId/master/edit": {
+      id: "/_authenticated/hotels/$hotelId/master/edit";
+      path: "/master/edit";
+      fullPath: "/hotels/$hotelId/master/edit";
+      preLoaderRoute: typeof AuthenticatedHotelsHotelIdMasterEditRouteImport;
+      parentRoute: typeof AuthenticatedHotelsHotelIdRouteRoute;
+    };
   }
 }
 
 interface AuthenticatedHotelsHotelIdRouteRouteChildren {
   AuthenticatedHotelsHotelIdEditRoute: typeof AuthenticatedHotelsHotelIdEditRoute;
   AuthenticatedHotelsHotelIdIndexRoute: typeof AuthenticatedHotelsHotelIdIndexRoute;
+  AuthenticatedHotelsHotelIdMasterEditRoute: typeof AuthenticatedHotelsHotelIdMasterEditRoute;
 }
 
 const AuthenticatedHotelsHotelIdRouteRouteChildren: AuthenticatedHotelsHotelIdRouteRouteChildren =
   {
     AuthenticatedHotelsHotelIdEditRoute: AuthenticatedHotelsHotelIdEditRoute,
     AuthenticatedHotelsHotelIdIndexRoute: AuthenticatedHotelsHotelIdIndexRoute,
+    AuthenticatedHotelsHotelIdMasterEditRoute:
+      AuthenticatedHotelsHotelIdMasterEditRoute,
   };
 
 const AuthenticatedHotelsHotelIdRouteRouteWithChildren =

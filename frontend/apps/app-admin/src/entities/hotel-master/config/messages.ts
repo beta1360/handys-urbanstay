@@ -9,4 +9,7 @@ export const HOTEL_MASTER_LOAD_MESSAGES = {
 
 export const HOTEL_MASTER_INFO_MESSAGES = {
   legend: "마스터 계정",
+  edit: "마스터 정보 수정",
+  loginIdLabel: "아이디(이메일)",
+  loginIdHint: "이메일 형식. 마스터가 hotel-admin에 로그인할 때 씁니다.",
 } as const;

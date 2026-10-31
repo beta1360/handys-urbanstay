@@ -64,6 +64,8 @@ const MULTILINE_DESCRIPTION = "바다가 보이는 호텔입니다.\n\n조식을
 
 const EDIT_PAGE_TEXT = "호텔 수정 화면";
 
+const MASTER_EDIT_PAGE_TEXT = "마스터 수정 화면";
+
 function hotelPath(hotelId: number | string) {
   return `/hotels/${hotelId}`;
 }
@@ -116,11 +118,20 @@ function renderHotelDetailPage(initialEntries = [hotelPath(HOTEL.id)]) {
     path: "edit",
     component: () => <p>{EDIT_PAGE_TEXT}</p>,
   });
+  const masterEditRoute = createRoute({
+    getParentRoute: () => hotelRoute,
+    path: "master/edit",
+    component: () => <p>{MASTER_EDIT_PAGE_TEXT}</p>,
+  });
   const router = createRouter({
     routeTree: rootRoute.addChildren([
       layoutRoute.addChildren([
         hotelListRoute,
-        hotelRoute.addChildren([hotelDetailRoute, hotelEditRoute]),
+        hotelRoute.addChildren([
+          hotelDetailRoute,
+          hotelEditRoute,
+          masterEditRoute,
+        ]),
       ]),
     ]),
     history: createMemoryHistory({
@@ -397,6 +408,34 @@ describe("HotelDetailPage 마스터 계정", () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(fetchHotelMaster).toHaveBeenCalledExactlyOnceWith(HOTEL.id);
+  });
+
+  it("마스터 정보를 보여줄 때만 묶음에 마스터 정보 수정 버튼을 두고, 누르면 마스터 수정 화면으로 이동한다", async () => {
+    const user = userEvent.setup();
+    let showMaster: (master: HotelMaster) => void = () => {};
+    fetchHotelMaster.mockReturnValue(
+      new Promise((resolve) => {
+        showMaster = resolve;
+      }),
+    );
+    const router = renderHotelDetailPage();
+    const master = within(await findMasterRegion());
+    const editName = { name: HOTEL_MASTER_INFO_MESSAGES.edit };
+    expect(master.queryByRole("link", editName)).not.toBeInTheDocument();
+
+    showMaster(MASTER);
+    const editLink = await master.findByRole("link", editName);
+    expect(editLink).toHaveAttribute(
+      "href",
+      `${hotelPath(HOTEL.id)}/master/edit`,
+    );
+
+    await user.click(editLink);
+
+    expect(await screen.findByText(MASTER_EDIT_PAGE_TEXT)).toBeInTheDocument();
+    expect(router.state.location.href).toBe(
+      `${hotelPath(HOTEL.id)}/master/edit`,
+    );
   });
 
   it("마스터 정보를 불러오는 동안 묶음 안에 불러오는 중 문구를 보여준다", async () => {
