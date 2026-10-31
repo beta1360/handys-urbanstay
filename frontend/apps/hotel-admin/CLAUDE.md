@@ -22,6 +22,8 @@
   - 지금 이용객은 응답의 `currentStay`(`docs/domain.md`의 '객실', 오늘(한국 시간)이 기간 안인 취소하지 않은 이용)다. 이용객 이름을 그 이용객의 상세(`/guests/$guestId`)로 가는 글자 링크로 보여주고, 없으면 빈칸이다. 객실 상태와 따로 정해지며 상태는 운영자가 그대로 바꾼다.
   - 상태 거르기는 검색 폼 안의 선택 입력(`SelectField`, '전체'와 네 상태)으로 한다. 검색어처럼 '검색'을 눌러야 반영하고, 바꿀 때마다 이동하지 않는다. URL의 `status`는 생성된 목록 파라미터 스키마의 값만 쓰고 그 밖의 값은 지운다.
   - 유형 거르기는 검색 폼 안의 선택 입력(`SelectField`, '전체'와 그 호텔의 유형(서버 순서))이다. 선택지는 `useRoomTypeOptions`(빈 값 문구 '전체')로 만들고, 상태처럼 '검색'을 눌러야 반영한다. URL의 `roomTypeId`는 숫자만 있는 1 이상의 안전한 정수만 쓰고 그 밖의 값은 지운다.
+    - 유형 목록을 불러왔는데 URL의 `roomTypeId`가 그 안에 없으면 방문 기록을 바꿔(replace) URL에서 그 값만 지우고, 목록은 유형 없이 다시 조회한다. 선택 입력은 '전체'인데 목록은 걸러진 채로 남지 않게 하기 위해서다. 판단은 `useRoomTypeOptions`의 `isUnlistedRoomType`, 이동은 `useRoomSearchForm`이 한다.
+    - 유형 목록을 불러오지 못했으면 확인할 수 없으므로 URL의 값을 두고 칸 아래에 '객실 유형을 불러오지 못했습니다.'를 보여준다.
   - 검색어·상태·유형으로 거른 목록이 비면 '검색 결과가 없습니다'를 보여준다.
   - 상태 문구(`VACANT` '공실', `RESERVED` '예약됨', `OCCUPIED` '이용중', `MAINTENANCE` '정비중')는 `entities/room`의 `ROOM_STATUS_LABELS`다. 층이 없으면 '층 없음', 소개가 없으면 '소개 없음'을 회색으로 보여준다.
   - 생성·수정 폼은 이름·유형·층(선택)·소개(선택)다. 최대 인원·1박 요금·체크인·체크아웃 시각은 유형에서 오므로 칸이 없다.
@@ -57,7 +59,7 @@
   - 거르기는 검색 폼 안의 이용객 검색어('이용객', 안내 글자 '이름 또는 전화번호', 서버 `keyword`), 체크인 시작·체크인 끝(브라우저 날짜 입력 `type="date"`, 서버 `checkInFrom`·`checkInTo`), 객실 선택(`SelectField`, '전체'와 이름순 객실 100개까지), 취소 여부 선택('전체'·'취소 안 됨'·'취소됨', 서버 `canceled`)이다. 객실 목록의 상태 거르기처럼 '검색'을 눌러야 반영하고, 검색하면 1페이지로 간다. 이용객 거르기(`guestId`)는 그대로 둔다. 빈 값은 URL과 요청에서 뺀다.
   - 체크인 끝이 시작보다 이르면 제출할 때 끝 칸에 '체크인 시작 날짜와 같거나 뒤여야 합니다.'를 보여주고 이동·조회하지 않는다. 직접 입력한 URL처럼 서버가 400으로 거르기 칸(`checkInTo` 등)의 오류를 주면 그 문구를 해당 칸 아래에 보여준다. 거르기 폼은 목록과 같은 파라미터로 이용 목록 쿼리를 함께 구독해 오류를 읽는다(같은 쿼리 키라 요청은 한 번이다).
   - 이용객 거르기는 선택 입력 없이 URL의 `guestId`로만 받는다(이용객 상세의 '이용 보기'). 걸려 있으면 검색 폼 아래에 '이용객: 이름 (전화번호)'와 이용객 거르기만 푸는 링크를 보여준다. 이름은 이용객 조회로 읽고, 불러오는 중·찾을 수 없음·실패에는 `entities/guest`의 문구를 대신 보여준다.
-  - URL의 `roomId`·`guestId`는 숫자만 있는 1 이상의 안전한 정수만, `canceled`는 `true`·`false`(소문자)만, `keyword`는 앞뒤 공백을 지운 100자 이하만, `checkInFrom`·`checkInTo`는 있는 날짜의 `YYYY-MM-DD`만 쓰고 그 밖의 값은 지운다. 이용객 거르기를 푸는 링크는 다른 거르기 값을 모두 둔다. 거르기 값이 하나라도 있는데 목록이 비면 '검색 결과가 없습니다'를 보여준다.
+  - URL의 `roomId`·`guestId`는 숫자만 있는 1 이상의 안전한 정수만, `canceled`는 `true`·`false`(소문자)만, `keyword`는 앞뒤 공백을 지운 100자 이하만, `checkInFrom`·`checkInTo`는 있는 날짜의 `YYYY-MM-DD`만 쓰고 그 밖의 값은 지운다. 객실 선택지를 불러왔는데 URL의 `roomId`가 그 안에 없으면 객실 목록의 유형 거르기처럼 방문 기록을 바꿔 URL에서 그 값만 지운다(판단은 `entities/stay`의 `isUnlistedStayRoom`). 선택지를 불러오지 못했거나(칸 아래에 '객실 목록을 불러오지 못했습니다.') 객실이 선택지 수(100개)보다 많아 선택지가 잘렸으면 확인할 수 없으므로 그대로 둔다. 이용객 거르기를 푸는 링크는 다른 거르기 값을 모두 둔다. 거르기 값이 하나라도 있는데 목록이 비면 '검색 결과가 없습니다'를 보여준다.
   - 상세는 객실(객실 상세 링크)·이용객(이용객 상세 링크)·이용객 전화번호·체크인 날짜·체크아웃 날짜·인원과 예약 비용(1박 요금·박 수·기본 금액·할인 금액·최종 금액, 금액은 `formatWon`)이다. 예약 비용은 예약할 때 저장된 응답 값을 그대로 보여준다. 취소한 이용은 아래에 '취소 정보' 카드(취소 시각(한국 시간 `YYYY-MM-DD HH:mm`)·처리한 계정 이름·사유, 사유가 없으면 '사유 없음'을 회색으로)를 더한다. 대상 없음은 `STAY_NOT_FOUND`다.
   - 이용은 상세에서 취소한다. 취소하지 않았고 끝나지 않은 이용(체크아웃 날짜가 한국 시간 오늘(`getKoreanToday`)보다 뒤)이면 상세 내용 아래에 '이용 취소' 묶음을 둔다. 판단은 `entities/stay`의 `isStayCancelable`이다.
   - '이용 취소'를 누르면 라이브러리나 `window.confirm` 없이 화면 안에 되돌릴 수 없다는 안내, 취소 사유 칸(선택), '취소 확정'·'닫기' 버튼이 열리고 사유 칸에 초점이 간다. '취소 확정'이 확인 버튼이다. '닫기'는 입력을 버리고 '이용 취소' 버튼에 초점을 돌린다.
@@ -152,14 +154,14 @@ apps/hotel-admin/
    ├─ features/
    │  ├─ auth-login/   # 로그인 폼. api: 로그인(성공하면 로그인 상태 시작). model: 폼 스키마, useLoginForm(react-hook-form, 성공하면 redirect로 이동). ui: LoginForm(연결)·LoginFormView(표현)
    │  ├─ auth-logout/  # api: 로그아웃. 성공하거나 401이면 로그인 상태를 끝낸다
-   │  ├─ room-search/  # 객실 목록 검색(이름 검색어·상태·유형). model: useRoomSearchForm(유형 선택지, 제출하면 1페이지로 이동). ui: RoomSearchForm(연결)·RoomSearchFormView(표현)
+   │  ├─ room-search/  # 객실 목록 검색(이름 검색어·상태·유형). model: useRoomSearchForm(유형 선택지, URL의 유형이 불러온 목록에 없으면 바꿔 이동해 지우기, 제출하면 1페이지로 이동). ui: RoomSearchForm(연결)·RoomSearchFormView(표현)
    │  ├─ room-create/  # 객실 생성. api: useCreateRoom. model: 폼 스키마, useRoomCreateForm(유형 선택지·유형 없음 여부, 이름 중복은 이름 칸 오류, 성공하면 상세로 이동). ui: 연결·표현(유형이 없으면 RoomTypeEmptyGuide)
    │  ├─ room-status-change/ # 객실 상태 바꾸기. api: useChangeRoomStatus. model: useRoomStatusChange(갈 수 있는 상태, 요청 중 막기, 성공·실패 토스트). ui: RoomStatusChange(연결)·RoomStatusChangeView(표현)
    │  ├─ room-update/  # 객실 수정. api: useUpdateRoom. model: 폼 스키마·값 채우기, useRoomUpdateForm(지금 유형을 넣은 유형 선택지, 수정 충돌이면 최신 내용 불러오기). ui: RoomUpdate(불러오기 상태)·RoomUpdateForm(연결)·표현
    │  ├─ room-type-create/ # 객실 유형 생성. api: useCreateRoomType. model: 폼 스키마, useRoomTypeCreateForm(이름 중복은 이름 칸 오류, 성공하면 상세로 이동). ui: 연결·표현
    │  ├─ room-type-update/ # 객실 유형 수정. api: useUpdateRoomType(성공하면 유형 캐시와 객실 목록·상세 캐시 갱신). model: 폼 스키마·값 채우기, useRoomTypeUpdateForm(수정 충돌이면 최신 내용 불러오기). ui: RoomTypeUpdate(불러오기 상태)·RoomTypeUpdateForm(연결)·표현
    │  ├─ guest-search/ # 이용객 목록 검색(이름 또는 전화번호). model: useGuestSearchForm(제출하면 1페이지로 이동). ui: GuestSearchForm(연결)·GuestSearchFormView(표현)
-   │  ├─ stay-search/  # 이용 목록 거르기(이용객 검색어·체크인 기간·객실·취소 여부, 이용객 거르기 표시와 풀기 링크). model: useStaySearchForm(체크인 기간 순서 검사, 목록 쿼리의 400 칸 오류 표시, 제출하면 이용객 거르기를 두고 1페이지로 이동), useStayGuestFilter(이용객 이름 문구). ui: StaySearchForm·StayGuestFilter(연결)와 표현
+   │  ├─ stay-search/  # 이용 목록 거르기(이용객 검색어·체크인 기간·객실·취소 여부, 이용객 거르기 표시와 풀기 링크). model: useStaySearchForm(체크인 기간 순서 검사, 목록 쿼리의 400 칸 오류 표시, URL의 객실이 불러온 선택지에 없으면 바꿔 이동해 지우기, 제출하면 이용객 거르기를 두고 1페이지로 이동), useStayGuestFilter(이용객 이름 문구). ui: StaySearchForm·StayGuestFilter(연결)와 표현
    │  ├─ stay-cancel/  # 이용 취소. api: useCancelStay(성공·409면 이용·객실 캐시 다시 불러오기). model: 사유 폼 스키마, useStayCancel(취소할 수 없음·닫힘·입력 중·제출 중, 닫으면 버튼에 초점). ui: StayCancel(연결)·StayCancelView(표현)
    │  ├─ guest-update/ # 이용객 수정. api: useUpdateGuest. model: 폼 스키마·값 채우기, useGuestUpdateForm(수정 충돌이면 최신 내용 불러오기). ui: GuestUpdate(불러오기 상태)·GuestUpdateForm(연결)·표현
    │  ├─ operator-search/ # 운영자 목록 검색(이름 또는 아이디·사용 여부). model: useOperatorSearchForm(제출하면 1페이지로 이동). ui: OperatorSearchForm(연결)·OperatorSearchFormView(표현)
@@ -170,9 +172,9 @@ apps/hotel-admin/
    ├─ entities/
    │  ├─ account/      # api: 내 정보 조회, 로그인 상태 캐시 규칙. config: 역할 문구(ACCOUNT_ROLE_LABELS). lib: 마스터 판단(isMaster)
    │  ├─ room/         # api: 목록·상세·상태 이력 조회, 새로 조회, 캐시 규칙, 목록·상세 무효화. config: 항목 이름·상태 문구(ROOM_STATUS_LABELS)·화면 문구. lib: 검색어·상태·유형 거르기 값·페이지 검사, 상태 전이 표(ROOM_STATUS_TRANSITIONS). model: 경로 파라미터 검사, useRoom(불러오는 중·실패·찾을 수 없음·내용), 생성·수정이 함께 쓰는 폼 스키마 조각. ui: 객실 정보 입력 칸(유형 선택지는 props로 받는다), 상세 내용(유형의 값은 슬롯), 층 표시, 상태별 카드
-   │  ├─ room-type/    # api: 목록·상세 조회, 새로 조회, 캐시 규칙. config: 항목 이름·선택지·화면 문구. model: 경로 파라미터 검사, useRoomType(불러오는 중·실패·찾을 수 없음·내용), useRoomTypeOptions(객실 폼·거르기의 유형 선택지(빈 값 문구, 지금 유형 넣기), 불러오기 실패 안내, 유형 없음 여부), 생성·수정이 함께 쓰는 폼 스키마 조각. ui: 유형 정보 입력 칸, 상세 내용, 유형의 값 항목(RoomTypeTerms), 상태별 카드, 유형 없음 안내(RoomTypeEmptyGuide)
+   │  ├─ room-type/    # api: 목록·상세 조회, 새로 조회, 캐시 규칙. config: 항목 이름·선택지·화면 문구. model: 경로 파라미터 검사, useRoomType(불러오는 중·실패·찾을 수 없음·내용), useRoomTypeOptions(객실 폼·거르기의 유형 선택지(빈 값 문구, 지금 유형 넣기), 불러오기 실패 안내, 유형 없음 여부, 불러온 목록에 없는 유형인지(isUnlistedRoomType)), 생성·수정이 함께 쓰는 폼 스키마 조각. ui: 유형 정보 입력 칸, 상세 내용, 유형의 값 항목(RoomTypeTerms), 상태별 카드, 유형 없음 안내(RoomTypeEmptyGuide)
    │  ├─ guest/        # api: 목록·상세 조회, 새로 조회, 캐시 규칙. config: 항목 이름·화면 문구. lib: 검색어·페이지 검사. model: 경로 파라미터 검사, useGuest(불러오는 중·실패·찾을 수 없음·내용), 수정 폼이 쓰는 폼 스키마 조각. ui: 이용객 정보 입력 칸, 상세 내용, 상태별 카드
-   │  ├─ stay/         # api: 목록·상세 조회, 취소한 뒤 다시 불러오기. config: 항목 이름·취소 여부·취소 정보·화면 문구. lib: 거르기 값(객실·이용객·취소 여부·이용객 검색어·체크인 날짜)·페이지 검사, 체크인 기간 순서, 목록 요청 파라미터(toStayListParams), 취소할 수 있는지(isStayCancelable), 거르기용 객실 선택지. model: 경로 파라미터 검사, useStay(불러오는 중·실패·찾을 수 없음·내용). ui: 상세 내용, 취소 정보, 상태별 카드, '이용 보기' 링크(StayListLink)
+   │  ├─ stay/         # api: 목록·상세 조회, 취소한 뒤 다시 불러오기. config: 항목 이름·취소 여부·취소 정보·화면 문구. lib: 거르기 값(객실·이용객·취소 여부·이용객 검색어·체크인 날짜)·페이지 검사, 체크인 기간 순서, 목록 요청 파라미터(toStayListParams), 취소할 수 있는지(isStayCancelable), 거르기용 객실 선택지와 불러온 선택지에 없는 객실인지(isUnlistedStayRoom). model: 경로 파라미터 검사, useStay(불러오는 중·실패·찾을 수 없음·내용). ui: 상세 내용, 취소 정보, 상태별 카드, '이용 보기' 링크(StayListLink)
    │  ├─ settlement/   # api: 월별 정산·이 달 이용 조회(이전 목록은 placeholderData). config: 요약 항목 이름(SETTLEMENT_FIELD_LABELS)·달 제목 문구. lib: 달 검사·이번 달·달 옮기기·달 제목(formatSettlementMonth), 페이지 검사. ui: 불러오는 중 카드
    │  └─ operator/     # api: 목록·상세 조회, 새로 조회, 캐시 규칙, 바꾼 뒤 다시 불러오기. config: 항목 이름·사용 여부 문구(OPERATOR_ACTIVE_LABELS)·화면 문구. lib: 검색어·사용 여부·페이지 검사, 비밀번호 길이. model: 경로 파라미터 검사, useOperator(불러오는 중·실패·찾을 수 없음·내용), 등록·수정이 함께 쓰는 폼 스키마 조각과 비밀번호 검사. ui: 운영자 계정 입력 칸, 비밀번호 칸, 상세 내용, 사용 여부 표시, 상태별 카드
    └─ shared/
