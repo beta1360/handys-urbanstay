@@ -83,6 +83,9 @@ class RoomHotelAdminController(
 		@RequestParam(required = false)
 		@Parameter(description = "openapi.hotel-admin.operation.getRooms.parameter.status")
 		status: RoomStatus?,
+		@RequestParam(required = false)
+		@Parameter(description = "openapi.hotel-admin.operation.getRooms.parameter.roomTypeId")
+		roomTypeId: Long?,
 		@RequestParam(defaultValue = PageParams.DEFAULT_PAGE)
 		@Min(value = PageParams.MIN_PAGE, message = "{validation.min}")
 		@Max(value = PageParams.MAX_PAGE, message = "{validation.max}")
@@ -94,7 +97,7 @@ class RoomHotelAdminController(
 		@Parameter(description = "openapi.hotel-admin.operation.getRooms.parameter.size")
 		size: Int,
 	): ApiResponse<PageResponse<RoomHotelAdminResponse>> {
-		val rooms = roomService.getRooms(hotelAdmin.hotelId, keyword, status, page, size)
+		val rooms = roomService.getRooms(hotelAdmin.hotelId, keyword, status, roomTypeId, page, size)
 		val currentStays = stayService.getCurrentStays(rooms.content.map { checkNotNull(it.id) })
 		return ApiResponse.success(PageResponse.from(rooms.map { RoomHotelAdminResponse.from(it, currentStays[it.id]) }))
 	}

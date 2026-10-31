@@ -49,19 +49,21 @@ class RoomService(
 	}
 
 	@Transactional(readOnly = true)
-	fun getRooms(hotelId: Long, keyword: String?, status: RoomStatus?, page: Int, size: Int): Page<Room> {
+	fun getRooms(hotelId: Long, keyword: String?, status: RoomStatus?, roomTypeId: Long?, page: Int, size: Int): Page<Room> {
 		val pageable = PageRequest.of(page, size, NAME_ORDER)
 		val nameKeyword = keyword?.trim()?.ifEmpty { null }
-		return if (status == null) {
-			if (nameKeyword == null) {
-				roomRepository.findByHotelId(hotelId, pageable)
-			} else {
-				roomRepository.findByHotelIdAndNameContainingIgnoreCase(hotelId, nameKeyword, pageable)
-			}
-		} else if (nameKeyword == null) {
-			roomRepository.findByHotelIdAndStatus(hotelId, status, pageable)
-		} else {
-			roomRepository.findByHotelIdAndStatusAndNameContainingIgnoreCase(hotelId, status, nameKeyword, pageable)
+		return when {
+			roomTypeId != null && status != null && nameKeyword != null ->
+				roomRepository.findByHotelIdAndRoomTypeIdAndStatusAndNameContainingIgnoreCase(hotelId, roomTypeId, status, nameKeyword, pageable)
+			roomTypeId != null && status != null -> roomRepository.findByHotelIdAndRoomTypeIdAndStatus(hotelId, roomTypeId, status, pageable)
+			roomTypeId != null && nameKeyword != null ->
+				roomRepository.findByHotelIdAndRoomTypeIdAndNameContainingIgnoreCase(hotelId, roomTypeId, nameKeyword, pageable)
+			roomTypeId != null -> roomRepository.findByHotelIdAndRoomTypeId(hotelId, roomTypeId, pageable)
+			status != null && nameKeyword != null ->
+				roomRepository.findByHotelIdAndStatusAndNameContainingIgnoreCase(hotelId, status, nameKeyword, pageable)
+			status != null -> roomRepository.findByHotelIdAndStatus(hotelId, status, pageable)
+			nameKeyword != null -> roomRepository.findByHotelIdAndNameContainingIgnoreCase(hotelId, nameKeyword, pageable)
+			else -> roomRepository.findByHotelId(hotelId, pageable)
 		}
 	}
 

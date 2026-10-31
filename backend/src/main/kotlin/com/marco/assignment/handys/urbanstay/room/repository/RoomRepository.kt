@@ -54,4 +54,22 @@ interface RoomRepository : JpaRepository<Room, Long> {
 		""",
 	)
 	fun updateStatus(id: Long, hotelId: Long, from: RoomStatus, to: RoomStatus, updatedAt: Instant): Int
+
+	@EntityGraph(attributePaths = [ROOM_TYPE])
+	fun findByHotelIdAndRoomTypeId(hotelId: Long, roomTypeId: Long, pageable: Pageable): Page<Room>
+
+	@EntityGraph(attributePaths = [ROOM_TYPE])
+	fun findByHotelIdAndRoomTypeIdAndNameContainingIgnoreCase(hotelId: Long, roomTypeId: Long, keyword: String, pageable: Pageable): Page<Room>
+
+	@EntityGraph(attributePaths = [ROOM_TYPE])
+	fun findByHotelIdAndRoomTypeIdAndStatus(hotelId: Long, roomTypeId: Long, status: RoomStatus, pageable: Pageable): Page<Room>
+
+	@EntityGraph(attributePaths = [ROOM_TYPE])
+	fun findByHotelIdAndRoomTypeIdAndStatusAndNameContainingIgnoreCase(
+		hotelId: Long,
+		roomTypeId: Long,
+		status: RoomStatus,
+		keyword: String,
+		pageable: Pageable,
+	): Page<Room>
 }

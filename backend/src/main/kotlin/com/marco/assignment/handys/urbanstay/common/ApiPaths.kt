@@ -9,4 +9,5 @@ object ApiPaths {
 	const val OPERATORS = "/operators"
 	const val ROOMS = "/rooms"
 	const val ROOM_TYPES = "/room-types"
+	const val SETTLEMENTS = "/settlements"
 }

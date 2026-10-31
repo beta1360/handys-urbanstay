@@ -664,6 +664,37 @@ class RoomHotelAdminControllerTest {
 		getRooms("status" to value).andExpectError(CommonErrorCode.INVALID_INPUT, "status" to message(TYPE))
 	}
 
+	@ParameterizedTest
+	@EnumSource(HotelAdminRole::class)
+	fun `마스터와 운영자 모두 객실 유형으로 거르면 그 유형의 자기 호텔 객실만 이름 오름차순으로 조회하고 검색어·상태와 함께 AND로 거른다`(role: HotelAdminRole) {
+		setStatus(saveRoom(hotel, "스위트 2", type = deluxe), RoomStatus.RESERVED)
+		saveRoom(hotel, "스위트 1", type = deluxe)
+		saveRoom(hotel, "디럭스 1", type = deluxe)
+		setStatus(saveRoom(hotel, "스위트 3"), RoomStatus.RESERVED)
+		saveRoom(otherHotel, "스위트 4")
+		val deluxeId = "roomTypeId" to deluxe.id.toString()
+		val names = { params: List<Pair<String, String>> ->
+			itemNames(getRooms(*params.toTypedArray(), principal = principals.getValue(role)).andExpectSuccess(HttpStatus.OK))
+		}
+
+		assertThat(names(listOf(deluxeId))).containsExactly("디럭스 1", "스위트 1", "스위트 2")
+		assertThat(names(listOf(deluxeId, "keyword" to "스위트"))).containsExactly("스위트 1", "스위트 2")
+		assertThat(names(listOf(deluxeId, "status" to RoomStatus.RESERVED.name))).containsExactly("스위트 2")
+		assertThat(names(listOf(deluxeId, "status" to RoomStatus.RESERVED.name, "keyword" to "스위트"))).containsExactly("스위트 2")
+		assertThat(names(listOf(deluxeId, "status" to RoomStatus.RESERVED.name, "keyword" to "디럭스"))).isEmpty()
+	}
+
+	@Test
+	fun `없거나 다른 호텔의 객실 유형으로 거르면 빈 목록이고 정수가 아니면 roomTypeId와 형식 메시지로 400 응답한다`() {
+		saveRoom(hotel, "101")
+		saveRoom(otherHotel, "101")
+
+		listOf(checkNotNull(otherHotelType.id), MISSING_ID).forEach {
+			assertThat(pageInfo(getRooms("roomTypeId" to it.toString()).andExpectSuccess(HttpStatus.OK))).containsExactly(0, 10, 0, 0)
+		}
+		getRooms("roomTypeId" to "abc").andExpectError(CommonErrorCode.INVALID_INPUT, "roomTypeId" to message(TYPE))
+	}
+
 	@Test
 	fun `로그인하지 않으면 객실 API는 401 UNAUTHORIZED로 응답하고 바꾸지 않는다`() {
 		val room = saveRoom(hotel, NAME)
@@ -1051,13 +1082,14 @@ class RoomHotelAdminControllerTest {
 	}
 
 	@Test
-	fun `객실 목록 문서는 검색어, 상태, page·size 파라미터와 모든 필드가 필수인 페이지 응답 스키마를 보여준다`() {
+	fun `객실 목록 문서는 검색어, 상태, 객실 유형, page·size 파라미터와 모든 필드가 필수인 페이지 응답 스키마를 보여준다`() {
 		val docs = apiDocs()
 		val getRooms = docs["paths"][ROOMS]["get"]
 		val parameters = getRooms["parameters"].values().associateBy { it["name"].stringValue() }
 		val page = docs["components"]["schemas"]["PageResponseRoomHotelAdminResponse"]
 
-		assertThat(parameters.keys).containsExactly("keyword", "status", "page", "size")
+		assertThat(parameters.keys).containsExactly("keyword", "status", "roomTypeId", "page", "size")
+		assertThat(parameters.getValue("roomTypeId")["schema"]).isEqualTo(json("""{"type":"integer","format":"int64"}"""))
 		assertThat(parameters.values.map { it["description"].stringValue() })
 			.containsExactlyElementsOf(parameters.keys.map { message("openapi.hotel-admin.operation.getRooms.parameter.$it") })
 		assertThat(parameters.values.map { it["required"].booleanValue() }).containsOnly(false)
