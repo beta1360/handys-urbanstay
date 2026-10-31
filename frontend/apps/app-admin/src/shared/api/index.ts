@@ -26,3 +26,5 @@ export type {
   HotelPage,
   UpdateHotelBody,
 } from "./hotel";
+export { fetchHotelMaster, hotelMasterQueryKey } from "./hotel-master";
+export type { HotelMaster } from "./hotel-master";

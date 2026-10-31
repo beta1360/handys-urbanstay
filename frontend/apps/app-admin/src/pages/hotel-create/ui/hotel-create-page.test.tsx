@@ -25,6 +25,10 @@ import {
 } from "@repo/admin-kit/config";
 import { dismissToast, showToast } from "@repo/admin-kit/toast";
 import { HOTEL_FIELD_LABELS, HOTEL_INFO_MESSAGES } from "@/entities/hotel";
+import {
+  HOTEL_MASTER_FIELD_LABELS,
+  HOTEL_MASTER_INFO_MESSAGES,
+} from "@/entities/hotel-master";
 import { HOTEL_CREATE_FORM_MESSAGES } from "@/features/hotel-create";
 import {
   API_ERROR_CODES,
@@ -178,7 +182,7 @@ function getHotelInfoGroup() {
 }
 
 function getMasterGroup() {
-  return screen.getByRole("group", { name: HOTEL_CREATE_FORM_MESSAGES.masterLegend });
+  return screen.getByRole("group", { name: HOTEL_MASTER_INFO_MESSAGES.legend });
 }
 
 function getFields(): Record<InputField, HTMLElement> {
@@ -192,7 +196,7 @@ function getFields(): Record<InputField, HTMLElement> {
       `${HOTEL_FIELD_LABELS.description} ${HOTEL_INFO_MESSAGES.optional}`,
     ),
     loginId: master.getByLabelText(HOTEL_CREATE_FORM_MESSAGES.masterLoginIdLabel),
-    masterName: master.getByLabelText(HOTEL_CREATE_FORM_MESSAGES.masterNameLabel),
+    masterName: master.getByLabelText(HOTEL_MASTER_FIELD_LABELS.name),
     password: master.getByLabelText(HOTEL_CREATE_FORM_MESSAGES.masterPasswordLabel),
   };
 }

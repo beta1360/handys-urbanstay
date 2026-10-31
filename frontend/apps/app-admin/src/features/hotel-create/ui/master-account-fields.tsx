@@ -1,6 +1,10 @@
 import { FormSection } from "@repo/ui/form-section";
 import { TextField } from "@repo/ui/text-field";
 import type { FormFieldProps } from "@repo/admin-kit/form";
+import {
+  HOTEL_MASTER_FIELD_LABELS,
+  HOTEL_MASTER_INFO_MESSAGES,
+} from "@/entities/hotel-master";
 import { HOTEL_CREATE_FORM_MESSAGES } from "../config/messages";
 import { MASTER_PASSWORD_LENGTH } from "../model/hotel-create-form-schema";
 import type { MasterField } from "../model/hotel-create-form-schema";
@@ -11,7 +15,7 @@ type MasterAccountFieldsProps = {
 
 export function MasterAccountFields({ fields }: MasterAccountFieldsProps) {
   return (
-    <FormSection legend={HOTEL_CREATE_FORM_MESSAGES.masterLegend}>
+    <FormSection legend={HOTEL_MASTER_INFO_MESSAGES.legend}>
       <TextField
         label={HOTEL_CREATE_FORM_MESSAGES.masterLoginIdLabel}
         type="email"
@@ -20,7 +24,7 @@ export function MasterAccountFields({ fields }: MasterAccountFieldsProps) {
         {...fields["master.loginId"]}
       />
       <TextField
-        label={HOTEL_CREATE_FORM_MESSAGES.masterNameLabel}
+        label={HOTEL_MASTER_FIELD_LABELS.name}
         {...fields["master.name"]}
       />
       <TextField
