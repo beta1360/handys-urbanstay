@@ -13,13 +13,11 @@ import com.marco.assignment.handys.urbanstay.common.exception.CommonErrorCode
 import com.marco.assignment.handys.urbanstay.common.exception.ErrorCode
 import com.marco.assignment.handys.urbanstay.common.security.Role
 import com.marco.assignment.handys.urbanstay.guest.entity.Guest
-import com.marco.assignment.handys.urbanstay.guest.exception.GuestErrorCode
 import com.marco.assignment.handys.urbanstay.guest.repository.GuestRepository
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRepository
 import com.marco.assignment.handys.urbanstay.room.entity.Room
 import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
-import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import com.marco.assignment.handys.urbanstay.room.repository.RoomRepository
 import com.marco.assignment.handys.urbanstay.stay.entity.Stay
 import com.marco.assignment.handys.urbanstay.stay.exception.StayErrorCode
@@ -55,7 +53,6 @@ import java.nio.charset.StandardCharsets
 import java.sql.Timestamp
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.ZoneOffset
 import java.util.Locale
 import java.util.UUID
 
@@ -134,100 +131,32 @@ class StayHotelAdminControllerTest {
 		hotelRepository.deleteAllByIdInBatch(createdHotelIds)
 	}
 
-	@ParameterizedTest
-	@EnumSource(HotelAdminRole::class)
-	fun `마스터와 운영자 모두 자기 호텔의 객실과 이용객으로 이용을 등록해 201로 응답하고 객실 상태는 바꾸지 않는다`(role: HotelAdminRole) {
-		val data = create(body(TODAY, TODAY.plusDays(2), guestCount = CAPACITY), principals.getValue(role)).andExpectSuccess(HttpStatus.CREATED)
+	@Test
+	fun `이용 등록 API는 없어 로그인과 CSRF 토큰이 있어도 404 NOT_FOUND로 응답하고 등록하지 않는다`() {
+		val body = linkedMapOf(
+			"roomId" to room.id,
+			"guestId" to guest.id,
+			"checkInDate" to TODAY.toString(),
+			"checkOutDate" to TODAY.plusDays(1).toString(),
+			"guestCount" to 2,
+		)
 
-		val id = data["id"].longValue()
-		assertThat(data).isEqualTo(stayJson(id, room, guest, TODAY, TODAY.plusDays(2), CAPACITY))
-		assertThat(getStay(id).andExpectSuccess(HttpStatus.OK)).isEqualTo(data)
-		assertThat(jdbcTemplate.queryForObject(SELECT_ROOM_STATUS, String::class.java, room.id)).isEqualTo("VACANT")
+		mockMvc.post(STAYS) {
+			with(user(masterPrincipal))
+			withCsrf()
+			jsonBody(body)
+		}.andExpectError(CommonErrorCode.NOT_FOUND)
+
+		assertThat(stayIds(room)).isEmpty()
 	}
 
 	@Test
-	fun `등록 시각은 Clock 빈의 시각으로 남는다`() {
-		val id = create(body(TODAY, TODAY.plusDays(1))).andExpectSuccess(HttpStatus.CREATED)["id"].longValue()
-
-		assertThat(jdbcTemplate.queryForObject(SELECT_CREATED_AT, Timestamp::class.java, id)?.toInstant()).isEqualTo(NOW)
-	}
-
-	@ParameterizedTest
-	@CsvSource("5, 7", "4, 6", "6, 8", "4, 8", "5, 6", "6, 7")
-	fun `같은 객실에 기간이 하루라도 겹치면 409 STAY_PERIOD_OVERLAPPED로 응답하고 등록하지 않는다`(checkIn: Long, checkOut: Long) {
-		val existing = saveStay(room, guest, TODAY.plusDays(5), TODAY.plusDays(7))
-
-		create(body(TODAY.plusDays(checkIn), TODAY.plusDays(checkOut), guest = otherGuest)).andExpectError(StayErrorCode.STAY_PERIOD_OVERLAPPED)
-
-		assertThat(stayIds(room)).containsExactly(existing.id)
-	}
-
-	@Test
-	fun `체크아웃 날에 체크인하거나 체크인 날에 체크아웃하는 이용과 다른 객실의 같은 기간 이용은 등록한다`() {
-		saveStay(room, guest, TODAY.plusDays(5), TODAY.plusDays(7))
-
-		create(body(TODAY.plusDays(7), TODAY.plusDays(9))).andExpectSuccess(HttpStatus.CREATED)
-		create(body(TODAY.plusDays(3), TODAY.plusDays(5))).andExpectSuccess(HttpStatus.CREATED)
-		create(body(TODAY.plusDays(5), TODAY.plusDays(7), room = otherRoom)).andExpectSuccess(HttpStatus.CREATED)
-		assertThat(stayIds(room)).hasSize(3)
-	}
-
-	@Test
-	fun `없거나 다른 호텔의 객실, 이용객, 이용은 각자의 404로 응답하고 객실을 이용객보다 먼저 확인한다`() {
+	fun `없거나 다른 호텔의 이용은 404 STAY_NOT_FOUND로 응답한다`() {
 		val otherHotelStay = saveStay(otherHotelRoom, otherHotelGuest, TODAY, TODAY.plusDays(1))
 
-		listOf(MISSING_ID, checkNotNull(otherHotelRoom.id)).forEach { roomId ->
-			create(body(TODAY, TODAY.plusDays(1)) + ("roomId" to roomId)).andExpectError(RoomErrorCode.ROOM_NOT_FOUND)
-			create(body(TODAY, TODAY.plusDays(1)) + ("roomId" to roomId) + ("guestId" to MISSING_ID)).andExpectError(RoomErrorCode.ROOM_NOT_FOUND)
-		}
-		listOf(MISSING_ID, checkNotNull(otherHotelGuest.id)).forEach { guestId ->
-			create(body(TODAY, TODAY.plusDays(1)) + ("guestId" to guestId)).andExpectError(GuestErrorCode.GUEST_NOT_FOUND)
-		}
 		listOf(MISSING_ID, checkNotNull(otherHotelStay.id)).forEach { stayId ->
 			HotelAdminRole.entries.forEach { getStay(stayId, principals.getValue(it)).andExpectError(StayErrorCode.STAY_NOT_FOUND) }
 		}
-		assertThat(stayIds(room)).isEmpty()
-	}
-
-	@ParameterizedTest
-	@CsvSource(
-		"0, 0, , validation.after-check-in",
-		"2, 1, , validation.after-check-in",
-		"0, 31, , validation.max-nights",
-		"-1, 1, validation.today-or-later, ",
-		"-2, -2, validation.today-or-later, validation.after-check-in",
-	)
-	fun `체크아웃이 체크인보다 뒤가 아니거나 30박을 넘거나 체크인이 한국 시간 오늘보다 앞이면 그 항목들의 오류로 400 응답한다`(
-		checkIn: Long,
-		checkOut: Long,
-		checkInKey: String?,
-		checkOutKey: String?,
-	) {
-		val expected = listOfNotNull(checkInKey?.let { "checkInDate" to message(it) }, checkOutKey?.let { "checkOutDate" to message(it, "max" to "30") })
-
-		create(body(TODAY.plusDays(checkIn), TODAY.plusDays(checkOut))).andExpectError(CommonErrorCode.INVALID_INPUT, *expected.toTypedArray())
-
-		assertThat(stayIds(room)).isEmpty()
-		assertThat(LocalDate.ofInstant(NOW, ZoneOffset.UTC)).isEqualTo(TODAY.minusDays(1))
-	}
-
-	@Test
-	fun `오늘 체크인과 30박은 등록한다`() {
-		create(body(TODAY, TODAY.plusDays(Stay.MAX_NIGHTS))).andExpectSuccess(HttpStatus.CREATED)
-	}
-
-	@Test
-	fun `인원이 1보다 적으면 최솟값 메시지로, 객실 최대 인원보다 많으면 최대 인원을 담은 메시지로 400 응답하고 다른 기간 오류와 함께 담는다`() {
-		create(body(TODAY, TODAY.plusDays(1), guestCount = 0)).andExpectError(CommonErrorCode.INVALID_INPUT, "guestCount" to message(MIN, "value" to "1"))
-		create(body(TODAY, TODAY.plusDays(1), guestCount = CAPACITY + 1))
-			.andExpectError(CommonErrorCode.INVALID_INPUT, "guestCount" to message(MAX, "value" to CAPACITY.toString()))
-		create(body(TODAY.minusDays(1), TODAY.minusDays(1), guestCount = CAPACITY + 1)).andExpectError(
-			CommonErrorCode.INVALID_INPUT,
-			"checkInDate" to message("validation.today-or-later"),
-			"checkOutDate" to message("validation.after-check-in"),
-			"guestCount" to message(MAX, "value" to CAPACITY.toString()),
-		)
-		assertThat(stayIds(room)).isEmpty()
 	}
 
 	@ParameterizedTest
@@ -332,16 +261,6 @@ class StayHotelAdminControllerTest {
 	}
 
 	@Test
-	fun `취소한 이용과 같은 객실, 같은 기간의 이용을 다시 등록한다`() {
-		val stay = saveStay(room, guest, TODAY.plusDays(5), TODAY.plusDays(7))
-		cancel(checkNotNull(stay.id)).andExpectSuccess(HttpStatus.OK)
-
-		create(body(TODAY.plusDays(5), TODAY.plusDays(7))).andExpectSuccess(HttpStatus.CREATED)
-		create(body(TODAY.plusDays(6), TODAY.plusDays(8))).andExpectError(StayErrorCode.STAY_PERIOD_OVERLAPPED)
-		assertThat(stayIds(room)).hasSize(2)
-	}
-
-	@Test
 	fun `사유는 앞뒤 공백을 지워 200자까지 받고, 없거나 null이거나 비면 사유 없이 취소하며, 200자를 넘으면 400 응답한다`() {
 		val stays = (1L..5L).map { checkNotNull(saveStay(room, guest, TODAY.plusDays(it * 2), TODAY.plusDays(it * 2 + 1)).id) }
 		val maxReason = "가".repeat(Stay.CANCEL_REASON_MAX_LENGTH)
@@ -373,41 +292,34 @@ class StayHotelAdminControllerTest {
 	}
 
 	@Test
-	fun `로그인하지 않으면 401, 전체 어드민 역할이면 403, CSRF 토큰이 없으면 403 INVALID_CSRF_TOKEN으로 응답하고 등록·취소하지 않는다`() {
+	fun `로그인하지 않으면 401, 전체 어드민 역할이면 403, CSRF 토큰이 없으면 403 INVALID_CSRF_TOKEN으로 응답하고 취소하지 않는다`() {
 		val stay = saveStay(room, guest, TODAY, TODAY.plusDays(1))
 		val appAdmin = User.withUsername("tester").password(PASSWORD_HASH).roles(Role.APP_ADMIN.name).build()
-		val newStay = body(TODAY.plusDays(2), TODAY.plusDays(3))
 		val cancelPath = "$STAYS/${stay.id}/cancel"
 
 		mockMvc.get(STAYS).andExpectError(CommonErrorCode.UNAUTHORIZED)
 		mockMvc.get("$STAYS/${stay.id}").andExpectError(CommonErrorCode.UNAUTHORIZED)
-		mockMvc.post(STAYS) { withCsrf(); jsonBody(newStay) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
 		mockMvc.post(cancelPath) { withCsrf(); jsonBody(emptyMap()) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
 		mockMvc.get(STAYS) { with(user(appAdmin)) }.andExpectError(CommonErrorCode.FORBIDDEN)
 		getStay(checkNotNull(stay.id), appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
-		create(newStay, appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
 		cancel(stay.id!!, principal = appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
-		mockMvc.post(STAYS) { with(user(masterPrincipal)); jsonBody(newStay) }.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
 		mockMvc.post(cancelPath) { with(user(masterPrincipal)); jsonBody(emptyMap()) }.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
-		assertThat(stayIds(room)).containsExactly(stay.id)
 		assertThat(jdbcTemplate.queryForObject(SELECT_CANCELED_AT, Timestamp::class.java, stay.id)).isNull()
 	}
 
 	@Test
-	fun `이용 API 문서는 stay 태그에 operation마다 낼 수 있는 객실, 이용객, 이용 에러를 예시로 보여준다`() {
+	fun `이용 API 문서는 stay 태그에 operation마다 낼 수 있는 이용 에러를 예시로 보여준다`() {
 		val docs = apiDocs()
 		val stays = docs["paths"][STAYS]
 		val stay = docs["paths"]["$STAYS/{stayId}"]
 		val cancel = docs["paths"]["$STAYS/{stayId}/cancel"]["post"]
-		val operations = listOf(stays["post"], stays["get"], stay["get"], cancel)
+		val operations = listOf(stays["get"], stay["get"], cancel)
 		val schemas = docs["components"]["schemas"]
 
-		assertThat(operations.map { it["operationId"].stringValue() }).containsExactly("createStay", "getStays", "getStay", "cancelStay")
+		assertThat(stays.has("post")).isFalse()
+		assertThat(schemas.has("StayCreateHotelAdminRequest")).isFalse()
+		assertThat(operations.map { it["operationId"].stringValue() }).containsExactly("getStays", "getStay", "cancelStay")
 		assertThat(operations.map { op -> op["tags"].values().map { it.stringValue() } }).containsOnly(listOf("stay"))
-		assertThat(stays["post"]["responses"].propertyNames()).containsExactlyInAnyOrder("201", "400", "401", "403", "404", "409", "500")
-		assertThat(errorCodes(stays["post"], HttpStatus.NOT_FOUND))
-			.containsExactlyInAnyOrder(RoomErrorCode.ROOM_NOT_FOUND.code, GuestErrorCode.GUEST_NOT_FOUND.code)
-		assertThat(errorCodes(stays["post"], HttpStatus.CONFLICT)).containsExactly(StayErrorCode.STAY_PERIOD_OVERLAPPED.code)
 		assertThat(stays["get"]["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "403", "500")
 		assertThat(stays["get"]["parameters"].values().map { it["name"].stringValue() }).containsExactly("roomId", "guestId", "canceled", "page", "size")
 		assertThat(errorCodes(stay["get"], HttpStatus.NOT_FOUND)).containsExactly(StayErrorCode.STAY_NOT_FOUND.code)
@@ -420,13 +332,6 @@ class StayHotelAdminControllerTest {
 		assertThat(schemas["StayHotelAdminResponse"]["properties"]["cancellation"]["oneOf"].values().map { it["type"]?.stringValue() ?: it[REF].stringValue() })
 			.containsExactlyInAnyOrder("null", "#/components/schemas/StayCancellationHotelAdminResponse")
 	}
-
-	private fun create(body: Map<String, Any?>, principal: UserDetails = masterPrincipal): ResultActionsDsl =
-		mockMvc.post(STAYS) {
-			with(user(principal))
-			withCsrf()
-			jsonBody(body)
-		}
 
 	private fun getStays(vararg params: Pair<String, Any?>, principal: UserDetails = masterPrincipal): JsonNode =
 		mockMvc.get(STAYS) {
@@ -454,15 +359,6 @@ class StayHotelAdminControllerTest {
 		content = jsonMapper.writeValueAsString(body)
 	}
 
-	private fun body(checkIn: LocalDate, checkOut: LocalDate, room: Room = this.room, guest: Guest = this.guest, guestCount: Int = 2): Map<String, Any?> =
-		linkedMapOf(
-			"roomId" to room.id,
-			"guestId" to guest.id,
-			"checkInDate" to checkIn.toString(),
-			"checkOutDate" to checkOut.toString(),
-			"guestCount" to guestCount,
-		)
-
 	private fun saveHotel(name: String): Hotel =
 		hotelRepository.save(Hotel(name, "서울 $suffix", HOTEL_PHONE, null)).also { createdHotelIds += checkNotNull(it.id) }
 
@@ -481,11 +377,7 @@ class StayHotelAdminControllerTest {
 	private fun ResultActionsDsl.andExpectSuccess(status: HttpStatus): JsonNode {
 		val result = andReturn()
 		val body = json(result.response.getContentAsString(StandardCharsets.UTF_8))
-		val expectedMessage = when {
-			result.request.method != "POST" -> null
-			result.request.requestURI.orEmpty().endsWith("/cancel") -> message("success.stay.canceled")
-			else -> message("success.stay.created")
-		}
+		val expectedMessage = if (result.request.method == "POST") message("success.stay.canceled") else null
 		assertThat(result.response.status).isEqualTo(status.value())
 		assertThat(body.properties().map { it.key }).containsExactly("success", "data", "message", "error")
 		assertThat(body["success"].booleanValue()).isTrue()
@@ -564,11 +456,8 @@ class StayHotelAdminControllerTest {
 		private const val XSRF_HEADER = "X-XSRF-TOKEN"
 		private const val FIELD_ERRORS = "fieldErrors"
 		private const val JSON = "application/json"
-		private const val MIN = "validation.min"
-		private const val MAX = "validation.max"
 		private const val MISSING_ID = Long.MAX_VALUE
 		private const val SELECT_ROOM_STATUS = "select status from room where id = ?"
-		private const val SELECT_CREATED_AT = "select created_at from stay where id = ?"
 		private const val SELECT_STAY_IDS = "select id from stay where room_id = ? order by id"
 		private const val SELECT_CANCELED_AT = "select canceled_at from stay where id = ?"
 		private const val SELECT_HISTORIES = "select from_status, to_status, changed_by_id, changed_by_name from room_status_history where room_id = ? order by id"

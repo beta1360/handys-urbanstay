@@ -111,17 +111,15 @@ class GuestHotelAdminControllerTest {
 		hotelRepository.deleteAllByIdInBatch(createdHotelIds)
 	}
 
-	@ParameterizedTest
-	@EnumSource(HotelAdminRole::class)
-	fun `마스터와 운영자 모두 자기 호텔에 이용객을 등록하고 앞뒤 공백만 지워 전화번호와 이메일은 입력한 모양 그대로 저장해 201로 응답한다`(role: HotelAdminRole) {
-		val body = createBody("name" to " 홍길동\t", "phone" to " 010-1234-5678 ", "email" to "\nHong.GilDong@Example.COM ")
+	@Test
+	fun `이용객 등록 API는 없어 로그인과 CSRF 토큰이 있어도 404 NOT_FOUND로 응답하고 등록하지 않는다`() {
+		mockMvc.post(GUESTS) {
+			with(user(masterPrincipal))
+			withCsrf()
+			jsonBody(updateBody(0) - "version")
+		}.andExpectError(CommonErrorCode.NOT_FOUND)
 
-		val data = create(body, principals.getValue(role)).andExpectSuccess(HttpStatus.CREATED)
-
-		val id = data["id"].longValue()
-		assertThat(data).isEqualTo(guestJson(id, "홍길동", "010-1234-5678", "Hong.GilDong@Example.COM", 0))
-		assertThat(jdbcTemplate.queryForObject(SELECT_HOTEL_ID, Long::class.java, id)).isEqualTo(hotel.id)
-		assertThat(guestJson(reload(id))).isEqualTo(data)
+		assertThat(guestIds(hotel)).isEmpty()
 	}
 
 	@ParameterizedTest
@@ -159,27 +157,6 @@ class GuestHotelAdminControllerTest {
 		assertUnchanged(otherGuest)
 	}
 
-	@ParameterizedTest
-	@ValueSource(strings = ["010-1234-5678", " 01012345678 ", "0101-234-5678", "-010-1234-5678-"])
-	fun `같은 호텔에 하이픈을 뺀 숫자가 같은 전화번호로 등록하면 409 GUEST_PHONE_DUPLICATED로 응답하고 등록하지 않는다`(phone: String) {
-		val guest = saveGuest(hotel, PHONE)
-
-		create(createBody("name" to "다른 사람", "phone" to phone, "email" to "other@example.com")).andExpectError(GuestErrorCode.GUEST_PHONE_DUPLICATED)
-
-		assertThat(guestIds(hotel)).containsExactly(guest.id)
-	}
-
-	@Test
-	fun `다른 호텔의 이용객과는 전화번호가 같아도 되고 이름과 이메일은 같은 호텔에서도 같아도 된다`() {
-		saveGuest(otherHotel, PHONE)
-		saveGuest(hotel, OTHER_PHONE)
-
-		val data = create(createBody("phone" to PHONE)).andExpectSuccess(HttpStatus.CREATED)
-
-		assertThat(listOf(data["name"].stringValue(), data["phone"].stringValue(), data["email"].stringValue())).containsExactly(NAME, PHONE, EMAIL)
-		assertThat(guestIds(hotel)).hasSize(2)
-	}
-
 	@Test
 	fun `수정할 때 자기 전화번호는 하이픈 모양만 바꿔도 되고 같은 호텔의 다른 이용객과 숫자가 같아지면 409 GUEST_PHONE_DUPLICATED로 응답하고 바꾸지 않는다`() {
 		saveGuest(hotel, OTHER_PHONE)
@@ -206,42 +183,39 @@ class GuestHotelAdminControllerTest {
 
 	@ParameterizedTest
 	@ValueSource(strings = ["", " ", "\t", "　"])
-	fun `등록과 수정 모두 이름, 전화번호, 이메일이 비어 있거나 공백만 있으면 필드마다 필수 입력 메시지 하나로 400 응답한다`(value: String) {
+	fun `수정할 때 이름, 전화번호, 이메일이 비어 있거나 공백만 있으면 필드마다 필수 입력 메시지 하나로 400 응답한다`(value: String) {
 		val guest = saveGuest(hotel, PHONE)
 		val expected = arrayOf("name" to message(REQUIRED), "phone" to message(REQUIRED), "email" to message(REQUIRED))
 
-		create(createBody("name" to value, "phone" to value, "email" to value)).andExpectError(CommonErrorCode.INVALID_INPUT, *expected)
 		update(guest.id!!, updateBody(0, "name" to value, "phone" to value, "email" to value)).andExpectError(CommonErrorCode.INVALID_INPUT, *expected)
-		assertThat(guestIds(hotel)).containsExactly(guest.id)
 		assertUnchanged(guest)
 	}
 
 	@Test
 	fun `이름의 최대 길이는 앞뒤 공백을 지운 값으로 세고 넘으면 최대 길이 메시지로 400 응답한다`() {
+		val guest = saveGuest(hotel, PHONE)
 		val name = "가".repeat(Guest.NAME_MAX_LENGTH)
 
-		assertThat(create(createBody("name" to " $name ")).andExpectSuccess(HttpStatus.CREATED)["name"].stringValue()).isEqualTo(name)
-		create(createBody("name" to "${name}가", "phone" to OTHER_PHONE)).andExpectError(CommonErrorCode.INVALID_INPUT, "name" to maxLength(Guest.NAME_MAX_LENGTH))
+		update(guest.id!!, updateBody(0, "name" to "${name}가")).andExpectError(CommonErrorCode.INVALID_INPUT, "name" to maxLength(Guest.NAME_MAX_LENGTH))
+		assertThat(update(guest.id!!, updateBody(0, "name" to " $name ")).andExpectSuccess(HttpStatus.OK)["name"].stringValue()).isEqualTo(name)
 	}
 
 	@ParameterizedTest
 	@MethodSource("phoneErrors")
-	fun `등록과 수정 모두 전화번호 오류는 빈 값, 형식, 길이 순으로 하나만 응답한다`(phone: String, messageKey: String) {
+	fun `수정할 때 전화번호 오류는 빈 값, 형식, 길이 순으로 하나만 응답한다`(phone: String, messageKey: String) {
 		val guest = saveGuest(hotel, PHONE)
 		val expected = if (messageKey == MAX_LENGTH) maxLength(Guest.PHONE_MAX_LENGTH) else message(messageKey)
 
-		create(createBody("phone" to phone)).andExpectError(CommonErrorCode.INVALID_INPUT, "phone" to expected)
 		update(guest.id!!, updateBody(0, "phone" to phone)).andExpectError(CommonErrorCode.INVALID_INPUT, "phone" to expected)
 		assertUnchanged(guest)
 	}
 
 	@ParameterizedTest
 	@MethodSource("emailErrors")
-	fun `등록과 수정 모두 이메일 오류는 빈 값, 형식, 길이 순으로 하나만 응답한다`(email: String, messageKey: String) {
+	fun `수정할 때 이메일 오류는 빈 값, 형식, 길이 순으로 하나만 응답한다`(email: String, messageKey: String) {
 		val guest = saveGuest(hotel, PHONE)
 		val expected = if (messageKey == MAX_LENGTH) maxLength(Guest.EMAIL_MAX_LENGTH) else message(messageKey)
 
-		create(createBody("phone" to OTHER_PHONE, "email" to email)).andExpectError(CommonErrorCode.INVALID_INPUT, "email" to expected)
 		update(guest.id!!, updateBody(0, "email" to email)).andExpectError(CommonErrorCode.INVALID_INPUT, "email" to expected)
 		assertUnchanged(guest)
 	}
@@ -249,7 +223,9 @@ class GuestHotelAdminControllerTest {
 	@ParameterizedTest
 	@ValueSource(strings = ["12345678", "010-1234-5678", "01012345678", "02--1234-5678"])
 	fun `숫자와 -만 있고 숫자가 8~11개인 전화번호는 입력한 모양 그대로 저장한다`(phone: String) {
-		assertThat(create(createBody("phone" to phone)).andExpectSuccess(HttpStatus.CREATED)["phone"].stringValue()).isEqualTo(phone)
+		val guest = saveGuest(hotel, OTHER_PHONE)
+
+		assertThat(update(guest.id!!, updateBody(0, "phone" to phone)).andExpectSuccess(HttpStatus.OK)["phone"].stringValue()).isEqualTo(phone)
 	}
 
 	@ParameterizedTest
@@ -257,10 +233,6 @@ class GuestHotelAdminControllerTest {
 	fun `필수 항목이 없거나 null이면 필수 입력 메시지로 400 응답한다`(field: String) {
 		val guest = saveGuest(hotel, PHONE)
 
-		if (field != "version") {
-			create(createBody() - field).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(REQUIRED))
-			create(createBody(field to null)).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(REQUIRED))
-		}
 		update(guest.id!!, updateBody(0) - field).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(REQUIRED))
 		update(guest.id!!, updateBody(0, field to null)).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(REQUIRED))
 		assertUnchanged(guest)
@@ -271,9 +243,6 @@ class GuestHotelAdminControllerTest {
 	fun `항목에 다른 타입을 보내면 형식 메시지로 400 응답한다`(field: String, value: Any) {
 		val guest = saveGuest(hotel, PHONE)
 
-		if (field != "version") {
-			create(createBody("phone" to OTHER_PHONE, field to value)).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(TYPE))
-		}
 		update(guest.id!!, updateBody(0, field to value)).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(TYPE))
 		assertUnchanged(guest)
 	}
@@ -283,10 +252,7 @@ class GuestHotelAdminControllerTest {
 	fun `문서에 없는 id나 호텔 항목을 보내면 알 수 없는 항목 메시지로 400 응답하고 바꾸지 않는다`(field: String) {
 		val guest = saveGuest(hotel, PHONE)
 
-		create(createBody("phone" to OTHER_PHONE, field to otherHotel.id)).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(UNKNOWN_FIELD))
-		create(createBody("phone" to OTHER_PHONE, "version" to 0)).andExpectError(CommonErrorCode.INVALID_INPUT, "version" to message(UNKNOWN_FIELD))
 		update(guest.id!!, updateBody(0, field to otherHotel.id)).andExpectError(CommonErrorCode.INVALID_INPUT, field to message(UNKNOWN_FIELD))
-		assertThat(guestIds(hotel)).containsExactly(guest.id)
 		assertUnchanged(guest)
 	}
 
@@ -374,9 +340,7 @@ class GuestHotelAdminControllerTest {
 
 		mockMvc.get(GUESTS).andExpectError(CommonErrorCode.UNAUTHORIZED)
 		mockMvc.get("$GUESTS/${guest.id}").andExpectError(CommonErrorCode.UNAUTHORIZED)
-		mockMvc.post(GUESTS) { withCsrf(); jsonBody(createBody("phone" to OTHER_PHONE)) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
 		mockMvc.put("$GUESTS/${guest.id}") { withCsrf(); jsonBody(updateBody(0, "name" to "김철수")) }.andExpectError(CommonErrorCode.UNAUTHORIZED)
-		assertThat(guestIds(hotel)).containsExactly(guest.id)
 		assertUnchanged(guest)
 	}
 
@@ -387,20 +351,16 @@ class GuestHotelAdminControllerTest {
 
 		getGuests(principal = appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
 		getGuest(checkNotNull(guest.id), appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
-		create(createBody("phone" to OTHER_PHONE), appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
 		update(guest.id!!, updateBody(0, "name" to "김철수"), appAdmin).andExpectError(CommonErrorCode.FORBIDDEN)
-		assertThat(guestIds(hotel)).containsExactly(guest.id)
 		assertUnchanged(guest)
 	}
 
 	@Test
-	fun `CSRF 토큰 없이 등록하거나 수정하면 403 INVALID_CSRF_TOKEN으로 응답하고 바꾸지 않는다`() {
+	fun `CSRF 토큰 없이 수정하면 403 INVALID_CSRF_TOKEN으로 응답하고 바꾸지 않는다`() {
 		val guest = saveGuest(hotel, PHONE)
 
-		mockMvc.post(GUESTS) { with(user(masterPrincipal)); jsonBody(createBody("phone" to OTHER_PHONE)) }.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
 		mockMvc.put("$GUESTS/${guest.id}") { with(user(masterPrincipal)); jsonBody(updateBody(0, "name" to "김철수")) }
 			.andExpectError(CommonErrorCode.INVALID_CSRF_TOKEN)
-		assertThat(guestIds(hotel)).containsExactly(guest.id)
 		assertUnchanged(guest)
 	}
 
@@ -409,14 +369,14 @@ class GuestHotelAdminControllerTest {
 		val docs = apiDocs()
 		val guests = docs["paths"][GUESTS]
 		val guest = docs["paths"]["$GUESTS/{guestId}"]
-		val operations = listOf(guests["post"], guests["get"], guest["get"], guest["put"])
+		val operations = listOf(guests["get"], guest["get"], guest["put"])
 
-		assertThat(operations.map { it["operationId"].stringValue() }).containsExactly("createGuest", "getGuests", "getGuest", "updateGuest")
+		assertThat(guests.has("post")).isFalse()
+		assertThat(docs["components"]["schemas"].has("GuestCreateHotelAdminRequest")).isFalse()
+		assertThat(operations.map { it["operationId"].stringValue() }).containsExactly("getGuests", "getGuest", "updateGuest")
 		assertThat(operations.map { op -> op["tags"].values().map { it.stringValue() } }).containsOnly(listOf("guest"))
 		assertThat(docs["tags"].values().single { it["name"].stringValue() == "guest" }["description"].stringValue())
 			.isEqualTo(message("openapi.hotel-admin.tag.guest"))
-		assertThat(guests["post"]["responses"].propertyNames()).containsExactlyInAnyOrder("201", "400", "401", "403", "409", "500")
-		assertThat(errorCodes(guests["post"], HttpStatus.CONFLICT)).containsExactly(GuestErrorCode.GUEST_PHONE_DUPLICATED.code)
 		assertThat(guests["get"]["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "403", "500")
 		assertThat(guest["get"]["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "403", "404", "500")
 		listOf(guest["get"], guest["put"]).forEach { op ->
@@ -429,12 +389,11 @@ class GuestHotelAdminControllerTest {
 		assertThat(guests["get"]["parameters"].values().map { it["name"].stringValue() }).containsExactly("keyword", "page", "size")
 	}
 
-	@ParameterizedTest
-	@CsvSource("GuestCreateHotelAdminRequest, false", "GuestUpdateHotelAdminRequest, true")
-	fun `이용객 요청 문서는 모든 항목이 필수이고 이름 길이, 전화번호와 이메일의 형식과 길이를 보여준다`(schema: String, hasVersion: Boolean) {
-		val request = apiDocs()["components"]["schemas"][schema]
+	@Test
+	fun `이용객 수정 요청 문서는 모든 항목이 필수이고 이름 길이, 전화번호와 이메일의 형식과 길이를 보여준다`() {
+		val request = apiDocs()["components"]["schemas"]["GuestUpdateHotelAdminRequest"]
 		val properties = request["properties"]
-		val required = listOf("name", "phone", "email") + if (hasVersion) listOf("version") else emptyList()
+		val required = listOf("name", "phone", "email", "version")
 		val rules = listOf("name", "phone", "email").associateWith { field ->
 			listOf("minLength", "maxLength", "pattern").map { properties[field][it]?.asString() }
 		}
@@ -449,13 +408,6 @@ class GuestHotelAdminControllerTest {
 			),
 		)
 	}
-
-	private fun create(body: Map<String, Any?>, principal: UserDetails = masterPrincipal): ResultActionsDsl =
-		mockMvc.post(GUESTS) {
-			with(user(principal))
-			withCsrf()
-			jsonBody(body)
-		}
 
 	private fun getGuests(vararg params: Pair<String, String>, principal: UserDetails = masterPrincipal): ResultActionsDsl =
 		mockMvc.get(GUESTS) {
@@ -483,11 +435,8 @@ class GuestHotelAdminControllerTest {
 		content = jsonMapper.writeValueAsString(body)
 	}
 
-	private fun createBody(vararg overrides: Pair<String, Any?>): Map<String, Any?> =
-		linkedMapOf<String, Any?>("name" to NAME, "phone" to PHONE, "email" to EMAIL) + overrides
-
 	private fun updateBody(version: Long, vararg overrides: Pair<String, Any?>): Map<String, Any?> =
-		createBody() + ("version" to version) + overrides
+		linkedMapOf<String, Any?>("name" to NAME, "phone" to PHONE, "email" to EMAIL, "version" to version) + overrides
 
 	private fun phone(number: Int): String = "010-0000-%04d".format(number)
 
@@ -587,12 +536,10 @@ class GuestHotelAdminControllerTest {
 		private const val UNKNOWN_FIELD = "validation.unknown-field"
 		private const val MISSING_ID = Long.MAX_VALUE
 		private val SUCCESS_MESSAGE_KEYS = mapOf(
-			Regex("POST $GUESTS") to "success.guest.created",
 			Regex("PUT $GUESTS/\\d+") to "success.guest.updated",
 		)
 		private const val DELETE_GUESTS = "delete from guest where hotel_id = ?"
 		private const val DELETE_HOTEL_ADMINS = "delete from hotel_admin where hotel_id = ?"
-		private const val SELECT_HOTEL_ID = "select hotel_id from guest where id = ?"
 		private const val SELECT_GUEST_IDS = "select id from guest where hotel_id = ? order by id"
 
 		@JvmStatic
