@@ -29,6 +29,12 @@ interface StayRepository : JpaRepository<Stay, Long>, JpaSpecificationExecutor<S
 	@EntityGraph(attributePaths = [ROOM_HOTEL, ROOM_ROOM_TYPE])
 	fun findByGuestMemberId(memberId: Long, pageable: Pageable): Page<Stay>
 
+	@EntityGraph(attributePaths = [ROOM_HOTEL, ROOM_ROOM_TYPE])
+	fun findByGuestMemberIdAndCheckOutDateAfter(memberId: Long, today: LocalDate, pageable: Pageable): Page<Stay>
+
+	@EntityGraph(attributePaths = [ROOM_HOTEL, ROOM_ROOM_TYPE])
+	fun findByGuestMemberIdAndCheckOutDateLessThanEqual(memberId: Long, today: LocalDate, pageable: Pageable): Page<Stay>
+
 	@Modifying(flushAutomatically = true, clearAutomatically = true)
 	@Query(
 		"""

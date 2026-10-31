@@ -34,6 +34,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -312,6 +313,66 @@ class StayAppControllerTest {
 		myStays(null).andExpectError(CommonErrorCode.UNAUTHORIZED)
 	}
 
+	@Test
+	fun `내 이용 목록은 period=UPCOMING이면 체크아웃이 오늘보다 뒤인 이용을 체크인 이른 순(같으면 id 오름차순), PAST면 체크아웃이 오늘이거나 지난 이용을 체크인 늦은 순(같으면 id 내림차순)으로 취소 포함해 주고 다른 회원의 이용은 넣지 않는다`() {
+		jdbcTemplate.update(UPDATE_GUEST_MEMBER, member.id, guest.id)
+		jdbcTemplate.update(UPDATE_GUEST_MEMBER, member.id, otherGuest.id)
+		val stranger = guestRepository.save(Guest(hotel, "다른 회원", "010-3333-4444", EMAIL))
+		jdbcTemplate.update(UPDATE_GUEST_MEMBER, newMember.id, stranger.id)
+		val otherHotelRoom = saveRoom(otherHotel, "501", "디럭스")
+		val endsToday = saveStay(room, TODAY.minusDays(2), TODAY)
+		val inProgress = saveStay(otherRoom, TODAY.minusDays(1), TODAY.plusDays(1))
+		val startsToday = saveStay(room, TODAY, TODAY.plusDays(2))
+		val upcomingCanceled = saveStay(otherRoom, TODAY.plusDays(3), TODAY.plusDays(4)).also(::cancelStay)
+		val upcomingSameCheckIn = saveStay(otherHotelRoom, TODAY.plusDays(3), TODAY.plusDays(5), otherGuest)
+		val pastCanceled = saveStay(otherRoom, TODAY.minusDays(5), TODAY.minusDays(3)).also(::cancelStay)
+		val pastSameCheckIn = saveStay(room, TODAY.minusDays(5), TODAY.minusDays(4))
+		val pastOld = saveStay(otherHotelRoom, TODAY.minusDays(10), TODAY.minusDays(8), otherGuest)
+		val strangerUpcoming = saveStay(otherRoom, TODAY.plusDays(10), TODAY.plusDays(11), stranger)
+		val strangerPast = saveStay(otherRoom, TODAY.minusDays(20), TODAY.minusDays(19), stranger)
+
+		assertThat(myStayIds(member, UPCOMING)).containsExactly(inProgress.id, startsToday.id, upcomingCanceled.id, upcomingSameCheckIn.id)
+		assertThat(myStayIds(member, PAST)).containsExactly(endsToday.id, pastSameCheckIn.id, pastCanceled.id, pastOld.id)
+		assertThat(myStayIds(member)).containsExactly(
+			upcomingSameCheckIn.id, upcomingCanceled.id, startsToday.id, inProgress.id, endsToday.id, pastSameCheckIn.id, pastCanceled.id, pastOld.id,
+		)
+		assertThat(myStayIds(newMember, UPCOMING)).containsExactly(strangerUpcoming.id)
+		assertThat(myStayIds(newMember, PAST)).containsExactly(strangerPast.id)
+	}
+
+	@Test
+	fun `period별 내 이용 목록은 size=10이면 처음 10건을 주고 page=1에서 나머지를 이어서 준다`() {
+		jdbcTemplate.update(UPDATE_GUEST_MEMBER, member.id, guest.id)
+		val upcoming = (0L until 12L).map { saveStay(room, TODAY.plusDays(it), TODAY.plusDays(it + 1)).id }
+		val past = (0L until 12L).map { saveStay(room, TODAY.minusDays(it + 1), TODAY.minusDays(it)).id }
+
+		listOf(UPCOMING to upcoming, PAST to past).forEach { (period, ids) ->
+			val first = myStays(member, PERIOD to period, "size" to "10").andReturn().andExpectSuccess(HttpStatus.OK)
+			val second = myStays(member, PERIOD to period, "page" to "1", "size" to "10").andReturn().andExpectSuccess(HttpStatus.OK)
+
+			assertThat(first["items"].values().map { it["id"].longValue() }).containsExactlyElementsOf(ids.take(10))
+			assertThat(second["items"].values().map { it["id"].longValue() }).containsExactlyElementsOf(ids.drop(10))
+			assertThat(listOf(first, second).map { page -> PAGE_FIELDS.map { page[it].longValue() } })
+				.containsExactly(listOf(0L, 10L, 12L, 2L), listOf(1L, 10L, 12L, 2L))
+		}
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = ["upcoming", "Past", "NOW", "0"])
+	fun `period가 UPCOMING, PAST가 아니면 400 INVALID_INPUT으로 응답하고 fieldErrors에 period 형식 오류를 담는다`(period: String) {
+		myStays(member, PERIOD to period).andExpectError(CommonErrorCode.INVALID_INPUT, PERIOD to message("validation.type"))
+	}
+
+	@Test
+	fun `period가 비었거나 공백만 있으면 period 없이 조회한 것과 같고 로그인하지 않으면 period가 있어도 401이다`() {
+		jdbcTemplate.update(UPDATE_GUEST_MEMBER, member.id, guest.id)
+		val past = saveStay(room, TODAY.minusDays(2), TODAY)
+		val upcoming = saveStay(room, TODAY, TODAY.plusDays(1))
+
+		listOf("", " ").forEach { assertThat(myStayIds(member, it)).containsExactly(upcoming.id, past.id) }
+		myStays(null, PERIOD to UPCOMING).andExpectError(CommonErrorCode.UNAUTHORIZED)
+	}
+
 	@ParameterizedTest
 	@CsvSource(
 		"0, 0, , validation.after-check-in",
@@ -414,7 +475,11 @@ class StayAppControllerTest {
 		assertThat(myStays["operationId"].stringValue()).isEqualTo("getMyStays")
 		assertThat(myStays["tags"].values().map { it.stringValue() }).containsExactly("stay")
 		assertThat(myStays["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "500")
-		assertThat(myStays["parameters"].values().map { it["name"].stringValue() }).containsExactly("page", "size")
+		val myStaysParameters = myStays["parameters"].values().associateBy { it["name"].stringValue() }
+		assertThat(myStaysParameters.keys).containsExactly(PERIOD, "page", "size")
+		assertThat(myStaysParameters.getValue(PERIOD)["required"].booleanValue()).isFalse()
+		assertThat(myStaysParameters.getValue(PERIOD)["description"].stringValue()).isEqualTo(message("openapi.app.operation.getMyStays.parameter.period"))
+		assertThat(myStaysParameters.getValue(PERIOD)["schema"]).isEqualTo(json("""{"type":"string","enum":["$UPCOMING","$PAST"]}"""))
 		assertThat(schemas["StayMyAppResponse"]["properties"].propertyNames()).containsExactly(
 			"id", "hotel", "roomType", "checkInDate", "checkOutDate", "guestCount", "roomRate", "nights", "baseAmount", "discountAmount", "totalAmount", "canceledAt",
 		)
@@ -427,8 +492,16 @@ class StayAppControllerTest {
 			content = jsonMapper.writeValueAsString(body)
 		}
 
-	private fun myStays(member: Member?): ResultActionsDsl =
-		mockMvc.get(MY_STAYS) { member?.let { with(user(MemberPrincipal.from(it))) } }
+	private fun myStays(member: Member?, vararg params: Pair<String, String>): ResultActionsDsl =
+		mockMvc.get(MY_STAYS) {
+			member?.let { with(user(MemberPrincipal.from(it))) }
+			params.forEach { (name, value) -> param(name, value) }
+		}
+
+	private fun myStayIds(member: Member, period: String? = null): List<Long> {
+		val params = listOfNotNull(period?.let { PERIOD to it }).toTypedArray()
+		return myStays(member, *params).andReturn().andExpectSuccess(HttpStatus.OK)["items"].values().map { it["id"].longValue() }
+	}
 
 	private fun saveMember(email: String, name: String, phone: String): Member =
 		memberRepository.save(Member(email, "password-hash", name, phone)).also { createdMemberIds += checkNotNull(it.id) }
@@ -553,6 +626,10 @@ class StayAppControllerTest {
 	companion object {
 		private const val STAYS = ApiPaths.APP + "/stays"
 		private const val MY_STAYS = ApiPaths.APP + "/me/stays"
+		private const val PERIOD = "period"
+		private const val UPCOMING = "UPCOMING"
+		private const val PAST = "PAST"
+		private val PAGE_FIELDS = listOf("page", "size", "totalElements", "totalPages")
 		private const val APP_DOCS = "/v3/api-docs/app"
 		private const val HOTEL_PHONE = "02-1234-5678"
 		private const val PHONE = "010-1234-5678"

@@ -19,6 +19,7 @@ import com.marco.assignment.handys.urbanstay.stay.dto.app.StayRoomTypeAppRespons
 import com.marco.assignment.handys.urbanstay.stay.entity.Stay
 import com.marco.assignment.handys.urbanstay.stay.exception.StayApiErrors
 import com.marco.assignment.handys.urbanstay.stay.exception.StayErrorCode
+import com.marco.assignment.handys.urbanstay.stay.service.StayPeriod
 import com.marco.assignment.handys.urbanstay.stay.service.StayService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -89,6 +90,9 @@ class StayAppController(
 	@GetMapping("/me/stays")
 	fun getMyStays(
 		@AuthenticationPrincipal principal: MemberPrincipal,
+		@RequestParam(required = false)
+		@Parameter(description = "openapi.app.operation.getMyStays.parameter.period")
+		period: StayPeriod?,
 		@RequestParam(defaultValue = PageParams.DEFAULT_PAGE)
 		@Min(value = PageParams.MIN_PAGE, message = "{validation.min}")
 		@Max(value = PageParams.MAX_PAGE, message = "{validation.max}")
@@ -100,5 +104,5 @@ class StayAppController(
 		@Parameter(description = "openapi.app.operation.getMyStays.parameter.size")
 		size: Int,
 	): ApiResponse<PageResponse<StayMyAppResponse>> =
-		ApiResponse.success(PageResponse.from(stayService.getMemberStays(principal.id, page, size).map(StayMyAppResponse::from)))
+		ApiResponse.success(PageResponse.from(stayService.getMemberStays(principal.id, page, size, period).map(StayMyAppResponse::from)))
 }
