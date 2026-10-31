@@ -1,6 +1,7 @@
 export { useOperatorListQuery } from "./api/operator-list-query";
 export {
   cacheSavedOperator,
+  refreshOperator,
   useRefetchOperator,
 } from "./api/operator-query";
 export {

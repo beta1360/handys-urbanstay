@@ -35,6 +35,18 @@ export function useRefetchOperator(operatorId: number) {
   return () => refetchOperator(queryClient, operatorId);
 }
 
+export async function refreshOperator(
+  queryClient: QueryClient,
+  operatorId: number,
+) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: operatorListQueryKey() }),
+    queryClient.invalidateQueries({
+      queryKey: operatorQueryOptions(operatorId).queryKey,
+    }),
+  ]);
+}
+
 export function cacheSavedOperator(
   queryClient: QueryClient,
   operator: Operator,

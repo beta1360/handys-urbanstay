@@ -5,6 +5,8 @@ import {
   OperatorNotFound,
   useOperator,
 } from "@/entities/operator";
+import { OperatorActiveChange } from "@/features/operator-active-change";
+import { OperatorPasswordReset } from "@/features/operator-password-reset";
 import { OperatorDetailActions } from "./operator-detail-actions";
 
 type OperatorDetailProps = {
@@ -36,6 +38,11 @@ export function OperatorDetail({ operatorId }: OperatorDetailProps) {
         <>
           <OperatorDetailActions editOperatorId={state.operator.id} />
           <OperatorInformation operator={state.operator} />
+          <OperatorPasswordReset
+            key={state.operator.id}
+            operatorId={state.operator.id}
+          />
+          <OperatorActiveChange operator={state.operator} />
         </>
       );
   }
