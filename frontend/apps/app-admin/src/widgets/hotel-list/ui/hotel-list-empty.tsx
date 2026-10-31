@@ -1,4 +1,5 @@
 import { Card } from "@repo/ui/card";
+import { COMMON_MESSAGES } from "@/shared/config";
 import { HOTEL_LIST_CONTENT_MESSAGES } from "../config/messages";
 
 type HotelListEmptyProps = {
@@ -10,7 +11,7 @@ export function HotelListEmpty({ hasKeyword }: HotelListEmptyProps) {
     <Card>
       <p className="text-center text-sm text-neutral-500">
         {hasKeyword
-          ? HOTEL_LIST_CONTENT_MESSAGES.emptySearchResult
+          ? COMMON_MESSAGES.emptySearchResult
           : HOTEL_LIST_CONTENT_MESSAGES.empty}
       </p>
     </Card>

@@ -39,3 +39,33 @@ export type {
   ResetHotelMasterPasswordBody,
   UpdateHotelMasterBody,
 } from "./hotel-master";
+export {
+  fetchMember,
+  fetchMembers,
+  fetchMemberStays,
+  memberListParamsSchema,
+  memberListQueryKey,
+  memberParamsSchema,
+  memberQueryKey,
+  memberStayListParamsSchema,
+  memberStayListQueryKey,
+} from "./member";
+export type {
+  Member,
+  MemberListParams,
+  MemberPage,
+  MemberStay,
+  MemberStayListParams,
+  MemberStayPage,
+} from "./member";
+export {
+  fetchHotelRooms,
+  hotelRoomListParamsSchema,
+  hotelRoomListQueryKey,
+} from "./room";
+export type {
+  HotelRoom,
+  HotelRoomListParams,
+  HotelRoomPage,
+  RoomStatus,
+} from "./room";

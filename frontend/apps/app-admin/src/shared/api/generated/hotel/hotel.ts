@@ -219,7 +219,7 @@ export const useUpdateHotel = <TError = ErrorType<ErrorApiResponse>,
       return useMutation(getUpdateHotelMutationOptions(options), queryClient);
     }
     /**
- * 호텔 목록을 최근 등록 순(id 내림차순)으로 페이지로 나눠 조회합니다. keyword를 보내면 이름에 keyword가 들어 있는 호텔만 대소문자 구분 없이 찾습니다. %, _, \ 같은 문자도 글자 그대로 찾습니다. keyword는 앞뒤 공백을 지운 뒤 100자 이하이고, 없거나 비어 있거나 공백만 있으면 전체를 조회합니다. page는 0~99(기본 0), size는 1~100(기본 10)입니다. totalElements와 totalPages는 검색 결과 기준이며, totalPages가 100을 넘어도 page는 99까지만 받으므로 그 뒤의 호텔은 keyword로 좁혀 찾습니다. 범위를 벗어나면 400 INVALID_INPUT으로 응답하고 fieldErrors에 파라미터 이름을 담습니다.
+ * 호텔 목록을 최근 등록 순(id 내림차순)으로 페이지로 나눠 조회합니다. keyword를 보내면 이름, 주소, 대표 전화번호 중 하나에 keyword가 들어 있는 호텔만 찾습니다. 이름과 주소는 대소문자 구분 없이, 전화번호는 저장된 번호와 keyword 양쪽의 하이픈(-)을 빼고 비교합니다(예: 0212345678로 02-1234-5678을 찾습니다). 하이픈만 있는 keyword는 전화번호로는 찾지 않습니다. %, _, \ 같은 문자도 글자 그대로 찾습니다. keyword는 앞뒤 공백을 지운 뒤 100자 이하이고, 없거나 비어 있거나 공백만 있으면 전체를 조회합니다. page는 0~99(기본 0), size는 1~100(기본 10)입니다. totalElements와 totalPages는 검색 결과 기준이며, totalPages가 100을 넘어도 page는 99까지만 받으므로 그 뒤의 호텔은 keyword로 좁혀 찾습니다. 범위를 벗어나면 400 INVALID_INPUT으로 응답하고 fieldErrors에 파라미터 이름을 담습니다.
  * @summary 호텔 목록 조회
  */
 export const getHotels = (
