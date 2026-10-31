@@ -33,12 +33,26 @@ class StayService(
 ) {
 
 	@Transactional
-	fun create(hotelId: Long, roomId: Long, guestId: Long, checkInDate: LocalDate, checkOutDate: LocalDate, guestCount: Int): Stay {
-		val room = roomService.getRoom(hotelId, roomId)
-		val guest = guestService.getGuest(hotelId, guestId)
+	fun reserve(
+		roomId: Long,
+		checkInDate: LocalDate,
+		checkOutDate: LocalDate,
+		guestCount: Int,
+		guestName: String,
+		guestPhone: String,
+		guestEmail: String,
+	): Stay {
+		val room = roomService.getRoomWithHotel(roomId)
 		checkValid(room, checkInDate, checkOutDate, guestCount)
 		checkNotOverlapped(roomId, checkInDate, checkOutDate)
+		val guest = guestService.getOrCreate(checkNotNull(room.hotel.id), guestName, guestPhone, guestEmail)
 		return translateConflicts { stayRepository.saveAndFlush(Stay(room, guest, checkInDate, checkOutDate, guestCount)) }
+	}
+
+	@Transactional(readOnly = true)
+	fun getReservedPeriods(roomId: Long, page: Int, size: Int): Page<Stay> {
+		roomService.getRoomWithHotel(roomId)
+		return stayRepository.findByRoomIdAndCanceledAtIsNullAndCheckOutDateAfter(roomId, LocalDate.now(clock), PageRequest.of(page, size, EARLIEST_CHECK_IN_FIRST))
 	}
 
 	@Transactional(readOnly = true)
@@ -103,6 +117,7 @@ class StayService(
 
 	companion object {
 		private val LATEST_CHECK_IN_FIRST = Sort.by(Sort.Order.desc(Stay::checkInDate.name), Sort.Order.desc(Stay::id.name))
+		private val EARLIEST_CHECK_IN_FIRST = Sort.by(Sort.Order.asc(Stay::checkInDate.name), Sort.Order.asc(Stay::id.name))
 		private const val TODAY_OR_LATER = "validation.today-or-later"
 		private const val AFTER_CHECK_IN = "validation.after-check-in"
 		private const val MAX_NIGHTS = "validation.max-nights"

@@ -7,7 +7,6 @@ import com.marco.assignment.handys.urbanstay.common.request.TrimmedStringEditor
 import com.marco.assignment.handys.urbanstay.common.response.ApiResponse
 import com.marco.assignment.handys.urbanstay.common.response.PageResponse
 import com.marco.assignment.handys.urbanstay.common.response.SuccessMessage
-import com.marco.assignment.handys.urbanstay.guest.dto.hoteladmin.GuestCreateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.guest.dto.hoteladmin.GuestHotelAdminResponse
 import com.marco.assignment.handys.urbanstay.guest.dto.hoteladmin.GuestUpdateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.guest.exception.GuestApiErrors
@@ -20,18 +19,15 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Size
-import org.springframework.http.HttpStatus
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.WebDataBinder
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.InitBinder
 import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
-import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
 @Tag(name = "guest", description = "openapi.hotel-admin.tag.guest")
@@ -44,19 +40,6 @@ class GuestHotelAdminController(
 	@InitBinder
 	fun trimRequestParameters(binder: WebDataBinder) {
 		binder.registerCustomEditor(String::class.java, TrimmedStringEditor())
-	}
-
-	@Operation(summary = "openapi.hotel-admin.operation.createGuest.summary", description = "openapi.hotel-admin.operation.createGuest.description")
-	@GuestApiErrors(GuestErrorCode.GUEST_PHONE_DUPLICATED)
-	@SuccessMessage("success.guest.created")
-	@PostMapping
-	@ResponseStatus(HttpStatus.CREATED)
-	fun createGuest(
-		@AuthenticationPrincipal hotelAdmin: HotelAdminPrincipal,
-		@Valid @RequestBody request: GuestCreateHotelAdminRequest,
-	): ApiResponse<GuestHotelAdminResponse> {
-		val guest = guestService.create(hotelId = hotelAdmin.hotelId, name = request.name, phone = request.phone, email = request.email)
-		return ApiResponse.success(GuestHotelAdminResponse.from(guest))
 	}
 
 	@Operation(summary = "openapi.hotel-admin.operation.getGuests.summary", description = "openapi.hotel-admin.operation.getGuests.description")

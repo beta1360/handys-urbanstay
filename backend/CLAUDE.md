@@ -82,6 +82,7 @@ urbanstay/
   - 결정적(deterministic, 기본값) collation이라 같은 값 비교(유일 제약, 중복 확인)는 지금처럼 글자 그대로, 대소문자를 구분한다. `upper`·LIKE 검색과 이스케이프도 그대로 동작한다.
   - 정렬 순서는 operation 설명에 적고, 숫자·영문 대소문자·한글이 섞인 이름으로 저장소 테스트와 API 테스트에서 확인한다.
   - 이름이 유일한 범위의 목록에도 id를 둘째 기준으로 둔다(예: 객실 목록은 이름 오름차순, 같으면 id 오름차순).
+  - 예외: 호텔 이름(`hotel.name`)은 `natural_sort`가 아니다. 게스트 앱 호텔 목록은 DB 기본 collation의 이름순이다(게스트 앱 API 절).
 - 부분 일치 검색은 Spring Data 파생 쿼리(예: `findByNameContainingIgnoreCase`)로 한다. 파생 쿼리는 `\`, `%`, `_`를 이스케이프하고 `escape '\'`를 붙여 입력을 글자 그대로 찾는다. `@Query`로 LIKE를 직접 쓰면 이스케이프되지 않는다.
 - 한 필드 검색과 선택 필터를 AND로만 묶는 목록은 조합마다 파생 쿼리를 두고 서비스가 고른다. 예: 객실 목록의 `findByHotelId`, `findByHotelIdAndStatus`, `findByHotelIdAndNameContainingIgnoreCase`, `findByHotelIdAndStatusAndNameContainingIgnoreCase`. 이스케이프와 서비스가 정한 정렬이 그대로 적용된다. 필터가 더 늘어 조합이 감당하기 어려워지면 `Specification`으로 옮긴다.
 - 여러 필드 중 하나에 들어 있으면 찾는 검색(OR)과 선택 필터가 함께 있어 파생 쿼리로 쓰기 어려우면 `Specification`(`JpaSpecificationExecutor`)으로 한다. 예: `account/repository/HotelAdminSpecifications.search`(이름 또는 아이디 검색 + 활성 여부 필터)
@@ -234,6 +235,7 @@ urbanstay/
 ## 이용객
 
 - 이용객은 `guest` 도메인의 `guest` 테이블(`Guest`, `V8__create_guest.sql`)에 저장한다. 한 호텔에 속하고(`hotel_id`, `Hotel`과 JPA 연관관계) 이름, 전화번호, 이메일, 낙관적 잠금 버전(`version`)을 가진다.
+  - 이용객은 게스트 앱 예약에서 등록된다(게스트 앱 API 절). hotel-admin에는 등록 API가 없다.
   - 이용객 삭제는 없다. 게스트 앱 계정과 연결하는 컬럼은 아직 두지 않는다.
 - 값의 규칙
   - 이름은 앞뒤 공백을 지운 뒤 1~50자다. 같은 호텔에서도 겹쳐도 된다.
@@ -242,16 +244,17 @@ urbanstay/
   - 엔티티(`Guest.normalize`)가 공백을 지워 저장한다. DB도 CHECK 제약으로 정리된 이름·이메일과 호텔과 같은 규칙의 전화번호만 받는다.
 - 전화번호는 같은 호텔 안에서 하이픈을 뺀 숫자로 유일하다. `010-1234-5678`과 `01012345678`은 같은 번호다. 다른 호텔과는 같아도 된다.
   - DB는 식 유일 인덱스 `guest_hotel_id_phone_digits_key (hotel_id, replace(phone, '-', ''))`로 막는다. CHECK가 숫자와 `-`만 받으므로 하이픈을 뺀 값이 숫자만 뽑은 값이다.
-  - 사전 확인도 같은 식으로 비교하고(`GuestSpecifications.samePhone`, 수정은 자기 자신을 뺀다), 이 인덱스 위반도 `GuestErrorCode.GUEST_PHONE_DUPLICATED`(409)로 바꾼다. 인덱스 이름은 `Guest.HOTEL_PHONE_UNIQUE_CONSTRAINT`다.
+  - 수정의 사전 확인도 같은 식으로 비교하고(`GuestSpecifications.samePhone`, 자기 자신을 뺀다), 이 인덱스 위반도 `GuestErrorCode.GUEST_PHONE_DUPLICATED`(409)로 바꾼다. 인덱스 이름은 `Guest.HOTEL_PHONE_UNIQUE_CONSTRAINT`다.
+  - 예약의 이용객 찾기·만들기는 같은 번호를 409로 거절하지 않고 그 이용객으로 예약한다. 이 인덱스를 `on conflict` 대상으로 써서 같은 새 이용객이 동시에 와도 하나만 남긴다(게스트 앱 API 절).
   - 이 인덱스가 호텔별 목록의 `hotel_id` 조건에도 쓰여 따로 인덱스를 두지 않는다.
-- 이용객 관리(`ApiPaths.HOTEL_ADMIN + "/guests"`의 등록·목록·조회·수정, `GuestHotelAdminController`)는 `GuestService`가 한다. 호텔 계정 모두(마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 보안 규칙은 따로 두지 않는다(`HOTEL_ADMIN_PATTERN`).
-  - 대상 호텔은 로그인한 계정의 `HotelAdminPrincipal.hotelId`다. 등록은 `HotelService.getHotel(hotelId)`로 호텔을 읽어 연관관계에 쓴다.
+- 이용객 관리(`ApiPaths.HOTEL_ADMIN + "/guests"`의 목록·조회·수정, `GuestHotelAdminController`)는 `GuestService`가 한다. 호텔 계정 모두(마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 보안 규칙은 따로 두지 않는다(`HOTEL_ADMIN_PATTERN`).
+  - 대상 호텔은 로그인한 계정의 `HotelAdminPrincipal.hotelId`다.
   - 조회·수정할 이용객은 같은 호텔에서만 찾는다(`findByIdAndHotelId`). 없는 id와 다른 호텔의 이용객 id는 모두 404 `GuestErrorCode.GUEST_NOT_FOUND`다.
   - 수정은 PUT으로 모든 항목을 바꾼다. 순서는 이용객 조회 → version 확인(`GUEST_MODIFIED`) → 전화번호 중복 확인 → 엔티티 변경 → `saveAndFlush`이고, 유일 인덱스 위반과 `OptimisticLockingFailureException`을 함께 변환한다. version 충돌과 전화번호 중복이 겹치면 version 충돌이 먼저다.
   - 목록은 같은 호텔의 이용객을 최근 등록 순(id 내림차순)으로 준다. `keyword`(선택, 100자)는 이름 또는 전화번호에서 찾는다(`GuestSpecifications.search`, 이스케이프는 목록 조회 절). 이름은 대소문자 구분 없이, 전화번호는 저장값과 검색어 양쪽의 하이픈을 빼고 부분 일치로 찾는다(`01012345678`로 `010-1234-5678`을 찾는다).
   - 하이픈만 있는 검색어는 하이픈을 빼면 비어 모든 전화번호에 맞으므로 이름에서만 찾는다.
 - 테스트
-  - 사전 확인을 통과한 뒤 유일 인덱스(하이픈 모양만 다른 번호)와 JPA 버전 검사가 막는 경로는 순서를 고정해 확인한다(`GuestServiceTest`).
+  - 수정이 사전 확인을 통과한 뒤 유일 인덱스(하이픈 모양만 다른 번호)와 JPA 버전 검사가 막는 경로는 순서를 고정해 확인한다(`GuestServiceTest`). 테스트 이용객은 `GuestService.getOrCreate`나 저장소로 만든다.
   - 이용객이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔의 `guest`를 먼저 지운다.
 
 ## 이용
@@ -268,8 +271,8 @@ urbanstay/
 - 같은 객실에 기간이 겹치는 취소하지 않은 이용은 둘 수 없다. 사전 확인(`existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfterAndCanceledAtIsNull`)과 배제 제약(`stay_room_id_period_excl`, `btree_gist`로 `room_id WITH =`, `daterange(check_in_date, check_out_date, '[)') WITH &&`, `where (canceled_at is null)`)이 막고, 둘 다 409 `StayErrorCode.STAY_PERIOD_OVERLAPPED`다(동시성과 충돌 절). 취소한 이용과는 겹쳐도 된다.
   - 배제 제약은 `V10__add_stay_cancellation.sql`이 같은 이름으로 다시 만들어 취소하지 않은 이용에만 건다.
   - 배제 제약의 gist 인덱스는 취소하지 않은 이용만 담아 취소를 포함한 목록에 쓰이지 않는다. 객실별 조회는 `stay_room_id_check_in_date_id_idx`, 이용객별 조회는 `stay_guest_id_check_in_date_id_idx`를 쓴다.
-- 이용 관리(`ApiPaths.HOTEL_ADMIN + "/stays"`의 등록·목록·조회와 `/{stayId}/cancel` 취소, `StayHotelAdminController`)는 `StayService`가 한다. 호텔 계정 모두(마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 수정은 없다.
-  - 등록은 객실 조회(`RoomService.getRoom`, 404 `ROOM_NOT_FOUND`) → 이용객 조회(`GuestService.getGuest`, 404 `GUEST_NOT_FOUND`) → 기간·인원(400) → 겹침(409) 순으로 판단한다. 객실 상태와 관계없고 상태를 바꾸지 않는다.
+- 이용 등록은 게스트 앱 예약(`StayService.reserve`)만 한다(게스트 앱 API 절). 객실 상태와 관계없고 상태를 바꾸지 않는다.
+- 이용 관리(`ApiPaths.HOTEL_ADMIN + "/stays"`의 목록·조회와 `/{stayId}/cancel` 취소, `StayHotelAdminController`)는 `StayService`가 한다. 호텔 계정 모두(마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 등록과 수정은 없다.
   - 조회할 이용은 객실의 호텔로 찾는다(`findByIdAndRoomHotelId`). 없는 id와 다른 호텔의 이용 id는 모두 404 `STAY_NOT_FOUND`다.
   - 목록은 같은 호텔의 이용을 취소한 이용까지 체크인 날짜 내림차순, 같으면 id 내림차순으로 준다. `roomId`·`guestId`·`canceled`(선택)로 거르고 함께 보내면 AND다. 조합이 여덟 가지라 파생 쿼리 대신 `StaySpecifications.search`로 거른다(목록 조회 절). 없거나 다른 호텔의 id로 거르면 빈 목록이다.
   - 응답은 객실 `{ id, name }`, 이용객 `{ id, name, phone }`을 조회 시점의 값으로 담고, 취소 정보 `cancellation: { canceledAt, canceledBy: { id, name }, reason }`(취소하지 않았으면 null)을 담는다. 목록(`findAll(Specification, Pageable)`을 다시 선언)과 조회는 `@EntityGraph`로 객실과 이용객을 함께 읽는다.
@@ -281,9 +284,25 @@ urbanstay/
   - 객실이 예약됨(`RESERVED`)이면 같은 트랜잭션에서 공실(`VACANT`)로 바꾸고 취소한 계정으로 상태 이력을 남긴다(`RoomService.releaseReservation`, `RESERVED → VACANT` 조건부 UPDATE). 이용중·정비중·공실이거나 그사이 상태가 바뀌어 0행이면 그대로 두고 취소는 성공한다.
   - DB도 CHECK로 취소 시각·계정·이름이 함께 있거나 함께 없고, 사유는 취소한 이용에만 있으며(`stay_cancellation_check`), 이름(50자)·사유(200자)는 비지 않고 앞뒤 공백이 없는 값만 받는다. 처리한 계정은 외래 키로 가리킨다.
 - 테스트
-  - 사전 확인을 통과한 뒤 배제 제약이 막는 경로와, 먼저 온 취소 때문에 늦은 취소의 조건부 UPDATE가 0행이 되는 경로는 순서를 고정해 확인한다(`StayServiceTest`).
+  - 순서를 고정해 확인하는 경로(`StayServiceTest`): 예약이 겹침 사전 확인을 통과한 뒤 배제 제약에 막히는 경로(함께 등록한 새 이용객도 남지 않는다), 같은 새 이용객의 예약이 이용객 INSERT에서 먼저 온 예약의 커밋을 기다렸다가 그 이용객으로 예약되는 경로(이용객은 하나, 이름은 먼저 온 값), 먼저 온 취소 때문에 늦은 취소의 조건부 UPDATE가 0행이 되는 경로. 가운데 것은 `on conflict do nothing`을 빼면 유일 인덱스 위반으로 실패한다.
   - 오늘 규칙은 UTC로는 전날인 한국 시각으로 고정한 Clock(`FixedClockConfiguration`)으로 확인한다. 오늘 체크아웃하는 이용은 끝난 이용이다.
-  - 이용이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔 객실의 `stay`를 먼저 지운다. 취소가 객실 상태 이력을 남기므로 `room_status_history`도 객실과 호텔 계정보다 먼저 지운다.
+  - 이용이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔 객실의 `stay`를 먼저 지운다. 취소가 객실 상태 이력을 남기므로 `room_status_history`도 객실과 호텔 계정보다 먼저 지운다. 예약은 이용객을 새로 만들 수 있으므로 `guest`는 호텔 id로 지운다.
+
+## 게스트 앱 API
+
+- 게스트 앱 API(`ApiPaths.APP`)는 로그인 없이 쓰고 CSRF와 세션이 없다(보안 절). 컨트롤러는 도메인마다 `controller/app`(`HotelAppController`, `RoomAppController`, `StayAppController`), DTO는 `dto/app`에 둔다. 문서는 `app` 그룹이고 401·403 자동 에러가 붙지 않는다.
+- 호텔 목록(`GET ApiPaths.APP + "/hotels"`, `HotelService.getHotelsByName`)은 모든 호텔의 `{ id, name, address }`를 이름 오름차순, 같으면 id 오름차순으로 준다. 검색은 없다.
+  - `hotel.name`은 `natural_sort`가 아니라 DB 기본 collation으로 정렬한다. 이름 속 숫자는 글자 순서로 비교해(`1001`이 `101`보다 앞) 객실 목록의 이름순과 다를 수 있고, operation 설명에 적는다. collation을 바꾸는 마이그레이션은 유일 제약·전체 어드민 검색까지 바뀌어 게스트 앱 정렬 하나로는 과하다고 보고 하지 않았다.
+- 객실 목록(`GET ApiPaths.APP + "/hotels/{hotelId}/rooms"`, `RoomService.getHotelRooms`)은 `HotelService.getHotel`로 호텔을 확인하고(404 `HOTEL_NOT_FOUND`) 그 호텔 객실의 `{ id, name, type, capacity, checkInTime, checkOutTime }`을 hotel-admin 객실 목록과 같은 순서(`natural_sort` 이름 오름차순, id 오름차순)로 준다. 상태는 싣지 않고 거르지 않는다(어느 상태든 예약할 수 있다).
+- 예약된 기간(`GET ApiPaths.APP + "/rooms/{roomId}/reserved-periods"`, `StayService.getReservedPeriods`)은 객실을 확인하고(`RoomService.getRoomWithHotel`, 404 `ROOM_NOT_FOUND`) 취소하지 않았고 체크아웃 날짜가 오늘(`Clock`)보다 뒤인 그 객실 이용의 `{ checkInDate, checkOutDate }`만 체크인 오름차순, 같으면 id 오름차순으로 준다(`findByRoomIdAndCanceledAtIsNullAndCheckOutDateAfter`). 이용객 정보는 싣지 않는다.
+- 예약(`POST ApiPaths.APP + "/stays"`, 본문 `{ roomId, checkInDate, checkOutDate, guestCount, guest: { name, phone, email } }`, `StayService.reserve`)은 201과 `success.stay.reserved`로 응답한다.
+  - 판단 순서는 요청 검증(400, 이용객 칸은 중첩 `@Valid`로 `guest.name` 같은 경로) → 객실 조회(`RoomService.getRoomWithHotel`, 404 `ROOM_NOT_FOUND`) → 기간·인원(400, 이용 절의 값 규칙) → 겹침 사전 확인(409) → 이용객 찾기·만들기 → 이용 `saveAndFlush`(배제 제약 위반 409)다. 한 트랜잭션이라 이용 저장이 실패하면 새로 만든 이용객도 남지 않는다.
+  - 이용객 찾기·만들기(`GuestService.getOrCreate`): 객실의 호텔에서 숫자가 같은 전화번호의 이용객을 찾아(`GuestSpecifications.samePhone`) 있으면 그 이용객으로 예약하고 이름·이메일은 바꾸지 않는다. 없으면 `GuestRepository.insertIfPhoneAbsent`(`insert ... on conflict (hotel_id, (replace(phone, '-', ''))) do nothing`)로 넣은 뒤 다시 찾는다.
+    - 이유: 같은 새 이용객의 예약이 동시에 오면 둘 다 찾지 못한다. JPA 저장의 유일 인덱스 위반은 트랜잭션을 깨뜨려(PostgreSQL은 오류 뒤 같은 트랜잭션의 문장을 받지 않는다) 다시 찾거나 이용을 저장할 수 없다. `on conflict do nothing`은 늦은 쪽이 먼저 넣은 행의 커밋을 기다렸다가 아무것도 넣지 않고, READ COMMITTED라 다음 조회가 커밋된 행을 본다. 먼저 쪽이 롤백되면 늦은 쪽이 넣는다.
+    - 네이티브 INSERT는 JPA Auditing과 엔티티 정규화를 거치지 않으므로 서비스가 `Guest.normalize`한 값과 `Instant.now(clock)`을 넘기고 version은 0이다.
+    - 알려진 경합: 찾은 뒤 그 이용객의 전화번호가 hotel-admin 수정으로 바뀌어 커밋되면 다시 찾기가 비어 500이 된다. 드물어 다루지 않았다.
+  - 응답은 `{ id, hotel: { id, name }, room: { id, name }, checkInDate, checkOutDate, guestCount, guest: { name } }`이다. 객실은 `@EntityGraph`(`findWithHotelById`)로 호텔과 함께 읽어 트랜잭션 밖에서 응답을 만든다.
+- 테스트는 로그인·CSRF 토큰 없이 요청하고 세션·쿠키가 생기지 않는지 확인한다(`StayAppControllerTest`). 호텔 목록은 다른 테스트의 호텔이 있을 수 있어 `size=100`으로 받아 자기 호텔만 골라 순서를 본다(`HotelAppControllerTest`).
 
 ## 상수
 
@@ -329,6 +348,7 @@ urbanstay/
   - 지금 낙관적 잠금을 쓰는 엔티티는 `Hotel`(`HOTEL_MODIFIED`), `HotelAdmin`(`HOTEL_ADMIN_MODIFIED`), `Room`(`ROOM_MODIFIED`), `Guest`(`GUEST_MODIFIED`)이다. version을 받지 않는 변경(예: 비밀번호 재설정, 활성 상태 변경)도 같은 엔티티를 바꾸면 같은 변환을 거친다.
 - version과 따로 움직여야 하는 값(예: 객실 상태)은 요청에 화면에서 본 값을 함께 받아 "지금 값이 그것일 때만" 바꾸는 조건부 UPDATE로 막는다. 바뀐 행이 없으면 도메인 409다(`ROOM_STATUS_CHANGED`, 객실 상태 절).
 - 한 번만 일어나야 하는 변경(예: 이용 취소)도 "아직 일어나지 않았을 때만" 바꾸는 조건부 UPDATE로 막는다. 바뀐 행이 없으면 도메인 409다(`STAY_ALREADY_CANCELED`, 이용 절).
+- 유일한 키로 "있으면 쓰고 없으면 만드는" 행(예: 예약의 이용객)은 `insert ... on conflict (유일 인덱스) do nothing` 뒤 다시 조회한다. 유일 제약 위반을 잡아 바꾸는 방식은 트랜잭션이 깨져 이어서 쓸 수 없다(게스트 앱 API 절).
 - 중복 확인 같은 조회는 엔티티를 바꾸기 전에 한다. 바뀐 엔티티가 있으면 조회 전 자동 flush로 제약 위반이 변환 범위 밖에서 난다.
 - 테스트는 두 경로를 모두 확인한다.
   - 동시 요청: 두 스레드를 `CountDownLatch`로 함께 출발시킨다.

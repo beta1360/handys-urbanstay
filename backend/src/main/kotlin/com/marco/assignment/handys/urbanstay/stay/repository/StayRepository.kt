@@ -20,6 +20,8 @@ interface StayRepository : JpaRepository<Stay, Long>, JpaSpecificationExecutor<S
 
 	fun existsByRoomIdAndCheckInDateBeforeAndCheckOutDateAfterAndCanceledAtIsNull(roomId: Long, checkOutDate: LocalDate, checkInDate: LocalDate): Boolean
 
+	fun findByRoomIdAndCanceledAtIsNullAndCheckOutDateAfter(roomId: Long, date: LocalDate, pageable: Pageable): Page<Stay>
+
 	@EntityGraph(attributePaths = [ROOM, GUEST])
 	fun findByIdAndRoomHotelId(id: Long, hotelId: Long): Stay?
 
