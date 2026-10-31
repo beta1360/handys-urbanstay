@@ -19,7 +19,10 @@ import { ROOM_SEARCH_FORM_MESSAGES } from "@/features/room-search";
 import type { Room, RoomPage } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
-import { ROOM_LIST_CONTENT_MESSAGES } from "@/widgets/room-list";
+import {
+  ROOM_LIST_CONTENT_MESSAGES,
+  ROOM_TABLE_MESSAGES,
+} from "@/widgets/room-list";
 import { ROOM_LIST_MESSAGES } from "../config/messages";
 import {
   ROOM_LIST_DEFAULT_SEARCH,
@@ -49,6 +52,12 @@ const ROOMS: Room[] = [
     checkInTime: "15:00",
     checkOutTime: "11:00",
     status: "VACANT",
+    currentStay: {
+      id: 5,
+      checkInDate: "2026-10-30",
+      checkOutDate: "2026-11-01",
+      guest: { id: 9, name: "김이용", phone: "010-1234-5678" },
+    },
     version: 0,
   },
   {
@@ -61,6 +70,7 @@ const ROOMS: Room[] = [
     checkInTime: "16:00",
     checkOutTime: "12:00",
     status: "MAINTENANCE",
+    currentStay: null,
     version: 3,
   },
 ];
@@ -114,6 +124,10 @@ function renderRoomListPage(initialPath = roomsPath()) {
           getParentRoute: () => layoutRoute,
           path: "rooms/$roomId",
         }),
+        createRoute({
+          getParentRoute: () => layoutRoute,
+          path: "stays/$stayId",
+        }),
       ]),
     ]),
     history: createMemoryHistory({ initialEntries: [initialPath] }),
@@ -158,7 +172,7 @@ afterEach(() => {
 });
 
 describe("RoomListPage 목록", () => {
-  it("객실 목록을 이름·유형·층·최대 인원·상태 열의 표로 보여주고 층이 없으면 층 없음을 보여준다", async () => {
+  it("객실 목록을 이름·유형·층·최대 인원·상태·지금 이용객 열의 표로 보여주고 층이 없으면 층 없음, 지금 이용이 없으면 빈칸을 보여준다", async () => {
     renderRoomListPage();
 
     const table = await screen.findByRole("table");
@@ -172,19 +186,29 @@ describe("RoomListPage 목록", () => {
       ROOM_FIELD_LABELS.floor,
       ROOM_FIELD_LABELS.capacity,
       ROOM_FIELD_LABELS.status,
+      ROOM_TABLE_MESSAGES.currentGuest,
     ]);
     const [, ...rows] = within(table).getAllByRole("row");
     expect(rows.map(getRowTexts)).toEqual([
-      ["101", "스탠다드", "1", "2", ROOM_STATUS_LABELS.VACANT],
+      ["101", "스탠다드", "1", "2", ROOM_STATUS_LABELS.VACANT, "김이용"],
       [
         "스위트 A",
         "스위트",
         ROOM_INFORMATION_MESSAGES.emptyFloor,
         "4",
         ROOM_STATUS_LABELS.MAINTENANCE,
+        "",
       ],
     ]);
     expect(fetchRooms).toHaveBeenCalledExactlyOnceWith({ page: 0 });
+  });
+
+  it("지금 이용객 이름은 그 이용의 상세 화면으로 가는 링크다", async () => {
+    renderRoomListPage();
+
+    expect(
+      await screen.findByRole("link", { name: "김이용" }),
+    ).toHaveAttribute("href", "/stays/5");
   });
 
   it("객실 이름은 그 객실의 상세 화면으로 가는 링크다", async () => {

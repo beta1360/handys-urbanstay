@@ -38,6 +38,7 @@ const ROOM = {
   checkInTime: "15:00",
   checkOutTime: "11:00",
   status: "VACANT",
+  currentStay: null,
   version: 0,
 } as const;
 
@@ -192,6 +193,47 @@ describe("fetchRooms", () => {
     } as never);
 
     await expect(fetchRooms(LIST_PARAMS)).rejects.toBeInstanceOf(
+      ResponseValidationError,
+    );
+  });
+});
+
+describe("fetchRoom 지금 이용", () => {
+  const CURRENT_STAY = {
+    id: 5,
+    checkInDate: "2026-10-30",
+    checkOutDate: "2026-11-01",
+    guest: { id: 9, name: "김이용", phone: "010-1234-5678" },
+  };
+
+  it.each([
+    ["없으면 null로", null],
+    ["있으면 이용과 이용객을 함께", CURRENT_STAY],
+  ])("지금 이용이 %s 돌려준다", async (_, currentStay) => {
+    vi.mocked(generated.getRoom).mockResolvedValue({
+      ...ROOM_RESPONSE,
+      data: { ...ROOM, currentStay },
+    });
+
+    await expect(fetchRoom(ROOM_ID)).resolves.toEqual({
+      ...ROOM,
+      currentStay,
+    });
+  });
+
+  it.each([
+    ["빠지면", undefined],
+    [
+      "체크인 날짜가 YYYY-MM-DD 형식이 아니면",
+      { ...CURRENT_STAY, checkInDate: "2026/10/30" },
+    ],
+  ])("지금 이용이 %s 응답 검증 오류를 던진다", async (_, currentStay) => {
+    vi.mocked(generated.getRoom).mockResolvedValue({
+      ...ROOM_RESPONSE,
+      data: { ...ROOM, currentStay },
+    } as never);
+
+    await expect(fetchRoom(ROOM_ID)).rejects.toBeInstanceOf(
       ResponseValidationError,
     );
   });

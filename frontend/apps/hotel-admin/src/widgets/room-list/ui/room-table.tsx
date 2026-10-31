@@ -3,6 +3,7 @@ import type { TableColumn } from "@repo/ui/table";
 import { TextLink } from "@repo/admin-kit/link";
 import { ROOM_FIELD_LABELS, ROOM_STATUS_LABELS, RoomFloor } from "@/entities/room";
 import type { Room } from "@/shared/api";
+import { ROOM_TABLE_MESSAGES } from "../config/messages";
 
 const ROOM_COLUMNS: readonly TableColumn<Room>[] = [
   {
@@ -33,6 +34,16 @@ const ROOM_COLUMNS: readonly TableColumn<Room>[] = [
     key: "status",
     header: ROOM_FIELD_LABELS.status,
     cell: (room) => ROOM_STATUS_LABELS[room.status],
+  },
+  {
+    key: "currentGuest",
+    header: ROOM_TABLE_MESSAGES.currentGuest,
+    cell: (room) =>
+      room.currentStay === null ? null : (
+        <TextLink to="/stays/$stayId" params={{ stayId: room.currentStay.id }}>
+          {room.currentStay.guest.name}
+        </TextLink>
+      ),
   },
 ];
 

@@ -51,6 +51,7 @@ const ROOMS: Room[] = [
     checkInTime: "15:00",
     checkOutTime: "11:00",
     status: "VACANT",
+    currentStay: null,
     version: 0,
   },
   {
@@ -63,6 +64,7 @@ const ROOMS: Room[] = [
     checkInTime: "16:00",
     checkOutTime: "12:00",
     status: "RESERVED",
+    currentStay: null,
     version: 0,
   },
 ];
