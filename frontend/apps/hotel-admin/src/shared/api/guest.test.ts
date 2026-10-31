@@ -10,7 +10,6 @@ import {
   getGuestsQuerySizeDefault,
 } from "./generated/zod";
 import {
-  createGuest,
   fetchGuest,
   fetchGuests,
   guestListQueryKey,
@@ -22,7 +21,6 @@ vi.mock("./generated", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./generated")>()),
   getGuests: vi.fn(),
   getGuest: vi.fn(),
-  createGuest: vi.fn(),
   updateGuest: vi.fn(),
 }));
 
@@ -45,8 +43,6 @@ const GUEST_RESPONSE = {
   error: null,
 };
 
-const CREATE_MESSAGE = "이용객을 등록했습니다.";
-
 const UPDATE_MESSAGE = "이용객 정보를 수정했습니다.";
 
 const GUEST_PAGE = {
@@ -66,13 +62,12 @@ const GUEST_PAGE_RESPONSE = {
 
 const LIST_PARAMS = { keyword: "010", page: 1, size: 10 };
 
-const CREATE_BODY = {
+const UPDATE_BODY = {
   name: GUEST.name,
   phone: GUEST.phone,
   email: GUEST.email,
+  version: GUEST.version,
 };
-
-const UPDATE_BODY = { ...CREATE_BODY, version: GUEST.version };
 
 const UNSUCCESSFUL_RESPONSE_OVERRIDES = [
   ["success가 false", { success: false }],
@@ -80,13 +75,6 @@ const UNSUCCESSFUL_RESPONSE_OVERRIDES = [
 ] as const;
 
 const GUEST_CHANGE_OPERATIONS = [
-  {
-    name: "createGuest",
-    message: CREATE_MESSAGE,
-    mockResponse: (response: unknown) =>
-      vi.mocked(generated.createGuest).mockResolvedValue(response as never),
-    run: () => createGuest(CREATE_BODY),
-  },
   {
     name: "updateGuest",
     message: UPDATE_MESSAGE,
@@ -218,29 +206,16 @@ describe("fetchGuest", () => {
   });
 });
 
-describe("createGuest·updateGuest", () => {
-  it("스키마에 없는 필드를 버린 본문으로 등록하고 등록한 이용객과 성공 문구를 돌려준다", async () => {
-    vi.mocked(generated.createGuest).mockResolvedValue({
-      ...GUEST_RESPONSE,
-      message: CREATE_MESSAGE,
-    });
-
-    const bodyWithExtraField = { ...CREATE_BODY, extra: true };
-
-    await expect(createGuest(bodyWithExtraField)).resolves.toEqual({
-      data: GUEST,
-      message: CREATE_MESSAGE,
-    });
-    expect(generated.createGuest).toHaveBeenCalledWith(CREATE_BODY);
-  });
-
-  it("이용객 ID와 version이 담긴 본문으로 수정하고 수정한 이용객과 성공 문구를 돌려준다", async () => {
+describe("updateGuest", () => {
+  it("이용객 ID와 스키마에 없는 필드를 버린 본문(version 포함)으로 수정하고 수정한 이용객과 성공 문구를 돌려준다", async () => {
     vi.mocked(generated.updateGuest).mockResolvedValue({
       ...GUEST_RESPONSE,
       message: UPDATE_MESSAGE,
     });
 
-    await expect(updateGuest(GUEST_ID, UPDATE_BODY)).resolves.toEqual({
+    const bodyWithExtraField = { ...UPDATE_BODY, extra: true };
+
+    await expect(updateGuest(GUEST_ID, bodyWithExtraField)).resolves.toEqual({
       data: GUEST,
       message: UPDATE_MESSAGE,
     });
@@ -250,11 +225,11 @@ describe("createGuest·updateGuest", () => {
   it.each([
     [
       "전화번호 형식이 틀리면",
-      () => createGuest({ ...CREATE_BODY, phone: "010-123" }),
+      () => updateGuest(GUEST_ID, { ...UPDATE_BODY, phone: "010-123" }),
     ],
     [
       "이메일 형식이 틀리면",
-      () => createGuest({ ...CREATE_BODY, email: "guest" }),
+      () => updateGuest(GUEST_ID, { ...UPDATE_BODY, email: "guest" }),
     ],
     [
       "이용객 ID가 정수가 아니면",
@@ -266,7 +241,6 @@ describe("createGuest·updateGuest", () => {
     ],
   ])("%s 요청을 보내지 않고 요청 검증 오류를 던진다", async (_, run) => {
     await expect(run()).rejects.toBeInstanceOf(RequestValidationError);
-    expect(generated.createGuest).not.toHaveBeenCalled();
     expect(generated.updateGuest).not.toHaveBeenCalled();
   });
 });

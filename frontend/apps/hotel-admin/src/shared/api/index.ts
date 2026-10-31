@@ -8,8 +8,6 @@ export {
 export type { Account, LoginAccountBody } from "./account";
 export { API_ERROR_CODES, getApiError } from "./api-error";
 export {
-  createGuest,
-  createGuestBodySchema,
   fetchGuest,
   fetchGuests,
   guestListParamsSchema,
@@ -20,7 +18,6 @@ export {
   updateGuestBodySchema,
 } from "./guest";
 export type {
-  CreateGuestBody,
   Guest,
   GuestListParams,
   GuestPage,

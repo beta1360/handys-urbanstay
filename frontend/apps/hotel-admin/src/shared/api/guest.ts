@@ -2,7 +2,6 @@ import { z } from "zod";
 import { parseRequest, parseResponseBody } from "@repo/admin-kit/api";
 import * as generated from "./generated";
 import {
-  CreateGuestResponse,
   GetGuestParams,
   GetGuestResponse,
   GetGuestsQueryParams,
@@ -11,21 +10,16 @@ import {
   UpdateGuestResponse,
 } from "./generated/zod";
 import {
-  GuestCreateHotelAdminRequest,
   GuestHotelAdminResponse,
   GuestUpdateHotelAdminRequest,
   PageResponseGuestHotelAdminResponse,
 } from "./generated/zod/schemas";
-
-export const createGuestBodySchema = GuestCreateHotelAdminRequest;
 
 export const updateGuestBodySchema = GuestUpdateHotelAdminRequest;
 
 export const guestListParamsSchema = GetGuestsQueryParams;
 
 export const guestParamsSchema = GetGuestParams;
-
-export type CreateGuestBody = z.input<typeof GuestCreateHotelAdminRequest>;
 
 export type UpdateGuestBody = z.input<typeof GuestUpdateHotelAdminRequest>;
 
@@ -51,10 +45,6 @@ const GUEST_CHANGE_SUCCESS_SHAPE = {
   ...GUEST_SUCCESS_SHAPE,
   message: z.string(),
 };
-
-const CreateGuestSuccessResponse = CreateGuestResponse.extend(
-  GUEST_CHANGE_SUCCESS_SHAPE,
-);
 
 const UpdateGuestSuccessResponse = UpdateGuestResponse.extend(
   GUEST_CHANGE_SUCCESS_SHAPE,
@@ -96,21 +86,6 @@ export async function fetchGuest(
     signal,
   );
   return parseResponseBody("getGuest", GetGuestSuccessResponse, response).data;
-}
-
-export async function createGuest(body: CreateGuestBody) {
-  const validBody = parseRequest(
-    "createGuest",
-    GuestCreateHotelAdminRequest,
-    body,
-  );
-  const response = await generated.createGuest(validBody);
-  const { data, message } = parseResponseBody(
-    "createGuest",
-    CreateGuestSuccessResponse,
-    response,
-  );
-  return { data, message };
 }
 
 export async function updateGuest(guestId: number, body: UpdateGuestBody) {
