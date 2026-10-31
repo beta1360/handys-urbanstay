@@ -21,7 +21,7 @@ export const stayGuestCreateAppRequestEmailRegExp = new RegExp('^[\\x21-\\x3F\\x
 
 export const StayGuestCreateAppRequest = zod.object({
   "name": zod.string().min(1).max(stayGuestCreateAppRequestNameMax).describe('이용객 이름. 앞뒤 공백을 지운 뒤 1~50자. 같은 전화번호의 이용객이 이미 있으면 저장하지 않습니다.'),
-  "phone": zod.string().min(1).max(stayGuestCreateAppRequestPhoneMax).regex(stayGuestCreateAppRequestPhoneRegExp).describe('전화번호. 예: 010-1234-5678. 숫자와 -만 쓰고 숫자는 8~11개, 앞뒤 공백을 지운 뒤 20자 이하. 새 이용객이면 입력한 모양 그대로 저장합니다. 객실의 호텔에서 하이픈을 뺀 숫자로 같은 이용객을 찾습니다.'),
+  "phone": zod.string().min(1).max(stayGuestCreateAppRequestPhoneMax).regex(stayGuestCreateAppRequestPhoneRegExp).describe('전화번호. 예: 010-1234-5678. 숫자와 -만 쓰고 숫자는 8~11개, 앞뒤 공백을 지운 뒤 20자 이하. 새 이용객이면 입력한 모양 그대로 저장합니다. 그 호텔에서 하이픈을 뺀 숫자로 같은 이용객을 찾습니다.'),
   "email": zod.string().min(1).max(stayGuestCreateAppRequestEmailMax).regex(stayGuestCreateAppRequestEmailRegExp).describe('이메일. 앞뒤 공백을 지운 뒤 이메일 형식이고 254자 이하. 공백을 뺀 영문 자판의 글자(영문, 숫자, 특수문자)만 쓸 수 있고, @ 뒤 도메인은 빈 조각 없이 점으로 나눈 두 조각 이상이어야 합니다. 새 이용객이면 대소문자를 바꾸지 않고 입력한 그대로 저장합니다. 같은 전화번호의 이용객이 이미 있으면 저장하지 않습니다.')
 });
 

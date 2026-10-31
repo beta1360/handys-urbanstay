@@ -8,12 +8,11 @@
 import * as zod from 'zod';
 import { StayGuestAppResponse } from './stayGuestAppResponse.zod';
 import { StayHotelAppResponse } from './stayHotelAppResponse.zod';
-import { StayRoomAppResponse } from './stayRoomAppResponse.zod';
 
 export const StayAppResponse = zod.object({
   "id": zod.int().describe('이용(예약) ID'),
   "hotel": StayHotelAppResponse.describe('예약한 호텔'),
-  "room": StayRoomAppResponse.describe('예약한 객실'),
+  "roomType": zod.string().describe('예약한 객실 유형. 배정한 객실(호수)은 담지 않습니다.'),
   "checkInDate": zod.iso.date().describe('체크인 날짜("YYYY-MM-DD")'),
   "checkOutDate": zod.iso.date().describe('체크아웃 날짜("YYYY-MM-DD"). 이 날은 묵지 않습니다.'),
   "guestCount": zod.int().describe('인원'),

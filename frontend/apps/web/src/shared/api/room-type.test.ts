@@ -1,0 +1,113 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { API_ERROR_CODES, getApiError } from "./api-error";
+import * as generated from "./generated";
+import { fetchHotelRoomTypes, roomTypesQueryKey } from "./room-type";
+import {
+  RequestValidationError,
+  ResponseValidationError,
+} from "./validation-error";
+
+vi.mock("./generated", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./generated")>()),
+  getHotelRoomTypes: vi.fn(),
+}));
+
+const HOTEL_ID = 3;
+
+const PARAMS = {
+  checkInDate: "2026-11-04",
+  checkOutDate: "2026-11-06",
+  guestCount: 2,
+};
+
+const ROOM_TYPES = [
+  { type: "디럭스", roomCount: 2, maxGuests: 4, availableCount: 0 },
+  { type: "스탠다드", roomCount: 3, maxGuests: 2, availableCount: 2 },
+];
+
+const HEADERS = new Headers();
+
+beforeEach(() => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
+  vi.restoreAllMocks();
+});
+
+describe("fetchHotelRoomTypes", () => {
+  it("호텔 ID·조건과 signal을 넘겨 객실 유형 목록을 돌려준다", async () => {
+    vi.mocked(generated.getHotelRoomTypes).mockResolvedValue({
+      status: 200,
+      headers: HEADERS,
+      data: { success: true, data: ROOM_TYPES, message: null, error: null },
+    });
+    const { signal } = new AbortController();
+
+    await expect(
+      fetchHotelRoomTypes(HOTEL_ID, PARAMS, { signal }),
+    ).resolves.toEqual(ROOM_TYPES);
+    expect(generated.getHotelRoomTypes).toHaveBeenCalledWith(
+      HOTEL_ID,
+      PARAMS,
+      { signal },
+    );
+  });
+
+  it("인원이 1보다 작으면 요청을 보내지 않고 요청 검증 오류를 던진다", async () => {
+    await expect(
+      fetchHotelRoomTypes(HOTEL_ID, { ...PARAMS, guestCount: 0 }),
+    ).rejects.toBeInstanceOf(RequestValidationError);
+    expect(generated.getHotelRoomTypes).not.toHaveBeenCalled();
+  });
+
+  it("남은 객실 수가 빠지면 응답 검증 오류를 던진다", async () => {
+    vi.mocked(generated.getHotelRoomTypes).mockResolvedValue({
+      status: 200,
+      headers: HEADERS,
+      data: {
+        success: true,
+        data: [{ type: "디럭스", roomCount: 2, maxGuests: 4 }],
+        message: null,
+        error: null,
+      },
+    } as never);
+
+    await expect(fetchHotelRoomTypes(HOTEL_ID, PARAMS)).rejects.toBeInstanceOf(
+      ResponseValidationError,
+    );
+  });
+
+  it("404 응답이면 서버 오류 코드를 읽을 수 있는 오류를 던진다", async () => {
+    vi.mocked(generated.getHotelRoomTypes).mockResolvedValue({
+      status: 404,
+      headers: HEADERS,
+      data: {
+        success: false,
+        data: null,
+        message: null,
+        error: {
+          code: API_ERROR_CODES.hotelNotFound,
+          message: "호텔을 찾을 수 없습니다.",
+          fieldErrors: [],
+        },
+      },
+    });
+
+    const error = await fetchHotelRoomTypes(HOTEL_ID, PARAMS).catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(getApiError(error)?.code).toBe(API_ERROR_CODES.hotelNotFound);
+  });
+
+  it("호텔 단위로 무효화할 수 있도록 생성된 쿼리 키를 쓴다", () => {
+    expect(roomTypesQueryKey(HOTEL_ID, PARAMS)).toEqual(
+      generated.getGetHotelRoomTypesQueryKey(HOTEL_ID, PARAMS),
+    );
+    expect(roomTypesQueryKey(HOTEL_ID, PARAMS).slice(0, 1)).toEqual(
+      roomTypesQueryKey(HOTEL_ID),
+    );
+  });
+});

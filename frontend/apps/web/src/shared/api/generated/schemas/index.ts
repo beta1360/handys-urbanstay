@@ -6,6 +6,7 @@
  * OpenAPI spec version: v1
  */
 
+export * from './apiResponseListStayRoomTypeAppResponse';
 export * from './apiResponsePageResponseHotelAppResponse';
 export * from './apiResponsePageResponseRoomAppResponse';
 export * from './apiResponsePageResponseStayReservedPeriodAppResponse';
@@ -14,6 +15,7 @@ export * from './errorApiResponse';
 export * from './errorResponse';
 export * from './fieldErrorResponse';
 export * from './getHotelRoomsParams';
+export * from './getHotelRoomTypesParams';
 export * from './getHotelsParams';
 export * from './getRoomReservedPeriodsParams';
 export * from './hotelAppResponse';
@@ -27,4 +29,4 @@ export * from './stayGuestAppResponse';
 export * from './stayGuestCreateAppRequest';
 export * from './stayHotelAppResponse';
 export * from './stayReservedPeriodAppResponse';
-export * from './stayRoomAppResponse';
+export * from './stayRoomTypeAppResponse';

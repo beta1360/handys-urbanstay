@@ -1,3 +1,4 @@
+import { STAY_MESSAGES } from "../config/messages";
 import { STAY_RULES } from "../config/rules";
 
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
@@ -17,6 +18,14 @@ export function countNights({ checkInDate, checkOutDate }: StayPeriod) {
   return toEpochDay(checkOutDate) - toEpochDay(checkInDate);
 }
 
+export function formatStayPeriod(period: StayPeriod) {
+  return STAY_MESSAGES.periodWithNights(
+    period.checkInDate,
+    period.checkOutDate,
+    countNights(period),
+  );
+}
+
 export function isTodayOrLater(date: string, today: string) {
   return date >= today;
 }
@@ -28,15 +37,4 @@ export function findCheckOutDateIssue(
     return "afterCheckIn";
   }
   return countNights(period) > STAY_RULES.maxNights ? "maxNights" : undefined;
-}
-
-export function isPeriodOverlapped(
-  period: StayPeriod,
-  reservedPeriods: readonly StayPeriod[],
-) {
-  return reservedPeriods.some(
-    (reserved) =>
-      period.checkInDate < reserved.checkOutDate &&
-      reserved.checkInDate < period.checkOutDate,
-  );
 }

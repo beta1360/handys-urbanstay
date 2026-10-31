@@ -1,19 +1,28 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { refreshReservedPeriods } from "@/entities/stay";
+import { refreshRoomTypes } from "@/entities/room-type";
 import { API_ERROR_CODES, createStay, getApiError } from "@/shared/api";
 
-function isPeriodOverlappedError(error: unknown) {
-  return getApiError(error)?.code === API_ERROR_CODES.stayPeriodOverlapped;
+const STALE_ROOM_TYPES_ERROR_CODES: readonly string[] = [
+  API_ERROR_CODES.roomTypeUnavailable,
+  API_ERROR_CODES.roomTypeNotFound,
+  API_ERROR_CODES.stayPeriodOverlapped,
+];
+
+function isStaleRoomTypesError(error: unknown) {
+  const code = getApiError(error)?.code;
+  return code !== undefined && STALE_ROOM_TYPES_ERROR_CODES.includes(code);
 }
 
-export function useReserveStay(roomId: number) {
+export function useReserveStay(hotelId: number) {
   const queryClient = useQueryClient();
   const { mutate } = useMutation({
     mutationFn: createStay,
-    onSuccess: () => refreshReservedPeriods(queryClient, roomId),
+    onSuccess: () => {
+      void refreshRoomTypes(queryClient, hotelId);
+    },
     onError: (error) =>
-      isPeriodOverlappedError(error)
-        ? refreshReservedPeriods(queryClient, roomId)
+      isStaleRoomTypesError(error)
+        ? refreshRoomTypes(queryClient, hotelId)
         : undefined,
   });
 

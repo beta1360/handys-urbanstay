@@ -6,6 +6,7 @@
  * OpenAPI spec version: v1
  */
 
+export * from './apiResponseListStayRoomTypeAppResponse.zod';
 export * from './apiResponsePageResponseHotelAppResponse.zod';
 export * from './apiResponsePageResponseRoomAppResponse.zod';
 export * from './apiResponsePageResponseStayReservedPeriodAppResponse.zod';
@@ -13,6 +14,7 @@ export * from './apiResponseStayAppResponse.zod';
 export * from './errorApiResponse.zod';
 export * from './errorResponse.zod';
 export * from './fieldErrorResponse.zod';
+export * from './getHotelRoomTypesParams.zod';
 export * from './getHotelRoomsParams.zod';
 export * from './getHotelsParams.zod';
 export * from './getRoomReservedPeriodsParams.zod';
@@ -27,4 +29,4 @@ export * from './stayGuestAppResponse.zod';
 export * from './stayGuestCreateAppRequest.zod';
 export * from './stayHotelAppResponse.zod';
 export * from './stayReservedPeriodAppResponse.zod';
-export * from './stayRoomAppResponse.zod';
+export * from './stayRoomTypeAppResponse.zod';

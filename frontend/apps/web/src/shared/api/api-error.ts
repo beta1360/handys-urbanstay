@@ -8,7 +8,8 @@ export const API_ERROR_CODES = {
   notFound: "NOT_FOUND",
   internalServerError: "INTERNAL_SERVER_ERROR",
   hotelNotFound: "HOTEL_NOT_FOUND",
-  roomNotFound: "ROOM_NOT_FOUND",
+  roomTypeNotFound: "ROOM_TYPE_NOT_FOUND",
+  roomTypeUnavailable: "ROOM_TYPE_UNAVAILABLE",
   stayPeriodOverlapped: "STAY_PERIOD_OVERLAPPED",
 } as const;
 

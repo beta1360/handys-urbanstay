@@ -1,11 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { API_ERROR_CODES, getApiError } from "./api-error";
 import * as generated from "./generated";
-import {
-  createStay,
-  fetchRoomReservedPeriods,
-  reservedPeriodsQueryKey,
-} from "./stay";
+import { createStay } from "./stay";
 import {
   RequestValidationError,
   ResponseValidationError,
@@ -13,24 +9,14 @@ import {
 
 vi.mock("./generated", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./generated")>()),
-  getRoomReservedPeriods: vi.fn(),
   createStay: vi.fn(),
 }));
 
-const ROOM_ID = 7;
-
 const HEADERS = new Headers();
 
-const PERIOD_PAGE = {
-  items: [{ checkInDate: "2026-11-02", checkOutDate: "2026-11-04" }],
-  page: 0,
-  size: 100,
-  totalElements: 1,
-  totalPages: 1,
-};
-
 const BODY = {
-  roomId: ROOM_ID,
+  hotelId: 3,
+  roomType: "스탠다드",
   checkInDate: "2026-11-04",
   checkOutDate: "2026-11-06",
   guestCount: 2,
@@ -40,7 +26,7 @@ const BODY = {
 const RESERVED_STAY = {
   id: 11,
   hotel: { id: 3, name: "어반스테이 강남" },
-  room: { id: ROOM_ID, name: "101" },
+  roomType: "스탠다드",
   checkInDate: "2026-11-04",
   checkOutDate: "2026-11-06",
   guestCount: 2,
@@ -56,32 +42,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.clearAllMocks();
   vi.restoreAllMocks();
-});
-
-describe("fetchRoomReservedPeriods", () => {
-  it("객실 ID·페이지 파라미터와 signal을 넘겨 예약된 기간 페이지를 돌려준다", async () => {
-    vi.mocked(generated.getRoomReservedPeriods).mockResolvedValue({
-      status: 200,
-      headers: HEADERS,
-      data: { success: true, data: PERIOD_PAGE, message: null, error: null },
-    });
-    const { signal } = new AbortController();
-
-    await expect(
-      fetchRoomReservedPeriods(ROOM_ID, { page: 0, size: 100 }, { signal }),
-    ).resolves.toEqual(PERIOD_PAGE);
-    expect(generated.getRoomReservedPeriods).toHaveBeenCalledWith(
-      ROOM_ID,
-      { page: 0, size: 100 },
-      { signal },
-    );
-  });
-
-  it("생성된 쿼리 키를 쓴다", () => {
-    expect(reservedPeriodsQueryKey(ROOM_ID, { size: 100 })).toEqual(
-      generated.getGetRoomReservedPeriodsQueryKey(ROOM_ID, { size: 100 }),
-    );
-  });
 });
 
 describe("createStay", () => {
@@ -111,7 +71,7 @@ describe("createStay", () => {
     expect(generated.createStay).not.toHaveBeenCalled();
   });
 
-  it("409 응답이면 겹침 오류 코드를 읽을 수 있는 오류를 던진다", async () => {
+  it("409 응답이면 서버 오류 코드를 읽을 수 있는 오류를 던진다", async () => {
     vi.mocked(generated.createStay).mockResolvedValue({
       status: 409,
       headers: HEADERS,
@@ -120,8 +80,8 @@ describe("createStay", () => {
         data: null,
         message: null,
         error: {
-          code: API_ERROR_CODES.stayPeriodOverlapped,
-          message: "같은 객실에 기간이 겹치는 이용이 이미 있습니다.",
+          code: API_ERROR_CODES.roomTypeUnavailable,
+          message: "선택한 기간과 인원으로 예약할 수 있는 객실이 없습니다.",
           fieldErrors: [],
         },
       },
@@ -129,7 +89,7 @@ describe("createStay", () => {
 
     const error = await createStay(BODY).catch((caught: unknown) => caught);
 
-    expect(getApiError(error)?.code).toBe(API_ERROR_CODES.stayPeriodOverlapped);
+    expect(getApiError(error)?.code).toBe(API_ERROR_CODES.roomTypeUnavailable);
   });
 
   it("성공 응답의 message가 null이면 응답 검증 오류를 던진다", async () => {

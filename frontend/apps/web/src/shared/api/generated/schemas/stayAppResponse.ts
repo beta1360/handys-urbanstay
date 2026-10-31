@@ -7,15 +7,14 @@
  */
 import type { StayGuestAppResponse } from './stayGuestAppResponse';
 import type { StayHotelAppResponse } from './stayHotelAppResponse';
-import type { StayRoomAppResponse } from './stayRoomAppResponse';
 
 export interface StayAppResponse {
   /** 이용(예약) ID */
   id: number;
   /** 예약한 호텔 */
   hotel: StayHotelAppResponse;
-  /** 예약한 객실 */
-  room: StayRoomAppResponse;
+  /** 예약한 객실 유형. 배정한 객실(호수)은 담지 않습니다. */
+  roomType: string;
   /** 체크인 날짜("YYYY-MM-DD") */
   checkInDate: string;
   /** 체크아웃 날짜("YYYY-MM-DD"). 이 날은 묵지 않습니다. */

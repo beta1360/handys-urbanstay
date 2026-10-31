@@ -1,18 +1,19 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { Room } from "@/shared/api";
+import { RoomTypesEmpty, RoomTypesLoadFailed } from "@/entities/room-type";
+import { LoadingMessage } from "@/shared/ui";
 import { useStayReserve } from "../model/use-stay-reserve";
 import { StayReserveCompleted } from "./stay-reserve-completed";
 import { StayReserveFormView } from "./stay-reserve-form-view";
 
 type StayReserveProps = {
-  room: Room;
+  hotelId: number;
   children: ReactNode;
 };
 
-export function StayReserve({ room, children }: StayReserveProps) {
-  const state = useStayReserve(room);
+export function StayReserve({ hotelId, children }: StayReserveProps) {
+  const state = useStayReserve(hotelId);
 
   if (state.status === "completed") {
     return (
@@ -25,13 +26,21 @@ export function StayReserve({ room, children }: StayReserveProps) {
   return (
     <>
       {children}
-      <StayReserveFormView
-        capacity={room.capacity}
-        fields={state.fields}
-        formAlert={state.formAlert}
-        isSubmitting={state.isSubmitting}
-        onSubmit={state.handleSubmit}
-      />
+      {state.status === "loading" ? <LoadingMessage /> : null}
+      {state.status === "failed" ? (
+        <RoomTypesLoadFailed onRetry={state.retry} />
+      ) : null}
+      {state.status === "empty" ? <RoomTypesEmpty /> : null}
+      {state.status === "ready" ? (
+        <StayReserveFormView
+          roomTypes={state.roomTypes}
+          fields={state.fields}
+          summary={state.summary}
+          formAlert={state.formAlert}
+          isSubmitting={state.isSubmitting}
+          onSubmit={state.handleSubmit}
+        />
+      ) : null}
     </>
   );
 }
