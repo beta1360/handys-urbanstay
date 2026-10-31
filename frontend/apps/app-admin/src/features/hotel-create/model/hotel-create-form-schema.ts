@@ -1,9 +1,9 @@
 import type { z } from "zod";
+import { passwordSchema, requiredTextSchema } from "@repo/admin-kit/form";
+import { FORM_VALIDATION_MESSAGES } from "@repo/admin-kit/config";
 import { createHotelInfoFormShape, HOTEL_INFO_FIELDS } from "@/entities/hotel";
 import type { HotelInfoField } from "@/entities/hotel";
 import { createHotelBodySchema } from "@/shared/api";
-import { FORM_VALIDATION_MESSAGES } from "@/shared/config";
-import { passwordSchema, requiredTextSchema } from "@/shared/lib/form";
 
 const masterRules = createHotelBodySchema.shape.master;
 

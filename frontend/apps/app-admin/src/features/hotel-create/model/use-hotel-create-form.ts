@@ -2,14 +2,14 @@ import type { FormEvent } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "@tanstack/react-router";
-import { API_ERROR_CODES } from "@/shared/api";
 import {
   showSubmitError,
   SUBMIT_ONLY_VALIDATION,
   toFieldPropsMap,
   useFormErrorToast,
-} from "@/shared/lib/form";
-import { showToast } from "@/shared/lib/toast";
+} from "@repo/admin-kit/form";
+import { showToast } from "@repo/admin-kit/toast";
+import { API_ERROR_CODES, getApiError } from "@/shared/api";
 import { useCreateHotel } from "../api/use-create-hotel";
 import {
   EMPTY_HOTEL_CREATE_VALUES,
@@ -45,7 +45,7 @@ export function useHotelCreateForm() {
             resolve();
           },
           onError: (error) => {
-            showSubmitError(error, {
+            showSubmitError(getApiError(error), {
               fields: HOTEL_CREATE_FIELDS,
               setError: form.setError,
               fieldOfCode: {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseRequest, parseResponseBody } from "@repo/admin-kit/api";
 import { getGetMeQueryKey, getMe, login, logout } from "./generated";
 import {
   GetMeResponse,
@@ -7,7 +8,6 @@ import {
   LogoutResponse,
 } from "./generated/zod";
 import { AccountAppAdminResponse } from "./generated/zod/schemas";
-import { parseRequest, parseResponseBody } from "./validate";
 
 export const loginAccountBodySchema = LoginBody;
 

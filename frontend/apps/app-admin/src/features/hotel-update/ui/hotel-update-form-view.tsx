@@ -1,10 +1,10 @@
 import type { FormEvent, Ref } from "react";
 import { Button } from "@repo/ui/button";
+import type { FormFieldProps } from "@repo/admin-kit/form";
+import { ButtonLink } from "@repo/admin-kit/link";
 import { HotelInfoFields } from "@/entities/hotel";
 import type { HotelInfoField } from "@/entities/hotel";
 import { COMMON_MESSAGES } from "@/shared/config";
-import type { FormFieldProps } from "@/shared/lib/form";
-import { ButtonLink } from "@/shared/ui";
 import { HOTEL_UPDATE_FORM_MESSAGES } from "../config/messages";
 import type { HotelUpdateStatus } from "../model/use-hotel-update-form";
 

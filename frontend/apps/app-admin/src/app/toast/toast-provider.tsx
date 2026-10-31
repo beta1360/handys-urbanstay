@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Toast, ToastRegion } from "@repo/ui/toast";
+import { dismissToast, useToasts } from "@repo/admin-kit/toast";
 import { TOAST_MESSAGES } from "@/shared/config";
-import { dismissToast, useToasts } from "@/shared/lib/toast";
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const toasts = useToasts();

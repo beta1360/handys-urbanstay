@@ -1,6 +1,20 @@
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getApiError } from "./api-error";
+import { z } from "zod";
+import { createApiErrorReader } from "./api-error";
+
+const ERROR_RESPONSE_SCHEMA = z.object({
+  success: z.boolean(),
+  data: z.null(),
+  message: z.null(),
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    fieldErrors: z.array(z.object({ field: z.string(), message: z.string() })),
+  }),
+});
+
+const getApiError = createApiErrorReader(ERROR_RESPONSE_SCHEMA);
 
 const INVALID_CREDENTIALS_ERROR = {
   code: "INVALID_CREDENTIALS",
@@ -29,7 +43,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("getApiError", () => {
+describe("createApiErrorReader", () => {
   it("본문이 오류 응답 형식인 AxiosError면 서버 오류 정보를 돌려준다", () => {
     const error = createAxiosError(401, {
       success: false,

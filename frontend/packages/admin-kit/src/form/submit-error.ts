@@ -1,6 +1,7 @@
 import type { FieldValues, Path, UseFormSetError } from "react-hook-form";
-import { API_ERROR_CODES, getApiError } from "@/shared/api";
-import { COMMON_MESSAGES } from "@/shared/config";
+import { COMMON_API_ERROR_CODES } from "../api";
+import type { ApiError } from "../api";
+import { FORM_ALERT_MESSAGES } from "../config";
 
 export const FORM_ALERT = "root.server";
 
@@ -17,19 +18,18 @@ type SubmitErrorTarget<T extends FieldValues> = {
 };
 
 export function showSubmitError<T extends FieldValues>(
-  error: unknown,
+  apiError: ApiError | undefined,
   { fields, setError, fieldOfCode = {}, onAlert }: SubmitErrorTarget<T>,
 ) {
   function showAlert(alert: FormAlert) {
     setError(FORM_ALERT, { type: alert.code, message: alert.message });
-    if (alert.code !== API_ERROR_CODES.unauthorized) {
+    if (alert.code !== COMMON_API_ERROR_CODES.unauthorized) {
       onAlert?.(alert);
     }
   }
 
-  const apiError = getApiError(error);
   if (apiError === undefined) {
-    showAlert({ code: undefined, message: COMMON_MESSAGES.requestFailed });
+    showAlert({ code: undefined, message: FORM_ALERT_MESSAGES.requestFailed });
     return;
   }
   const codeField = fieldOfCode[apiError.code];

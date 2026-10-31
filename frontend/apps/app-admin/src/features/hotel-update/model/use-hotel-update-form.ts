@@ -5,21 +5,21 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  FORM_ALERT,
+  showSubmitError,
+  SUBMIT_ONLY_VALIDATION,
+  toFieldPropsMap,
+  useFormErrorToast,
+} from "@repo/admin-kit/form";
+import type { FormAlert } from "@repo/admin-kit/form";
+import { showToast } from "@repo/admin-kit/toast";
+import {
   HOTEL_INFO_FIELDS,
   HOTEL_LOAD_MESSAGES,
   useRefetchHotel,
 } from "@/entities/hotel";
 import { API_ERROR_CODES, getApiError } from "@/shared/api";
 import type { Hotel } from "@/shared/api";
-import {
-  FORM_ALERT,
-  showSubmitError,
-  SUBMIT_ONLY_VALIDATION,
-  toFieldPropsMap,
-  useFormErrorToast,
-} from "@/shared/lib/form";
-import type { FormAlert } from "@/shared/lib/form";
-import { showToast } from "@/shared/lib/toast";
 import { useUpdateHotel } from "../api/use-update-hotel";
 import {
   hotelUpdateFormSchema,
@@ -82,7 +82,7 @@ export function useHotelUpdateForm(hotelId: number, initialHotel: Hotel) {
             resolve();
           },
           onError: (error) => {
-            showSubmitError(error, {
+            showSubmitError(getApiError(error), {
               fields: HOTEL_INFO_FIELDS,
               setError: form.setError,
               onAlert: toastFormAlert,

@@ -15,6 +15,15 @@ import userEvent from "@testing-library/user-event";
 import type { UserEvent } from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  RequestValidationError,
+  ResponseValidationError,
+} from "@repo/admin-kit/api";
+import {
+  FORM_ALERT_MESSAGES,
+  FORM_VALIDATION_MESSAGES,
+} from "@repo/admin-kit/config";
+import { dismissToast, showToast } from "@repo/admin-kit/toast";
 import { HOTEL_FIELD_LABELS, HOTEL_INFO_MESSAGES } from "@/entities/hotel";
 import { HOTEL_CREATE_FORM_MESSAGES } from "@/features/hotel-create";
 import {
@@ -22,13 +31,10 @@ import {
   createHotel,
   hotelListQueryKey,
   hotelQueryKey,
-  RequestValidationError,
-  ResponseValidationError,
 } from "@/shared/api";
 import type { Hotel, HotelPage } from "@/shared/api";
-import { COMMON_MESSAGES, FORM_VALIDATION_MESSAGES } from "@/shared/config";
+import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
-import { dismissToast, showToast } from "@/shared/lib/toast";
 import { HotelCreatePage } from "./hotel-create-page";
 
 vi.mock("@/shared/api", async (importOriginal) => ({
@@ -36,8 +42,8 @@ vi.mock("@/shared/api", async (importOriginal) => ({
   createHotel: vi.fn(),
 }));
 
-vi.mock("@/shared/lib/toast", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/shared/lib/toast")>()),
+vi.mock("@repo/admin-kit/toast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@repo/admin-kit/toast")>()),
   showToast: vi.fn(),
   dismissToast: vi.fn(),
 }));
@@ -625,7 +631,7 @@ describe("HotelCreatePage 서버 오류 처리", () => {
     await vi.waitFor(() => {
       expect(showToast).toHaveBeenCalledExactlyOnceWith({
         type: "error",
-        message: COMMON_MESSAGES.requestFailed,
+        message: FORM_ALERT_MESSAGES.requestFailed,
       });
     });
   });

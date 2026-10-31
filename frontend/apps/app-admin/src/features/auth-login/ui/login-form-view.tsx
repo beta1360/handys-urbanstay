@@ -1,7 +1,7 @@
 import type { FormEvent } from "react";
 import { Button } from "@repo/ui/button";
 import { TextField } from "@repo/ui/text-field";
-import type { FormFieldProps } from "@/shared/lib/form";
+import type { FormFieldProps } from "@repo/admin-kit/form";
 import { LOGIN_MESSAGES } from "../config/messages";
 import type { LoginField } from "../model/login-form-schema";
 

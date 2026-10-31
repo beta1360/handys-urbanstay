@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { showToast } from "@repo/admin-kit/toast";
 import { useLogout as useLogoutRequest } from "@/features/auth-logout";
-import { showToast } from "@/shared/lib/toast";
 
 export type LogoutStatus = "idle" | "pending" | "failed";
 

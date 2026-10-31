@@ -1,5 +1,5 @@
+import { ButtonLink, TextLink } from "@repo/admin-kit/link";
 import { COMMON_MESSAGES } from "@/shared/config";
-import { ButtonLink, TextLink } from "@/shared/ui";
 import { HOTEL_DETAIL_ACTION_MESSAGES } from "../config/messages";
 
 type HotelDetailActionsProps = {

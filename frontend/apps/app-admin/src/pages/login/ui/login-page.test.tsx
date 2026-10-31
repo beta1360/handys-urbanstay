@@ -19,15 +19,15 @@ import {
   vi,
 } from "vitest";
 import {
-  loginAccount,
-  meQueryKey,
   RequestValidationError,
   ResponseValidationError,
-} from "@/shared/api";
+} from "@repo/admin-kit/api";
+import { FORM_ALERT_MESSAGES } from "@repo/admin-kit/config";
+import { showToast } from "@repo/admin-kit/toast";
+import { loginAccount, meQueryKey } from "@/shared/api";
 import { LOGIN_MESSAGES } from "@/features/auth-login";
-import { APP_INFO, COMMON_MESSAGES } from "@/shared/config";
+import { APP_INFO } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
-import { showToast } from "@/shared/lib/toast";
 import { LoginPage } from "./login-page";
 
 vi.mock("@/shared/api", async (importOriginal) => ({
@@ -35,8 +35,8 @@ vi.mock("@/shared/api", async (importOriginal) => ({
   loginAccount: vi.fn(),
 }));
 
-vi.mock("@/shared/lib/toast", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/shared/lib/toast")>()),
+vi.mock("@repo/admin-kit/toast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@repo/admin-kit/toast")>()),
   showToast: vi.fn(),
 }));
 
@@ -370,7 +370,7 @@ describe("LoginPage 서버 오류 처리", () => {
     await user.click(getSubmitButton());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      COMMON_MESSAGES.requestFailed,
+      FORM_ALERT_MESSAGES.requestFailed,
     );
   });
 });

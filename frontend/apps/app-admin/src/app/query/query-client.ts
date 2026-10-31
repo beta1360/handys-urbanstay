@@ -1,7 +1,10 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { RequestValidationError, ResponseValidationError } from "@/shared/api";
+import {
+  RequestValidationError,
+  ResponseValidationError,
+} from "@repo/admin-kit/api";
 
 const MAX_QUERY_RETRY_COUNT = 3;
 const CLIENT_ERROR_STATUS = { min: 400, max: 499 } as const;

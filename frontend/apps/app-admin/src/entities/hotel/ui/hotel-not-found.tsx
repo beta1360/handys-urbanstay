@@ -1,6 +1,6 @@
 import { Card } from "@repo/ui/card";
+import { ButtonLink } from "@repo/admin-kit/link";
 import { COMMON_MESSAGES } from "@/shared/config";
-import { ButtonLink } from "@/shared/ui";
 import { HOTEL_NOT_FOUND_MESSAGES } from "../config/messages";
 
 export function HotelNotFound() {
