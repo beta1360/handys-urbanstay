@@ -22,7 +22,6 @@ import {
 import { API_ERROR_CODES } from "@/shared/api";
 import type { Room } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
-import { ROOM_DETAIL_ACTION_MESSAGES } from "@/widgets/room-detail";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { RoomDetailPage } from "./room-detail-page";
 
@@ -227,7 +226,7 @@ describe("RoomDetailPage 수정 버튼", () => {
     const { router, user } = renderRoomDetailPage();
 
     const editLink = await screen.findByRole("link", {
-      name: ROOM_DETAIL_ACTION_MESSAGES.edit,
+      name: COMMON_MESSAGES.edit,
     });
     expect(editLink).toHaveAttribute("href", `${roomPath(ROOM.id)}/edit`);
     expect(editLink.parentElement).toBe(getBackLink().parentElement);
@@ -252,7 +251,7 @@ describe("RoomDetailPage 수정 버튼", () => {
 
     expect(await screen.findByRole(role)).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: ROOM_DETAIL_ACTION_MESSAGES.edit }),
+      screen.queryByRole("link", { name: COMMON_MESSAGES.edit }),
     ).not.toBeInTheDocument();
   });
 });

@@ -26,7 +26,6 @@ import {
   GUEST_INFO_MESSAGES,
 } from "@/entities/guest";
 import type { GuestInfoField } from "@/entities/guest";
-import { GUEST_CREATE_FORM_MESSAGES } from "@/features/guest-create";
 import {
   API_ERROR_CODES,
   createGuest,
@@ -150,7 +149,7 @@ function getFields(): Record<GuestInfoField, HTMLElement> {
 
 function getSubmitButton() {
   return screen.getByRole("button", {
-    name: GUEST_CREATE_FORM_MESSAGES.submit,
+    name: COMMON_MESSAGES.create,
   });
 }
 

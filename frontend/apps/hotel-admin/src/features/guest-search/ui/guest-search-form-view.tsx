@@ -3,6 +3,7 @@ import { Button } from "@repo/ui/button";
 import { TextField } from "@repo/ui/text-field";
 import type { FormFieldProps } from "@repo/admin-kit/form";
 import { GUEST_KEYWORD_MAX_LENGTH } from "@/entities/guest";
+import { COMMON_MESSAGES } from "@/shared/config";
 import { GUEST_SEARCH_FORM_MESSAGES } from "../config/messages";
 
 type GuestSearchFormViewProps = {
@@ -24,7 +25,7 @@ export function GuestSearchFormView({
         {...keywordField}
       />
       <Button type="submit" variant="secondary">
-        {GUEST_SEARCH_FORM_MESSAGES.search}
+        {COMMON_MESSAGES.search}
       </Button>
     </form>
   );

@@ -152,7 +152,7 @@ describe("GuestListPage 목록", () => {
       GUESTS.map((guest) => [guest.name, guest.phone, guest.email]),
     );
     expect(
-      screen.getByText(GUEST_LIST_CONTENT_MESSAGES.pageStatus(1, 1)),
+      screen.getByText(COMMON_MESSAGES.pageStatus(1, 1)),
     ).toBeInTheDocument();
     expect(fetchGuests).toHaveBeenCalledExactlyOnceWith({ page: 0 });
   });
@@ -173,7 +173,7 @@ describe("GuestListPage 목록", () => {
     renderGuestListPage(guestsPath({ keyword: KEYWORD, page: "3" }));
 
     expect(
-      await screen.findByText(GUEST_LIST_CONTENT_MESSAGES.pageStatus(3, 5)),
+      await screen.findByText(COMMON_MESSAGES.pageStatus(3, 5)),
     ).toBeInTheDocument();
     expect(await findKeywordInput()).toHaveValue(KEYWORD);
     expect(fetchGuests).toHaveBeenCalledExactlyOnceWith({
@@ -191,7 +191,7 @@ describe("GuestListPage 목록", () => {
     [
       "검색 결과가 없으면",
       guestsPath({ keyword: KEYWORD }),
-      GUEST_LIST_CONTENT_MESSAGES.emptySearchResult,
+      COMMON_MESSAGES.emptySearchResult,
     ],
   ])("%s 빈 상태 문구를 보여주고 표를 감춘다", async (_, path, message) => {
     fetchGuests.mockResolvedValue(
@@ -226,7 +226,7 @@ describe("GuestListPage 검색", () => {
     [
       "검색 버튼을 누르면",
       (user: UserEvent) =>
-        user.click(getPageButton(GUEST_SEARCH_FORM_MESSAGES.search)),
+        user.click(getPageButton(COMMON_MESSAGES.search)),
     ],
     [
       "검색창에서 Enter를 누르면",
@@ -269,10 +269,10 @@ describe("GuestListPage 페이지 이동", () => {
 
     await screen.findByRole("table");
     const previousButton = getPageButton(
-      GUEST_LIST_CONTENT_MESSAGES.previousPage,
+      COMMON_MESSAGES.previousPage,
     );
     expect(previousButton).toBeDisabled();
-    await user.click(getPageButton(GUEST_LIST_CONTENT_MESSAGES.nextPage));
+    await user.click(getPageButton(COMMON_MESSAGES.nextPage));
 
     await vi.waitFor(() => {
       expect(router.state.location.href).toBe(
@@ -293,7 +293,7 @@ describe("GuestListPage 페이지 이동", () => {
     renderGuestListPage(guestsPath({ page: "3" }));
 
     await screen.findByRole("table");
-    expect(getPageButton(GUEST_LIST_CONTENT_MESSAGES.nextPage)).toBeDisabled();
+    expect(getPageButton(COMMON_MESSAGES.nextPage)).toBeDisabled();
   });
 
   it("URL의 페이지가 마지막 페이지보다 크면 마지막 페이지로 방문 기록을 바꿔 이동한다", async () => {

@@ -5,7 +5,6 @@ import { ButtonLink } from "@repo/admin-kit/link";
 import { GuestInfoFields } from "@/entities/guest";
 import type { GuestInfoField } from "@/entities/guest";
 import { COMMON_MESSAGES } from "@/shared/config";
-import { GUEST_CREATE_FORM_MESSAGES } from "../config/messages";
 
 type GuestCreateFormViewProps = {
   fields: Record<GuestInfoField, FormFieldProps>;
@@ -27,7 +26,7 @@ export function GuestCreateFormView({
       <GuestInfoFields fields={fields} />
       <div className="flex gap-2">
         <Button type="submit" variant="primary" loading={isSubmitting}>
-          {GUEST_CREATE_FORM_MESSAGES.submit}
+          {COMMON_MESSAGES.create}
         </Button>
         <ButtonLink
           to="/guests"

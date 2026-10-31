@@ -1,5 +1,5 @@
 import { Pagination } from "@repo/ui/pagination";
-import { GUEST_LIST_CONTENT_MESSAGES } from "../config/messages";
+import { COMMON_MESSAGES } from "@/shared/config";
 import type { GuestListPaginationState } from "../model/use-guest-list";
 
 export function GuestListPagination({
@@ -12,10 +12,10 @@ export function GuestListPagination({
 }: GuestListPaginationState) {
   return (
     <Pagination
-      aria-label={GUEST_LIST_CONTENT_MESSAGES.paginationLabel}
-      status={GUEST_LIST_CONTENT_MESSAGES.pageStatus(page, totalPages)}
-      previousLabel={GUEST_LIST_CONTENT_MESSAGES.previousPage}
-      nextLabel={GUEST_LIST_CONTENT_MESSAGES.nextPage}
+      aria-label={COMMON_MESSAGES.paginationLabel}
+      status={COMMON_MESSAGES.pageStatus(page, totalPages)}
+      previousLabel={COMMON_MESSAGES.previousPage}
+      nextLabel={COMMON_MESSAGES.nextPage}
       hasPrevious={hasPrevious}
       hasNext={hasNext}
       onPrevious={goToPreviousPage}

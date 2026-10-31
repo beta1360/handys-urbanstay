@@ -5,7 +5,6 @@ import { ButtonLink } from "@repo/admin-kit/link";
 import { GuestInfoFields } from "@/entities/guest";
 import type { GuestInfoField } from "@/entities/guest";
 import { COMMON_MESSAGES } from "@/shared/config";
-import { GUEST_UPDATE_FORM_MESSAGES } from "../config/messages";
 import type { GuestUpdateStatus } from "../model/use-guest-update-form";
 
 type GuestUpdateFormViewProps = {
@@ -42,7 +41,7 @@ export function GuestUpdateFormView({
             loading={status === "reloading"}
             onClick={onReload}
           >
-            {GUEST_UPDATE_FORM_MESSAGES.reload}
+            {COMMON_MESSAGES.reload}
           </Button>
         </div>
       ) : null}
@@ -53,7 +52,7 @@ export function GuestUpdateFormView({
           loading={status === "submitting"}
           disabled={status === "reloading"}
         >
-          {GUEST_UPDATE_FORM_MESSAGES.submit}
+          {COMMON_MESSAGES.save}
         </Button>
         <ButtonLink
           to="/guests/$guestId"

@@ -1,6 +1,5 @@
 import { ButtonLink, TextLink } from "@repo/admin-kit/link";
 import { COMMON_MESSAGES } from "@/shared/config";
-import { ROOM_DETAIL_ACTION_MESSAGES } from "../config/messages";
 
 type RoomDetailActionsProps = {
   editRoomId?: number;
@@ -18,7 +17,7 @@ export function RoomDetailActions({ editRoomId }: RoomDetailActionsProps) {
           params={{ roomId: editRoomId }}
           variant="primary"
         >
-          {ROOM_DETAIL_ACTION_MESSAGES.edit}
+          {COMMON_MESSAGES.edit}
         </ButtonLink>
       )}
     </div>

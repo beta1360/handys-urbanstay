@@ -26,7 +26,6 @@ import {
   stringifyGuestPathParams,
 } from "@/entities/guest";
 import type { GuestInfoField } from "@/entities/guest";
-import { GUEST_UPDATE_FORM_MESSAGES } from "@/features/guest-update";
 import { API_ERROR_CODES, guestQueryKey, updateGuest } from "@/shared/api";
 import type { Guest } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
@@ -174,13 +173,13 @@ function expectFormValues(values: FormValues) {
 
 function getSubmitButton() {
   return screen.getByRole("button", {
-    name: GUEST_UPDATE_FORM_MESSAGES.submit,
+    name: COMMON_MESSAGES.save,
   });
 }
 
 function getReloadButton() {
   return screen.getByRole("button", {
-    name: GUEST_UPDATE_FORM_MESSAGES.reload,
+    name: COMMON_MESSAGES.reload,
   });
 }
 

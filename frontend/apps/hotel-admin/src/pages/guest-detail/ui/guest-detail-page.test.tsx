@@ -21,7 +21,6 @@ import { API_ERROR_CODES } from "@/shared/api";
 import type { Guest } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
-import { GUEST_DETAIL_ACTION_MESSAGES } from "@/widgets/guest-detail";
 import { GuestDetailPage } from "./guest-detail-page";
 
 const { fetchGuest } = vi.hoisted(() => ({ fetchGuest: vi.fn() }));
@@ -145,7 +144,7 @@ describe("GuestDetailPage", () => {
     expect(backLink).toHaveAttribute("href", "/guests");
     expect(backLink).not.toHaveAttribute("aria-current");
     expect(
-      screen.getByRole("link", { name: GUEST_DETAIL_ACTION_MESSAGES.edit }),
+      screen.getByRole("link", { name: COMMON_MESSAGES.edit }),
     ).toHaveAttribute("href", `/guests/${GUEST.id}/edit`);
     expect(fetchGuest).toHaveBeenCalledExactlyOnceWith(GUEST.id);
   });
@@ -159,7 +158,7 @@ describe("GuestDetailPage", () => {
     );
     expect(queryBackToListLinks()).toHaveLength(1);
     expect(
-      screen.queryByRole("link", { name: GUEST_DETAIL_ACTION_MESSAGES.edit }),
+      screen.queryByRole("link", { name: COMMON_MESSAGES.edit }),
     ).not.toBeInTheDocument();
   });
 

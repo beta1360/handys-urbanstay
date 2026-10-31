@@ -1,6 +1,5 @@
 import { ButtonLink, TextLink } from "@repo/admin-kit/link";
 import { COMMON_MESSAGES } from "@/shared/config";
-import { GUEST_DETAIL_ACTION_MESSAGES } from "../config/messages";
 
 type GuestDetailActionsProps = {
   editGuestId?: number;
@@ -18,7 +17,7 @@ export function GuestDetailActions({ editGuestId }: GuestDetailActionsProps) {
           params={{ guestId: editGuestId }}
           variant="primary"
         >
-          {GUEST_DETAIL_ACTION_MESSAGES.edit}
+          {COMMON_MESSAGES.edit}
         </ButtonLink>
       )}
     </div>
