@@ -1,7 +1,9 @@
 import { Table } from "@repo/ui/table";
 import type { TableColumn } from "@repo/ui/table";
+import { TextLink } from "@repo/admin-kit/link";
 import { STAY_CANCELED_LABELS, STAY_FIELD_LABELS } from "@/entities/stay";
 import type { Stay } from "@/shared/api";
+import { STAY_LIST_CONTENT_MESSAGES } from "../config/messages";
 
 const STAY_COLUMNS: readonly TableColumn<Stay>[] = [
   {
@@ -39,6 +41,15 @@ const STAY_COLUMNS: readonly TableColumn<Stay>[] = [
     header: STAY_FIELD_LABELS.canceled,
     cell: (stay) =>
       stay.cancellation === null ? null : STAY_CANCELED_LABELS.true,
+  },
+  {
+    key: "detail",
+    header: STAY_LIST_CONTENT_MESSAGES.detailHeader,
+    cell: (stay) => (
+      <TextLink to="/stays/$stayId" params={{ stayId: stay.id }}>
+        {STAY_LIST_CONTENT_MESSAGES.detailLink}
+      </TextLink>
+    ),
   },
 ];
 

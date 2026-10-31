@@ -189,7 +189,7 @@ afterEach(() => {
 });
 
 describe("StayListPage 목록", () => {
-  it("이용 목록을 객실·이용객·체크인·체크아웃·인원·취소 여부 열의 표로 보여주고 취소한 이용은 취소됨으로 표시한다", async () => {
+  it("이용 목록을 객실·이용객·체크인·체크아웃·인원·취소 여부·상세 열의 표로 보여주고 취소한 이용은 취소됨으로 표시한다", async () => {
     renderStayListPage();
 
     const table = await screen.findByRole("table");
@@ -204,10 +204,19 @@ describe("StayListPage 목록", () => {
       STAY_FIELD_LABELS.checkOutDate,
       STAY_FIELD_LABELS.guestCount,
       STAY_FIELD_LABELS.canceled,
+      STAY_LIST_CONTENT_MESSAGES.detailHeader,
     ]);
     const [, ...rows] = within(table).getAllByRole("row");
     expect(rows.map(getRowTexts)).toEqual([
-      ["스위트 A", "김이용010-1234-5678", "2026-11-20", "2026-11-22", "3", ""],
+      [
+        "스위트 A",
+        "김이용010-1234-5678",
+        "2026-11-20",
+        "2026-11-22",
+        "3",
+        "",
+        STAY_LIST_CONTENT_MESSAGES.detailLink,
+      ],
       [
         "101",
         "박손님010-9876-5432",
@@ -215,8 +224,14 @@ describe("StayListPage 목록", () => {
         "2026-11-04",
         "2",
         STAY_CANCELED_LABELS.true,
+        STAY_LIST_CONTENT_MESSAGES.detailLink,
       ],
     ]);
+    expect(
+      within(rows[0]).getByRole("link", {
+        name: STAY_LIST_CONTENT_MESSAGES.detailLink,
+      }),
+    ).toHaveAttribute("href", `/stays/${STAYS[0].id}`);
     expect(fetchStays).toHaveBeenCalledExactlyOnceWith({ page: 0 });
   });
 
