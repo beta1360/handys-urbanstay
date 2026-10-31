@@ -95,7 +95,7 @@ const REQUIRED_FIELDS = INPUT_FIELDS.filter(
   (field) => field !== "description",
 );
 
-const PASSWORD_HINT = HOTEL_CREATE_FORM_MESSAGES.masterPasswordHint(8, 64);
+const PASSWORD_HINT = HOTEL_MASTER_INFO_MESSAGES.passwordHint(8, 64);
 
 const PASSWORD_RULE = FORM_VALIDATION_MESSAGES.passwordRule(8, 64);
 

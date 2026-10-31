@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import { requiredTextSchema } from "@repo/admin-kit/form";
+import { passwordSchema, requiredTextSchema } from "@repo/admin-kit/form";
 import { FORM_VALIDATION_MESSAGES } from "@repo/admin-kit/config";
 
 export const HOTEL_MASTER_INFO_FIELDS = ["loginId", "name"] as const;
@@ -16,4 +16,11 @@ export function createHotelMasterInfoFormShape(
     ),
     name: requiredTextSchema(rules.name),
   };
+}
+
+export function createHotelMasterPasswordSchema(rule: z.ZodString) {
+  return passwordSchema(
+    rule,
+    FORM_VALIDATION_MESSAGES.passwordRule(rule.minLength, rule.maxLength),
+  );
 }

@@ -8,6 +8,7 @@ import {
   HotelMasterSection,
   useHotelMaster,
 } from "@/entities/hotel-master";
+import { HotelMasterPasswordReset } from "@/features/hotel-master-password-reset";
 
 type HotelMasterPanelProps = {
   hotelId: number;
@@ -45,6 +46,7 @@ export function HotelMasterPanel({ hotelId }: HotelMasterPanelProps) {
           }
         >
           <HotelMasterInformation master={state.master} />
+          <HotelMasterPasswordReset key={hotelId} hotelId={hotelId} />
         </HotelMasterSection>
       );
   }

@@ -7,6 +7,7 @@ import * as generated from "./generated";
 import {
   fetchHotelMaster,
   hotelMasterQueryKey,
+  resetHotelMasterPassword,
   updateHotelMaster,
 } from "./hotel-master";
 
@@ -14,6 +15,7 @@ vi.mock("./generated", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./generated")>()),
   getHotelMaster: vi.fn(),
   updateHotelMaster: vi.fn(),
+  resetHotelMasterPassword: vi.fn(),
 }));
 
 const HOTEL_ID = 1;
@@ -135,6 +137,48 @@ describe("updateHotelMaster", () => {
 
     await expect(
       updateHotelMaster(HOTEL_ID, UPDATE_BODY),
+    ).rejects.toBeInstanceOf(ResponseValidationError);
+  });
+});
+
+describe("resetHotelMasterPassword", () => {
+  const RESET_MESSAGE = "마스터 비밀번호를 재설정했습니다.";
+
+  it("입력한 그대로의 비밀번호로 요청하고 성공 문구만 돌려준다", async () => {
+    vi.mocked(generated.resetHotelMasterPassword).mockResolvedValue({
+      success: true,
+      data: null,
+      message: RESET_MESSAGE,
+      error: null,
+    });
+    const body = { password: " master123 " };
+
+    await expect(resetHotelMasterPassword(HOTEL_ID, body)).resolves.toEqual({
+      message: RESET_MESSAGE,
+    });
+    expect(generated.resetHotelMasterPassword).toHaveBeenCalledWith(
+      HOTEL_ID,
+      body,
+    );
+  });
+
+  it("새 비밀번호가 규칙에 맞지 않으면 요청을 보내지 않고 요청 검증 오류를 던진다", async () => {
+    await expect(
+      resetHotelMasterPassword(HOTEL_ID, { password: "password" }),
+    ).rejects.toBeInstanceOf(RequestValidationError);
+    expect(generated.resetHotelMasterPassword).not.toHaveBeenCalled();
+  });
+
+  it("성공 응답의 message가 null이면 응답 검증 오류를 던진다", async () => {
+    vi.mocked(generated.resetHotelMasterPassword).mockResolvedValue({
+      success: true,
+      data: null,
+      message: null,
+      error: null,
+    });
+
+    await expect(
+      resetHotelMasterPassword(HOTEL_ID, { password: "master123" }),
     ).rejects.toBeInstanceOf(ResponseValidationError);
   });
 });

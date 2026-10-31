@@ -31,6 +31,15 @@ export function useRefetchHotelMaster(hotelId: number) {
   return () => refetchHotelMaster(queryClient, hotelId);
 }
 
+export async function refreshHotelMaster(
+  queryClient: QueryClient,
+  hotelId: number,
+) {
+  await queryClient.invalidateQueries({
+    queryKey: hotelMasterQueryOptions(hotelId).queryKey,
+  });
+}
+
 export function cacheSavedHotelMaster(
   queryClient: QueryClient,
   hotelId: number,

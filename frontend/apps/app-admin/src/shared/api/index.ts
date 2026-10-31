@@ -29,7 +29,13 @@ export type {
 export {
   fetchHotelMaster,
   hotelMasterQueryKey,
+  resetHotelMasterPassword,
+  resetHotelMasterPasswordBodySchema,
   updateHotelMaster,
   updateHotelMasterBodySchema,
 } from "./hotel-master";
-export type { HotelMaster, UpdateHotelMasterBody } from "./hotel-master";
+export type {
+  HotelMaster,
+  ResetHotelMasterPasswordBody,
+  UpdateHotelMasterBody,
+} from "./hotel-master";

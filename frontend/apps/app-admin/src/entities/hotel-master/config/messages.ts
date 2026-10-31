@@ -12,4 +12,6 @@ export const HOTEL_MASTER_INFO_MESSAGES = {
   edit: "마스터 정보 수정",
   loginIdLabel: "아이디(이메일)",
   loginIdHint: "이메일 형식. 마스터가 hotel-admin에 로그인할 때 씁니다.",
+  passwordHint: (minLength: number | null, maxLength: number | null) =>
+    `영문과 숫자를 모두 넣어 ${minLength}~${maxLength}자`,
 } as const;
