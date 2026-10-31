@@ -26,11 +26,9 @@ import type {
 
 import type {
   ApiResponseListStayRoomTypeAppResponse,
-  ApiResponsePageResponseStayReservedPeriodAppResponse,
   ApiResponseStayAppResponse,
   ErrorApiResponse,
   GetHotelRoomTypesParams,
-  GetRoomReservedPeriodsParams,
   StayCreateAppRequest
 } from '../schemas';
 
@@ -178,152 +176,7 @@ export const useCreateStay = <TError = ErrorApiResponse,
       > => {
       return useMutation(getCreateStayMutationOptions(options), queryClient);
     }
-    export type getRoomReservedPeriodsResponse200 = {
-  data: ApiResponsePageResponseStayReservedPeriodAppResponse
-  status: 200
-}
-
-export type getRoomReservedPeriodsResponse400 = {
-  data: ErrorApiResponse
-  status: 400
-}
-
-export type getRoomReservedPeriodsResponse404 = {
-  data: ErrorApiResponse
-  status: 404
-}
-
-export type getRoomReservedPeriodsResponse500 = {
-  data: ErrorApiResponse
-  status: 500
-}
-
-export type getRoomReservedPeriodsResponseSuccess = (getRoomReservedPeriodsResponse200) & {
-  headers: Headers;
-};
-export type getRoomReservedPeriodsResponseError = (getRoomReservedPeriodsResponse400 | getRoomReservedPeriodsResponse404 | getRoomReservedPeriodsResponse500) & {
-  headers: Headers;
-};
-
-export type getRoomReservedPeriodsResponse = (getRoomReservedPeriodsResponseSuccess | getRoomReservedPeriodsResponseError)
-
-export const getGetRoomReservedPeriodsUrl = (roomId: number,
-    params?: GetRoomReservedPeriodsParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/v1/app/rooms/${roomId}/reserved-periods?${stringifiedParams}` : `/api/v1/app/rooms/${roomId}/reserved-periods`
-}
-
-/**
- * 객실 하나의 예약된 기간(체크인·체크아웃 날짜)만 페이지로 나눠 조회합니다. 로그인과 CSRF 토큰 없이 호출합니다. 취소하지 않았고 끝나지 않은 이용(체크아웃 날짜가 오늘(한국 시간)보다 뒤)만 담고, 이용객 정보는 담지 않습니다. 체크인 날짜 오름차순, 같으면 이용 id 오름차순으로 놓입니다. 예약 화면에서 입력한 기간이 이 기간들과 겹치는지 보내기 전에 확인하는 데 씁니다. 기간은 체크인 날짜부터 체크아웃 날짜 전날까지 묵는 것으로 보므로, 체크아웃 날에 체크인하는 예약은 겹치지 않습니다(예: 11월 1일~3일과 3일~5일). 없는 객실이면 404 ROOM_NOT_FOUND로 응답합니다. page는 0~99(기본 0), size는 1~100(기본 10)입니다. 범위를 벗어나면 400 INVALID_INPUT으로 응답하고 fieldErrors에 파라미터 이름을 담습니다.
- * @summary 객실의 예약된 기간 조회
- */
-export const getRoomReservedPeriods = async (roomId: number,
-    params?: GetRoomReservedPeriodsParams, options?: Parameters<typeof http>[1]): Promise<getRoomReservedPeriodsResponse> => {
-
-  return http<getRoomReservedPeriodsResponse>(getGetRoomReservedPeriodsUrl(roomId,params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetRoomReservedPeriodsQueryKey = (roomId: number,
-    params?: GetRoomReservedPeriodsParams,) => {
-    return [
-    `/api/v1/app/rooms/${roomId}/reserved-periods`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getGetRoomReservedPeriodsQueryOptions = <TData = Awaited<ReturnType<typeof getRoomReservedPeriods>>, TError = ErrorApiResponse>(roomId: number,
-    params?: GetRoomReservedPeriodsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRoomReservedPeriods>>, TError, TData>>, request?: SecondParameter<typeof http>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetRoomReservedPeriodsQueryKey(roomId,params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRoomReservedPeriods>>> = ({ signal }) => getRoomReservedPeriods(roomId,params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: roomId !== null && roomId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRoomReservedPeriods>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetRoomReservedPeriodsQueryResult = NonNullable<Awaited<ReturnType<typeof getRoomReservedPeriods>>>
-export type GetRoomReservedPeriodsQueryError = ErrorApiResponse
-
-
-export function useGetRoomReservedPeriods<TData = Awaited<ReturnType<typeof getRoomReservedPeriods>>, TError = ErrorApiResponse>(
- roomId: number,
-    params: undefined |  GetRoomReservedPeriodsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRoomReservedPeriods>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getRoomReservedPeriods>>,
-          TError,
-          Awaited<ReturnType<typeof getRoomReservedPeriods>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof http>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetRoomReservedPeriods<TData = Awaited<ReturnType<typeof getRoomReservedPeriods>>, TError = ErrorApiResponse>(
- roomId: number,
-    params?: GetRoomReservedPeriodsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRoomReservedPeriods>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getRoomReservedPeriods>>,
-          TError,
-          Awaited<ReturnType<typeof getRoomReservedPeriods>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof http>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetRoomReservedPeriods<TData = Awaited<ReturnType<typeof getRoomReservedPeriods>>, TError = ErrorApiResponse>(
- roomId: number,
-    params?: GetRoomReservedPeriodsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRoomReservedPeriods>>, TError, TData>>, request?: SecondParameter<typeof http>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary 객실의 예약된 기간 조회
- */
-
-export function useGetRoomReservedPeriods<TData = Awaited<ReturnType<typeof getRoomReservedPeriods>>, TError = ErrorApiResponse>(
- roomId: number,
-    params?: GetRoomReservedPeriodsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRoomReservedPeriods>>, TError, TData>>, request?: SecondParameter<typeof http>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetRoomReservedPeriodsQueryOptions(roomId,params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-export type getHotelRoomTypesResponse200 = {
+    export type getHotelRoomTypesResponse200 = {
   data: ApiResponseListStayRoomTypeAppResponse
   status: 200
 }
