@@ -17,6 +17,7 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalTime
 
@@ -26,6 +27,7 @@ class RoomService(
 	private val roomStatusHistoryRepository: RoomStatusHistoryRepository,
 	private val hotelService: HotelService,
 	private val hotelAdminService: HotelAdminService,
+	private val clock: Clock,
 ) {
 
 	@Transactional
@@ -98,7 +100,7 @@ class RoomService(
 		if (!from.canChangeTo(to)) {
 			throw BusinessException(RoomErrorCode.ROOM_STATUS_TRANSITION_NOT_ALLOWED)
 		}
-		if (roomRepository.updateStatus(roomId, hotelId, from, to, Instant.now()) == 0) {
+		if (roomRepository.updateStatus(roomId, hotelId, from, to, Instant.now(clock)) == 0) {
 			throw BusinessException(RoomErrorCode.ROOM_STATUS_CHANGED)
 		}
 		val changedBy = hotelAdminService.getHotelAdmin(hotelAdminId)

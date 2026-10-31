@@ -31,7 +31,7 @@ class GlobalExceptionHandler(private val errorResponseFactory: ErrorResponseFact
 
 	@ExceptionHandler(BusinessException::class)
 	fun handleBusinessException(e: BusinessException): ResponseEntity<ApiResponse<Nothing>> =
-		respond(e.errorCode)
+		respond(e.errorCode, e.fieldErrors.map { errorResponseFactory.fieldError(it.field, it.messageKey, it.arguments) })
 
 	@ExceptionHandler(MethodArgumentNotValidException::class)
 	fun handleMethodArgumentNotValid(e: MethodArgumentNotValidException): ResponseEntity<ApiResponse<Nothing>> =

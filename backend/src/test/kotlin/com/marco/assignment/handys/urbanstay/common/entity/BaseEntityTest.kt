@@ -14,7 +14,7 @@ import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.boot.persistence.autoconfigure.EntityScan
 import org.springframework.context.annotation.Import
 import org.springframework.data.auditing.AuditingHandler
-import org.springframework.data.auditing.CurrentDateTimeProvider
+import org.springframework.data.auditing.DateTimeProvider
 import java.time.Instant
 import java.util.Optional
 
@@ -29,6 +29,9 @@ class BaseEntityTest {
 	@Autowired
 	private lateinit var auditingHandler: AuditingHandler
 
+	@Autowired
+	private lateinit var dateTimeProvider: DateTimeProvider
+
 	private var now: Instant = CREATED_AT
 
 	@BeforeEach
@@ -38,7 +41,7 @@ class BaseEntityTest {
 
 	@AfterEach
 	fun restoreTime() {
-		auditingHandler.setDateTimeProvider(CurrentDateTimeProvider.INSTANCE)
+		auditingHandler.setDateTimeProvider(dateTimeProvider)
 	}
 
 	@Test
