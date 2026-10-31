@@ -238,8 +238,9 @@ class StayServiceTest {
 			"delete from room_type where hotel_id = ?",
 		)
 		private const val INSERT_STAY = """
-			insert into stay (room_id, guest_id, check_in_date, check_out_date, guest_count, created_at, updated_at)
-			values (?, ?, ?, ?, 2, now(), now())
+			insert into stay (room_id, guest_id, check_in_date, check_out_date, guest_count, room_rate, nights, base_amount, discount_amount, total_amount, created_at, updated_at)
+			select room_id, guest_id, check_in, check_out, 2, 0, check_out - check_in, 0, 0, 0, now(), now()
+			from (select cast(? as bigint) room_id, cast(? as bigint) guest_id, cast(? as date) check_in, cast(? as date) check_out) v
 		"""
 		private const val UPDATE_ROOM_STATUS = "update room set status = ? where id = ?"
 		private const val SELECT_STAYS = """

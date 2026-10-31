@@ -47,12 +47,12 @@ class StayService(
 		guestEmail: String,
 	): Stay {
 		checkPeriod(checkInDate, checkOutDate)
-		roomTypeService.getRoomType(hotelId, roomTypeId)
+		val roomType = roomTypeService.getRoomType(hotelId, roomTypeId)
 		val rooms = roomService.lockRoomsByType(roomTypeId)
 		val room = availableRooms(rooms, checkInDate, checkOutDate, guestCount).firstOrNull()
 			?: throw BusinessException(RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
 		val guest = guestService.getOrCreate(hotelId, guestName, guestPhone, guestEmail)
-		return translateConflicts { stayRepository.saveAndFlush(Stay(room, guest, checkInDate, checkOutDate, guestCount)) }
+		return translateConflicts { stayRepository.saveAndFlush(Stay(room, guest, checkInDate, checkOutDate, guestCount, roomType.roomRate)) }
 	}
 
 	@Transactional(readOnly = true)

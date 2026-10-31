@@ -51,6 +51,7 @@ import java.nio.charset.StandardCharsets
 import java.sql.Timestamp
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
 
@@ -220,6 +221,8 @@ class StayAppControllerTest {
 		assertThat(result.request.getSession(false)).isNull()
 		assertThat(result.response.cookies).isEmpty()
 		assertThat(stayRooms()).containsExactly("99")
+		assertThat(jdbcTemplate.queryForList(SELECT_STAY_AMOUNTS, id).single().values.map { (it as Number).toLong() })
+			.containsExactly(ROOM_RATE.toLong(), 2L, ROOM_RATE * 2L, 0L, ROOM_RATE * 2L)
 		assertThat(guests(hotel)).containsExactly(listOf("홍길동", PHONE, EMAIL), listOf("김철수", "010-9999-8888", "Kim@Example.com"))
 		assertThat(jdbcTemplate.queryForObject(SELECT_GUEST_NAME_OF_STAY, String::class.java, id)).isEqualTo("김철수")
 		assertThat(jdbcTemplate.queryForObject(SELECT_GUEST_CREATED_AT, Timestamp::class.java, id)?.toInstant()).isEqualTo(NOW)
@@ -341,8 +344,9 @@ class StayAppControllerTest {
 				listOf(Guest.PHONE_MAX_LENGTH.toString(), Hotel.PHONE_PATTERN),
 				listOf(Guest.EMAIL_MAX_LENGTH.toString(), LoginId.PATTERN),
 			)
-		assertThat(schemas["StayAppResponse"]["properties"].propertyNames())
-			.containsExactly("id", "hotel", "roomType", "checkInDate", "checkOutDate", "guestCount", "guest")
+		assertThat(schemas["StayAppResponse"]["properties"].propertyNames()).containsExactly(
+			"id", "hotel", "roomType", "checkInDate", "checkOutDate", "guestCount", "roomRate", "nights", "baseAmount", "discountAmount", "totalAmount", "guest",
+		)
 	}
 
 	private fun reserve(body: Map<String, Any?>): ResultActionsDsl =
@@ -383,7 +387,7 @@ class StayAppControllerTest {
 
 	private fun saveRoom(hotel: Hotel, name: String, type: String = STANDARD): Room = roomRepository.save(Room(hotel, name, roomType(hotel, type), null, null))
 
-	private fun saveStay(room: Room, checkIn: LocalDate, checkOut: LocalDate): Stay = stayRepository.save(Stay(room, guest, checkIn, checkOut, 2))
+	private fun saveStay(room: Room, checkIn: LocalDate, checkOut: LocalDate): Stay = stayRepository.save(Stay(room, guest, checkIn, checkOut, 2, ROOM_RATE))
 
 	private fun cancelStay(stay: Stay) {
 		jdbcTemplate.update(CANCEL_STAY, hotelAdmin.id, stay.id)
@@ -427,6 +431,11 @@ class StayAppControllerTest {
 					"checkInDate" to checkIn.toString(),
 					"checkOutDate" to checkOut.toString(),
 					"guestCount" to guestCount,
+					"roomRate" to ROOM_RATE,
+					"nights" to ChronoUnit.DAYS.between(checkIn, checkOut),
+					"baseAmount" to ROOM_RATE * ChronoUnit.DAYS.between(checkIn, checkOut),
+					"discountAmount" to 0,
+					"totalAmount" to ROOM_RATE * ChronoUnit.DAYS.between(checkIn, checkOut),
 					"guest" to linkedMapOf("name" to guestName),
 				),
 			),
@@ -480,6 +489,7 @@ class StayAppControllerTest {
 		private const val MISSING_ID = Long.MAX_VALUE
 		private val NEW_GUEST = mapOf("name" to "새 이용객", "phone" to "010-7777-6666", "email" to "new@example.com")
 		private const val SELECT_ROOM_STATUS = "select status from room where id = ?"
+		private const val SELECT_STAY_AMOUNTS = "select room_rate, nights, base_amount, discount_amount, total_amount from stay where id = ?"
 		private const val SELECT_STAY_ROOM_NAMES = "select r.name from stay s join room r on r.id = s.room_id where r.hotel_id = ? order by s.id"
 		private const val SELECT_GUESTS = "select name, phone, email from guest where hotel_id = ? order by id"
 		private const val SELECT_GUEST_ID_OF_STAY = "select guest_id from stay where id = ?"

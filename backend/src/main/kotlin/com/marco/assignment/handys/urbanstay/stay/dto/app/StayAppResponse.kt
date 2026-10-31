@@ -17,6 +17,16 @@ data class StayAppResponse(
 	val checkOutDate: LocalDate,
 	@Schema(description = "openapi.schema.StayAppResponse.guestCount", example = "2")
 	val guestCount: Int,
+	@Schema(description = "openapi.schema.StayAppResponse.roomRate", example = "100000")
+	val roomRate: Int,
+	@Schema(description = "openapi.schema.StayAppResponse.nights", example = "2")
+	val nights: Int,
+	@Schema(description = "openapi.schema.StayAppResponse.baseAmount", example = "200000")
+	val baseAmount: Int,
+	@Schema(description = "openapi.schema.StayAppResponse.discountAmount", example = "0")
+	val discountAmount: Int,
+	@Schema(description = "openapi.schema.StayAppResponse.totalAmount", example = "200000")
+	val totalAmount: Int,
 	@Schema(description = "openapi.schema.StayAppResponse.guest")
 	val guest: StayGuestAppResponse,
 ) {
@@ -31,6 +41,11 @@ data class StayAppResponse(
 				checkInDate = stay.checkInDate,
 				checkOutDate = stay.checkOutDate,
 				guestCount = stay.guestCount,
+				roomRate = stay.roomRate,
+				nights = stay.nights,
+				baseAmount = stay.baseAmount,
+				discountAmount = stay.discountAmount,
+				totalAmount = stay.totalAmount,
 				guest = StayGuestAppResponse.from(stay.guest),
 			)
 	}

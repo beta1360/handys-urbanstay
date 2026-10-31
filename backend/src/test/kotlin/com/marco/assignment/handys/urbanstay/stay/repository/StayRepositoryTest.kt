@@ -65,21 +65,42 @@ class StayRepositoryTest {
 	}
 
 	@Test
-	fun `객실, 이용객, 체크인·체크아웃 날짜, 인원을 저장한다`() {
-		val saved = stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2))
+	fun `객실, 이용객, 체크인·체크아웃 날짜, 인원과 1박 요금으로 계산한 금액을 저장한다`() {
+		val saved = stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2, ROOM_RATE))
 		entityManager.clear()
 
 		val found = stayRepository.findById(checkNotNull(saved.id)).orElseThrow()
 		assertThat(listOf(found.room.id, found.guest.id, found.checkInDate, found.checkOutDate, found.guestCount))
 			.containsExactly(room.id, guest.id, CHECK_IN, CHECK_OUT, 2)
+		assertThat(listOf(found.roomRate, found.nights, found.baseAmount, found.discountAmount, found.totalAmount))
+			.containsExactly(ROOM_RATE, 2, ROOM_RATE * 2, 0, ROOM_RATE * 2)
+	}
+
+	@ParameterizedTest
+	@CsvSource(
+		delimiter = '|',
+		value = [
+			"base_amount = 1",
+			"total_amount = 1",
+			"nights = 3",
+			"discount_amount = -1, total_amount = 200001",
+			"room_rate = -1, base_amount = -2, total_amount = -2",
+		],
+	)
+	fun `금액이 0보다 작거나 기본 금액이 1박 요금 × 박 수, 최종 금액이 기본 금액 - 할인 금액이 아니면 DB CHECK 제약이 막는다`(assignments: String) {
+		val stayId = checkNotNull(stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2, ROOM_RATE)).id)
+
+		assertThatThrownBy { jdbcTemplate.update("update stay set $assignments where id = ?", stayId) }
+			.isInstanceOf(DataIntegrityViolationException::class.java)
+			.hasMessageContaining("stay_amount_check")
 	}
 
 	@ParameterizedTest
 	@CsvSource("2026-11-01, 2026-11-03", "2026-10-30, 2026-11-02", "2026-11-02, 2026-11-05", "2026-10-30, 2026-11-05", "2026-11-02, 2026-11-03")
 	fun `같은 객실에 기간이 겹치는 이용은 이름 있는 배제 제약이 저장을 막는다`(checkIn: LocalDate, checkOut: LocalDate) {
-		stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2))
+		stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2, ROOM_RATE))
 
-		assertThatThrownBy { stayRepository.saveAndFlush(Stay(room, guest, checkIn, checkOut, 2)) }
+		assertThatThrownBy { stayRepository.saveAndFlush(Stay(room, guest, checkIn, checkOut, 2, ROOM_RATE)) }
 			.isInstanceOfSatisfying(DataIntegrityViolationException::class.java) {
 				assertThat(it.violates(Stay.ROOM_PERIOD_EXCLUSION_CONSTRAINT)).isTrue()
 			}
@@ -87,10 +108,10 @@ class StayRepositoryTest {
 
 	@Test
 	fun `체크아웃 날에 다음 체크인을 하는 이용과 다른 객실의 같은 기간 이용은 저장한다`() {
-		stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2))
-		stayRepository.saveAndFlush(Stay(room, guest, CHECK_OUT, CHECK_OUT.plusDays(2), 2))
-		stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN.minusDays(2), CHECK_IN, 2))
-		stayRepository.saveAndFlush(Stay(otherRoom, guest, CHECK_IN, CHECK_OUT, 2))
+		stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2, ROOM_RATE))
+		stayRepository.saveAndFlush(Stay(room, guest, CHECK_OUT, CHECK_OUT.plusDays(2), 2, ROOM_RATE))
+		stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN.minusDays(2), CHECK_IN, 2, ROOM_RATE))
+		stayRepository.saveAndFlush(Stay(otherRoom, guest, CHECK_IN, CHECK_OUT, 2, ROOM_RATE))
 
 		assertThat(jdbcTemplate.queryForObject(COUNT_STAYS, Int::class.java, guest.id)).isEqualTo(4)
 	}
@@ -109,7 +130,7 @@ class StayRepositoryTest {
 		guestCount: Int,
 		constraint: String,
 	) {
-		assertThatThrownBy { stayRepository.saveAndFlush(Stay(room, guest, checkIn, checkOut, guestCount)) }
+		assertThatThrownBy { stayRepository.saveAndFlush(Stay(room, guest, checkIn, checkOut, guestCount, 0)) }
 			.isInstanceOfSatisfying(DataIntegrityViolationException::class.java) {
 				assertThat(it.violates(constraint)).isTrue()
 				assertThat(it.violates(Stay.ROOM_PERIOD_EXCLUSION_CONSTRAINT)).isFalse()
@@ -118,21 +139,21 @@ class StayRepositoryTest {
 
 	@Test
 	fun `30박과 20명은 DB 제약을 통과한다`() {
-		val saved = stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_IN.plusDays(Stay.MAX_NIGHTS), 20))
+		val saved = stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_IN.plusDays(Stay.MAX_NIGHTS), 20, ROOM_RATE))
 
 		assertThat(saved.id).isNotNull()
 	}
 
 	@Test
 	fun `겹침 확인은 같은 객실에서 체크인 날짜 이상 체크아웃 날짜 미만의 기간으로 비교한다`() {
-		stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2))
+		stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2, ROOM_RATE))
 
 		assertThat(overlaps(room, CHECK_IN.plusDays(1), CHECK_OUT.plusDays(1))).isTrue()
 		assertThat(overlaps(room, CHECK_IN.minusDays(1), CHECK_IN.plusDays(1))).isTrue()
 		assertThat(overlaps(room, CHECK_OUT, CHECK_OUT.plusDays(1))).isFalse()
 		assertThat(overlaps(room, CHECK_IN.minusDays(1), CHECK_IN)).isFalse()
 		assertThat(overlaps(otherRoom, CHECK_IN, CHECK_OUT)).isFalse()
-		stayRepository.saveAndFlush(Stay(room, guest, CHECK_OUT, CHECK_OUT.plusDays(2), 2))
+		stayRepository.saveAndFlush(Stay(room, guest, CHECK_OUT, CHECK_OUT.plusDays(2), 2, ROOM_RATE))
 		assertThat(stayRepository.findOverlappedRoomIds(listOf(checkNotNull(room.id), checkNotNull(otherRoom.id)), CHECK_IN, CHECK_OUT.plusDays(2)))
 			.containsExactly(room.id)
 	}
@@ -140,7 +161,7 @@ class StayRepositoryTest {
 	@Test
 	fun `id와 객실의 호텔이 모두 맞을 때만 이용을 찾는다`() {
 		val otherHotel = entityManager.persistAndFlush(Hotel("어반스테이 $suffix", "부산 $suffix", PHONE, null))
-		val stay = stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2))
+		val stay = stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2, ROOM_RATE))
 
 		assertThat(stayRepository.findByIdAndRoomHotelId(checkNotNull(stay.id), checkNotNull(hotel.id))?.id).isEqualTo(stay.id)
 		assertThat(stayRepository.findByIdAndRoomHotelId(stay.id!!, checkNotNull(otherHotel.id))).isNull()
@@ -148,7 +169,7 @@ class StayRepositoryTest {
 
 	@Test
 	fun `취소는 취소되지 않은 이용에만 취소 시각, 처리 계정과 이름, 사유를 한 번 기록하고 바뀐 행 수를 돌려준다`() {
-		val stayId = checkNotNull(stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2)).id)
+		val stayId = checkNotNull(stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2, ROOM_RATE)).id)
 
 		assertThat(stayRepository.cancel(stayId, hotelAdmin, hotelAdmin.name, REASON, CANCELED_AT)).isEqualTo(1)
 		assertThat(stayRepository.cancel(stayId, hotelAdmin, "다른 이름", null, CANCELED_AT.plusSeconds(60))).isZero()
@@ -160,13 +181,13 @@ class StayRepositoryTest {
 
 	@Test
 	fun `취소한 이용은 배제 제약과 겹침 확인에서 빠져 같은 기간을 다시 저장할 수 있다`() {
-		val canceledId = checkNotNull(stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2)).id)
+		val canceledId = checkNotNull(stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2, ROOM_RATE)).id)
 		stayRepository.cancel(canceledId, hotelAdmin, hotelAdmin.name, null, CANCELED_AT)
 
 		assertThat(overlaps(room, CHECK_IN, CHECK_OUT)).isFalse()
-		stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2))
+		stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2, ROOM_RATE))
 		assertThat(overlaps(room, CHECK_IN, CHECK_OUT)).isTrue()
-		assertThatThrownBy { stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2)) }
+		assertThatThrownBy { stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2, ROOM_RATE)) }
 			.isInstanceOfSatisfying(DataIntegrityViolationException::class.java) {
 				assertThat(it.violates(Stay.ROOM_PERIOD_EXCLUSION_CONSTRAINT)).isTrue()
 			}
@@ -189,7 +210,7 @@ class StayRepositoryTest {
 		assignments: String,
 		constraint: String,
 	) {
-		val stayId = checkNotNull(stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2)).id)
+		val stayId = checkNotNull(stayRepository.saveAndFlush(Stay(room, guest, CHECK_IN, CHECK_OUT, 2, ROOM_RATE)).id)
 
 		assertThatThrownBy { jdbcTemplate.update("update stay set ${assignments.replace(":admin", hotelAdmin.id.toString())} where id = ?", stayId) }
 			.isInstanceOf(DataIntegrityViolationException::class.java)
@@ -203,6 +224,7 @@ class StayRepositoryTest {
 
 	companion object {
 		private const val PHONE = "02-1234-5678"
+		private const val ROOM_RATE = 100000
 		private val CHECK_IN = LocalDate.of(2026, 11, 1)
 		private val CHECK_OUT = LocalDate.of(2026, 11, 3)
 		private val CANCELED_AT = Instant.parse("2026-10-31T01:00:00Z")

@@ -249,7 +249,7 @@ class RoomCurrentStayHotelAdminControllerTest {
 		}
 
 	private fun saveStay(room: Room, guest: Guest, checkInOffset: Long, checkOutOffset: Long): Stay =
-		stayRepository.save(Stay(room, guest, TODAY.plusDays(checkInOffset), TODAY.plusDays(checkOutOffset), 2))
+		stayRepository.save(Stay(room, guest, TODAY.plusDays(checkInOffset), TODAY.plusDays(checkOutOffset), 2, 100000))
 
 	private fun cancel(stay: Stay) {
 		jdbcTemplate.update(CANCEL_STAY, master.id, stay.id)

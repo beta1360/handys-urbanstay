@@ -55,6 +55,7 @@ import java.nio.charset.StandardCharsets
 import java.sql.Timestamp
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
 
@@ -377,12 +378,12 @@ class StayHotelAdminControllerTest {
 
 	private fun roomType(hotel: Hotel): RoomType =
 		roomTypes.getOrPut(checkNotNull(hotel.id)) {
-			roomTypeRepository.save(RoomType(hotel, "스탠다드", CAPACITY, 100000, LocalTime.of(15, 0), LocalTime.of(11, 0)))
+			roomTypeRepository.save(RoomType(hotel, "스탠다드", CAPACITY, ROOM_RATE, LocalTime.of(15, 0), LocalTime.of(11, 0)))
 		}
 
 	private fun saveGuest(hotel: Hotel, name: String, phone: String): Guest = guestRepository.save(Guest(hotel, name, phone, "guest@example.com"))
 
-	private fun saveStay(room: Room, guest: Guest, checkIn: LocalDate, checkOut: LocalDate): Stay = stayRepository.save(Stay(room, guest, checkIn, checkOut, 2))
+	private fun saveStay(room: Room, guest: Guest, checkIn: LocalDate, checkOut: LocalDate): Stay = stayRepository.save(Stay(room, guest, checkIn, checkOut, 2, ROOM_RATE))
 
 	private fun stayIds(room: Room): List<Long> = jdbcTemplate.queryForList(SELECT_STAY_IDS, Long::class.javaObjectType, room.id).filterNotNull()
 
@@ -428,6 +429,11 @@ class StayHotelAdminControllerTest {
 					"checkInDate" to checkIn.toString(),
 					"checkOutDate" to checkOut.toString(),
 					"guestCount" to guestCount,
+					"roomRate" to ROOM_RATE,
+					"nights" to ChronoUnit.DAYS.between(checkIn, checkOut),
+					"baseAmount" to ROOM_RATE * ChronoUnit.DAYS.between(checkIn, checkOut),
+					"discountAmount" to 0,
+					"totalAmount" to ROOM_RATE * ChronoUnit.DAYS.between(checkIn, checkOut),
 					"cancellation" to cancellation,
 				),
 			),
@@ -464,6 +470,7 @@ class StayHotelAdminControllerTest {
 		private const val HOTEL_PHONE = "02-1234-5678"
 		private const val PASSWORD_HASH = "password-hash"
 		private const val CAPACITY = 4
+		private const val ROOM_RATE = 100000
 		private const val XSRF_COOKIE = "XSRF-TOKEN"
 		private const val XSRF_HEADER = "X-XSRF-TOKEN"
 		private const val FIELD_ERRORS = "fieldErrors"
