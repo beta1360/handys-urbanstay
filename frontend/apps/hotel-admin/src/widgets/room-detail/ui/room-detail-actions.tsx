@@ -1,4 +1,5 @@
 import { ButtonLink, TextLink } from "@repo/admin-kit/link";
+import { StayListLink } from "@/entities/stay";
 import { COMMON_MESSAGES } from "@/shared/config";
 
 type RoomDetailActionsProps = {
@@ -12,13 +13,16 @@ export function RoomDetailActions({ editRoomId }: RoomDetailActionsProps) {
         {COMMON_MESSAGES.backToList}
       </TextLink>
       {editRoomId === undefined ? null : (
-        <ButtonLink
-          to="/rooms/$roomId/edit"
-          params={{ roomId: editRoomId }}
-          variant="primary"
-        >
-          {COMMON_MESSAGES.edit}
-        </ButtonLink>
+        <div className="flex items-center gap-4">
+          <StayListLink roomId={editRoomId} />
+          <ButtonLink
+            to="/rooms/$roomId/edit"
+            params={{ roomId: editRoomId }}
+            variant="primary"
+          >
+            {COMMON_MESSAGES.edit}
+          </ButtonLink>
+        </div>
       )}
     </div>
   );
