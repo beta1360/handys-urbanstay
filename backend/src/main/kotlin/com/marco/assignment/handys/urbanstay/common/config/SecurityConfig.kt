@@ -106,6 +106,8 @@ class SecurityConfig(
 			Endpoint(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.AUTH + ApiPaths.LOGIN),
 		)
 		private val HOTEL_MASTER_APIS = listOf(
+			Endpoint(HttpMethod.GET, ApiPaths.HOTEL_ADMIN + ApiPaths.HOTEL),
+			Endpoint(HttpMethod.PUT, ApiPaths.HOTEL_ADMIN + ApiPaths.HOTEL),
 			Endpoint(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOM_TYPES),
 			Endpoint(HttpMethod.PUT, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOM_TYPES + "/*"),
 			Endpoint(HttpMethod.POST, ApiPaths.HOTEL_ADMIN + ApiPaths.ROOMS),
