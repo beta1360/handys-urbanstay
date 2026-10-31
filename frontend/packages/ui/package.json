@@ -11,6 +11,7 @@
     "./description-list": "./src/description-list.tsx",
     "./form-section": "./src/form-section.tsx",
     "./pagination": "./src/pagination.tsx",
+    "./select-field": "./src/select-field.tsx",
     "./sidebar": "./src/sidebar.tsx",
     "./table": "./src/table.tsx",
     "./text-field": "./src/text-field.tsx",
