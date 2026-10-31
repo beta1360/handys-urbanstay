@@ -3,6 +3,7 @@ package com.marco.assignment.handys.urbanstay.account.service
 import com.marco.assignment.handys.urbanstay.TestcontainersConfiguration
 import com.marco.assignment.handys.urbanstay.account.entity.AppAdmin
 import com.marco.assignment.handys.urbanstay.account.repository.AppAdminRepository
+import com.marco.assignment.handys.urbanstay.member.service.MemberUserDetailsService
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -46,11 +47,12 @@ class AppAdminUserDetailsServiceTest {
 	}
 
 	@Test
-	fun `UserDetailsService 빈은 전체 어드민용과 호텔 계정용뿐이라 Spring Boot 기본 사용자를 만들지 않는다`() {
+	fun `UserDetailsService 빈은 전체 어드민용, 호텔 계정용, 게스트 앱 회원용뿐이라 Spring Boot 기본 사용자를 만들지 않는다`() {
 		assertThat(applicationContext.getBeansOfType(UserDetailsService::class.java).values)
-			.hasSize(2)
+			.hasSize(3)
 			.hasAtLeastOneElementOfType(AppAdminUserDetailsService::class.java)
 			.hasAtLeastOneElementOfType(HotelAdminUserDetailsService::class.java)
+			.hasAtLeastOneElementOfType(MemberUserDetailsService::class.java)
 	}
 
 	companion object {

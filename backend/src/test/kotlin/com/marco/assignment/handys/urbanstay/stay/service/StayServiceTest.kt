@@ -11,6 +11,8 @@ import com.marco.assignment.handys.urbanstay.guest.entity.Guest
 import com.marco.assignment.handys.urbanstay.guest.repository.GuestRepository
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRepository
+import com.marco.assignment.handys.urbanstay.member.entity.Member
+import com.marco.assignment.handys.urbanstay.member.repository.MemberRepository
 import com.marco.assignment.handys.urbanstay.room.entity.Room
 import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
@@ -61,6 +63,9 @@ class StayServiceTest {
 	private lateinit var hotelAdminRepository: HotelAdminRepository
 
 	@Autowired
+	private lateinit var memberRepository: MemberRepository
+
+	@Autowired
 	private lateinit var transactionManager: PlatformTransactionManager
 
 	@Autowired
@@ -78,12 +83,17 @@ class StayServiceTest {
 
 	private lateinit var hotelAdmin: HotelAdmin
 
+	private lateinit var guestMember: Member
+
+	private val createdMemberIds = mutableListOf<Long>()
+
 	@BeforeEach
 	fun createRoomAndGuest() {
 		hotel = hotelRepository.save(Hotel("어반스테이 $suffix", "서울 $suffix", PHONE, null))
 		room = saveRoom("101", STANDARD)
 		guest = guestRepository.save(Guest(hotel, "홍길동", "010-1234-5678", "guest@example.com"))
 		hotelAdmin = hotelAdminRepository.save(HotelAdmin(hotel, "master-$suffix@test.local", "password-hash", "마스터", HotelAdminRole.MASTER))
+		guestMember = saveMember(guest.name, guest.phone)
 	}
 
 	@AfterEach
@@ -92,15 +102,18 @@ class StayServiceTest {
 		DELETE_BY_HOTEL.forEach { jdbcTemplate.update(it, hotel.id) }
 		hotelAdminRepository.deleteById(checkNotNull(hotelAdmin.id))
 		hotelRepository.deleteById(checkNotNull(hotel.id))
+		memberRepository.deleteAllByIdInBatch(createdMemberIds)
 	}
 
 	@Test
 	fun `같은 유형의 먼저 온 예약이 커밋되기 전이면 다음 예약은 그 유형 객실의 잠금을 기다렸다가 커밋된 이용을 보고 다음 이름순 객실을 배정한다`() {
 		saveRoom("102", STANDARD)
+		val firstMember = saveMember(FIRST_NAME, NEW_PHONE)
+		val secondMember = saveMember(SECOND_NAME, OTHER_PHONE)
 
 		val second = runSecondWhileFirstUncommitted(
-			first = { reserve(STANDARD, TODAY, TODAY.plusDays(2), FIRST_NAME, NEW_PHONE) },
-			second = { reserve(STANDARD, TODAY.plusDays(1), TODAY.plusDays(3), SECOND_NAME, OTHER_PHONE) },
+			first = { reserve(STANDARD, TODAY, TODAY.plusDays(2), firstMember) },
+			second = { reserve(STANDARD, TODAY.plusDays(1), TODAY.plusDays(3), secondMember) },
 			lockedQuery = ROOM_LOCK,
 		)
 
@@ -110,9 +123,11 @@ class StayServiceTest {
 
 	@Test
 	fun `같은 유형의 먼저 온 예약이 마지막 빈 객실로 커밋되면 잠금을 기다린 다음 예약은 ROOM_TYPE_UNAVAILABLE로 거절되고 새 이용객도 남지 않는다`() {
+		val secondMember = saveMember(SECOND_NAME, NEW_PHONE)
+
 		val second = runSecondWhileFirstUncommitted(
 			first = { create(TODAY, TODAY.plusDays(2)) },
-			second = { reserve(STANDARD, TODAY.plusDays(1), TODAY.plusDays(3), SECOND_NAME, NEW_PHONE) },
+			second = { reserve(STANDARD, TODAY.plusDays(1), TODAY.plusDays(3), secondMember) },
 			lockedQuery = ROOM_LOCK,
 		)
 
@@ -124,9 +139,11 @@ class StayServiceTest {
 
 	@Test
 	fun `잠금을 거치지 않고 넣은 겹치는 이용이 커밋되기 전이라 빈 객실로 보고 배정한 예약도 DB 배제 제약에 막혀 STAY_PERIOD_OVERLAPPED로 거절되고 새 이용객도 남지 않는다`() {
+		val secondMember = saveMember(SECOND_NAME, NEW_PHONE)
+
 		val second = runSecondWhileFirstUncommitted(
 			first = { jdbcTemplate.update(INSERT_STAY, room.id, guest.id, TODAY, TODAY.plusDays(3)) },
-			second = { reserve(STANDARD, TODAY.plusDays(2), TODAY.plusDays(4), SECOND_NAME, NEW_PHONE) },
+			second = { reserve(STANDARD, TODAY.plusDays(2), TODAY.plusDays(4), secondMember) },
 			lockedQuery = "insert into stay",
 		)
 
@@ -137,12 +154,13 @@ class StayServiceTest {
 	}
 
 	@Test
-	fun `다른 유형으로 먼저 온 같은 새 이용객의 예약이 커밋되기 전이라 이용객을 찾지 못한 예약도 이용객 등록에서 기다렸다가 먼저 등록된 이용객으로 예약하고 이용객은 하나만 남는다`() {
+	fun `같은 회원이 다른 유형으로 먼저 한 예약이 커밋되기 전이라 이용객을 찾지 못한 예약도 이용객 등록에서 기다렸다가 먼저 등록된 이용객으로 예약하고 이용객은 하나만 남는다`() {
 		saveRoom("201", DELUXE)
+		val firstMember = saveMember(FIRST_NAME, NEW_PHONE)
 
 		val second = runSecondWhileFirstUncommitted(
-			first = { reserve(STANDARD, TODAY, TODAY.plusDays(2), FIRST_NAME, NEW_PHONE) },
-			second = { reserve(DELUXE, TODAY, TODAY.plusDays(2), SECOND_NAME, NEW_PHONE.replace("-", "")) },
+			first = { reserve(STANDARD, TODAY, TODAY.plusDays(2), firstMember) },
+			second = { reserve(DELUXE, TODAY, TODAY.plusDays(2), firstMember) },
 			lockedQuery = "insert into guest",
 		)
 
@@ -174,10 +192,13 @@ class StayServiceTest {
 	private fun roomType(name: String): RoomType =
 		roomTypes.getOrPut(name) { roomTypeRepository.save(RoomType(hotel, name, 2, 100000, LocalTime.of(15, 0), LocalTime.of(11, 0))) }
 
-	private fun create(checkInDate: LocalDate, checkOutDate: LocalDate) = reserve(STANDARD, checkInDate, checkOutDate, guest.name, guest.phone)
+	private fun create(checkInDate: LocalDate, checkOutDate: LocalDate) = reserve(STANDARD, checkInDate, checkOutDate, guestMember)
 
-	private fun reserve(roomType: String, checkInDate: LocalDate, checkOutDate: LocalDate, name: String, phone: String) =
-		stayService.reserve(checkNotNull(hotel.id), checkNotNull(roomType(roomType).id), checkInDate, checkOutDate, 2, name, phone, "guest@example.com")
+	private fun reserve(roomType: String, checkInDate: LocalDate, checkOutDate: LocalDate, member: Member) =
+		stayService.reserve(checkNotNull(member.id), checkNotNull(hotel.id), checkNotNull(roomType(roomType).id), checkInDate, checkOutDate, 2)
+
+	private fun saveMember(name: String, phone: String): Member =
+		memberRepository.save(Member("member-${UUID.randomUUID()}@test.local", "password-hash", name, phone)).also { createdMemberIds += checkNotNull(it.id) }
 
 	private fun cancel(stayId: Long, reason: String) = stayService.cancel(checkNotNull(hotel.id), stayId, checkNotNull(hotelAdmin.id), reason)
 

@@ -3,7 +3,9 @@ package com.marco.assignment.handys.urbanstay.guest.service
 import com.marco.assignment.handys.urbanstay.TestcontainersConfiguration
 import com.marco.assignment.handys.urbanstay.common.exception.BusinessException
 import com.marco.assignment.handys.urbanstay.common.exception.ErrorCode
+import com.marco.assignment.handys.urbanstay.guest.entity.Guest
 import com.marco.assignment.handys.urbanstay.guest.exception.GuestErrorCode
+import com.marco.assignment.handys.urbanstay.guest.repository.GuestRepository
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRepository
 import org.assertj.core.api.Assertions.assertThat
@@ -28,6 +30,9 @@ class GuestServiceTest {
 
 	@Autowired
 	private lateinit var guestService: GuestService
+
+	@Autowired
+	private lateinit var guestRepository: GuestRepository
 
 	@Autowired
 	private lateinit var hotelRepository: HotelRepository
@@ -84,7 +89,7 @@ class GuestServiceTest {
 		assertThat(jdbcTemplate.queryForObject(SELECT_VERSION, Long::class.java, guestId)).isEqualTo(1)
 	}
 
-	private fun create(name: String, phone: String) = guestService.getOrCreate(checkNotNull(hotel.id), name, phone, EMAIL)
+	private fun create(name: String, phone: String) = guestRepository.save(Guest(hotel, name, phone, EMAIL))
 
 	private fun update(guestId: Long, name: String, phone: String = PHONE) = guestService.update(checkNotNull(hotel.id), guestId, 0, name, phone, EMAIL)
 

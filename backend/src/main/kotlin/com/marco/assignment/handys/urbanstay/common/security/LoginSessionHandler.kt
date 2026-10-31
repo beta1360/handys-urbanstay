@@ -16,7 +16,7 @@ import org.springframework.security.web.csrf.CsrfTokenRepository
 import org.springframework.security.web.csrf.XorCsrfTokenRequestAttributeHandler
 
 class LoginSessionHandler(
-	csrfTokenRepository: CsrfTokenRepository,
+	csrfTokenRepository: CsrfTokenRepository?,
 	private val securityContextRepository: SecurityContextRepository,
 	sessionCookieName: String,
 ) {
@@ -24,16 +24,18 @@ class LoginSessionHandler(
 	private val securityContextHolderStrategy = SecurityContextHolder.getContextHolderStrategy()
 
 	private val sessionAuthenticationStrategy = CompositeSessionAuthenticationStrategy(
-		listOf(
+		listOfNotNull(
 			ChangeSessionIdAuthenticationStrategy(),
-			CsrfAuthenticationStrategy(csrfTokenRepository).apply { setRequestHandler(eagerCsrfTokenRequestHandler()) },
+			csrfTokenRepository?.let { CsrfAuthenticationStrategy(it).apply { setRequestHandler(eagerCsrfTokenRequestHandler()) } },
 		),
 	)
 
 	private val logoutHandler = CompositeLogoutHandler(
-		CsrfLogoutHandler(csrfTokenRepository),
-		CookieClearingLogoutHandler(sessionCookieName),
-		SecurityContextLogoutHandler().apply { setSecurityContextRepository(securityContextRepository) },
+		listOfNotNull(
+			csrfTokenRepository?.let(::CsrfLogoutHandler),
+			CookieClearingLogoutHandler(sessionCookieName),
+			SecurityContextLogoutHandler().apply { setSecurityContextRepository(securityContextRepository) },
+		),
 	)
 
 	fun login(authentication: Authentication, request: HttpServletRequest, response: HttpServletResponse) {

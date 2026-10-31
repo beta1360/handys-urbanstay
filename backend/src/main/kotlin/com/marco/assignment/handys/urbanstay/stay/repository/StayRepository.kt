@@ -15,6 +15,8 @@ import java.time.LocalDate
 
 private const val ROOM = "room"
 private const val GUEST = "guest"
+private const val ROOM_HOTEL = "room.hotel"
+private const val ROOM_ROOM_TYPE = "room.roomType"
 
 interface StayRepository : JpaRepository<Stay, Long>, JpaSpecificationExecutor<Stay> {
 
@@ -23,6 +25,9 @@ interface StayRepository : JpaRepository<Stay, Long>, JpaSpecificationExecutor<S
 
 	@EntityGraph(attributePaths = [ROOM, GUEST])
 	override fun findAll(spec: Specification<Stay>, pageable: Pageable): Page<Stay>
+
+	@EntityGraph(attributePaths = [ROOM_HOTEL, ROOM_ROOM_TYPE])
+	fun findByGuestMemberId(memberId: Long, pageable: Pageable): Page<Stay>
 
 	@Modifying(flushAutomatically = true, clearAutomatically = true)
 	@Query(

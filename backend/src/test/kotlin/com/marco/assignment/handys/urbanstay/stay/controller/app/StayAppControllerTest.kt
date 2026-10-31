@@ -6,16 +6,19 @@ import com.marco.assignment.handys.urbanstay.FixedClockConfiguration.Companion.T
 import com.marco.assignment.handys.urbanstay.TestcontainersConfiguration
 import com.marco.assignment.handys.urbanstay.account.entity.HotelAdmin
 import com.marco.assignment.handys.urbanstay.account.entity.HotelAdminRole
-import com.marco.assignment.handys.urbanstay.account.entity.LoginId
 import com.marco.assignment.handys.urbanstay.account.repository.HotelAdminRepository
 import com.marco.assignment.handys.urbanstay.common.ApiPaths
 import com.marco.assignment.handys.urbanstay.common.exception.CommonErrorCode
 import com.marco.assignment.handys.urbanstay.common.exception.ErrorCode
 import com.marco.assignment.handys.urbanstay.guest.entity.Guest
+import com.marco.assignment.handys.urbanstay.guest.exception.GuestErrorCode
 import com.marco.assignment.handys.urbanstay.guest.repository.GuestRepository
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelErrorCode
 import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRepository
+import com.marco.assignment.handys.urbanstay.member.entity.Member
+import com.marco.assignment.handys.urbanstay.member.repository.MemberRepository
+import com.marco.assignment.handys.urbanstay.member.service.MemberPrincipal
 import com.marco.assignment.handys.urbanstay.room.entity.Room
 import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
@@ -39,6 +42,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.MvcResult
 import org.springframework.test.web.servlet.ResultActionsDsl
@@ -84,6 +88,9 @@ class StayAppControllerTest {
 	private lateinit var stayRepository: StayRepository
 
 	@Autowired
+	private lateinit var memberRepository: MemberRepository
+
+	@Autowired
 	private lateinit var messageSource: MessageSource
 
 	@Autowired
@@ -108,6 +115,14 @@ class StayAppControllerTest {
 
 	private lateinit var hotelAdmin: HotelAdmin
 
+	private lateinit var otherGuest: Guest
+
+	private lateinit var member: Member
+
+	private lateinit var newMember: Member
+
+	private val createdMemberIds = mutableListOf<Long>()
+
 	@BeforeEach
 	fun createRoomsAndGuests() {
 		hotel = saveHotel("어반스테이 $suffix")
@@ -115,14 +130,17 @@ class StayAppControllerTest {
 		room = saveRoom(hotel, "101")
 		otherRoom = saveRoom(hotel, "102")
 		guest = guestRepository.save(Guest(hotel, "홍길동", PHONE, EMAIL))
-		guestRepository.save(Guest(otherHotel, "다른 호텔 이용객", PHONE, EMAIL))
+		otherGuest = guestRepository.save(Guest(otherHotel, "다른 호텔 이용객", PHONE, EMAIL))
 		hotelAdmin = hotelAdminRepository.save(HotelAdmin(hotel, "master-$suffix@test.local", "password-hash", "계정", HotelAdminRole.MASTER))
+		member = saveMember("member-$suffix@test.local", "회원 홍길동", "01012345678")
+		newMember = saveMember("new-$suffix@test.local", "새 회원", "010-7777-6666")
 	}
 
 	@AfterEach
 	fun deleteHotels() {
 		createdHotelIds.forEach { hotelId -> DELETE_BY_HOTEL.forEach { jdbcTemplate.update(it, hotelId) } }
 		hotelRepository.deleteAllByIdInBatch(createdHotelIds)
+		memberRepository.deleteAllByIdInBatch(createdMemberIds)
 	}
 
 	@Test
@@ -208,37 +226,90 @@ class StayAppControllerTest {
 	}
 
 	@Test
-	fun `로그인과 CSRF 토큰 없이 새 이용객으로 유형을 예약하면 이름순(숫자 크기) 첫 객실을 상태와 관계없이 배정해 이용객과 함께 저장하고 201로 호수 없이 응답한다`() {
+	fun `회원이 그 호텔에 없던 전화번호로 유형을 예약하면 이름순(숫자 크기) 첫 객실을 상태와 관계없이 배정하고 회원 정보로 이용객을 만들어 연결하며 201로 호수 없이 응답한다`() {
 		val first = saveRoom(hotel, "99")
 		jdbcTemplate.update(UPDATE_ROOM_STATUS, RoomStatus.MAINTENANCE.name, first.id)
-		val newGuest = mapOf("name" to " 김철수 ", "phone" to " 010-9999-8888 ", "email" to " Kim@Example.com ")
+		val kim = saveMember("Kim-$suffix@Example.com", " 김철수 ", " 010-9999-8888 ")
 
-		val result = reserve(body(TODAY, TODAY.plusDays(2), guestCount = CAPACITY, guest = newGuest)).andReturn()
-		val data = result.andExpectSuccess(HttpStatus.CREATED)
+		val data = reserve(body(TODAY, TODAY.plusDays(2), guestCount = CAPACITY), kim).andReturn().andExpectSuccess(HttpStatus.CREATED)
 
 		val id = data["id"].longValue()
 		assertThat(data).isEqualTo(stayJson(id, TODAY, TODAY.plusDays(2), CAPACITY, "김철수"))
-		assertThat(result.request.getSession(false)).isNull()
-		assertThat(result.response.cookies).isEmpty()
 		assertThat(stayRooms()).containsExactly("99")
 		assertThat(jdbcTemplate.queryForList(SELECT_STAY_AMOUNTS, id).single().values.map { (it as Number).toLong() })
 			.containsExactly(ROOM_RATE.toLong(), 2L, ROOM_RATE * 2L, 0L, ROOM_RATE * 2L)
-		assertThat(guests(hotel)).containsExactly(listOf("홍길동", PHONE, EMAIL), listOf("김철수", "010-9999-8888", "Kim@Example.com"))
-		assertThat(jdbcTemplate.queryForObject(SELECT_GUEST_NAME_OF_STAY, String::class.java, id)).isEqualTo("김철수")
+		assertThat(guests(hotel)).containsExactly(listOf("홍길동", PHONE, EMAIL), listOf("김철수", "010-9999-8888", "kim-$suffix@example.com"))
+		assertThat(jdbcTemplate.queryForObject(SELECT_GUEST_MEMBER_OF_STAY, Long::class.java, id)).isEqualTo(kim.id)
 		assertThat(jdbcTemplate.queryForObject(SELECT_GUEST_CREATED_AT, Timestamp::class.java, id)?.toInstant()).isEqualTo(NOW)
 		assertThat(jdbcTemplate.queryForObject(SELECT_ROOM_STATUS, String::class.java, first.id)).isEqualTo(RoomStatus.MAINTENANCE.name)
 	}
 
 	@Test
-	fun `같은 호텔에 숫자가 같은 전화번호의 이용객이 있으면 그 이용객으로 예약하고 이름과 이메일은 바꾸지 않는다`() {
-		val sameGuest = mapOf("name" to "다른 이름", "phone" to "01012345678", "email" to "other@example.com")
-
-		val data = reserve(body(TODAY, TODAY.plusDays(1), guest = sameGuest)).andReturn().andExpectSuccess(HttpStatus.CREATED)
+	fun `같은 호텔에 숫자가 같은 전화번호의 이용객이 있으면 그 이용객으로 예약해 회원과 연결하고 이름과 이메일은 바꾸지 않는다`() {
+		val data = reserve(body(TODAY, TODAY.plusDays(1))).andReturn().andExpectSuccess(HttpStatus.CREATED)
+		reserve(body(TODAY.plusDays(1), TODAY.plusDays(2))).andReturn().andExpectSuccess(HttpStatus.CREATED)
 
 		assertThat(data["guest"]["name"].stringValue()).isEqualTo("홍길동")
 		assertThat(guests(hotel)).containsExactly(listOf("홍길동", PHONE, EMAIL))
 		assertThat(guests(otherHotel)).containsExactly(listOf("다른 호텔 이용객", PHONE, EMAIL))
 		assertThat(jdbcTemplate.queryForObject(SELECT_GUEST_ID_OF_STAY, Long::class.java, data["id"].longValue())).isEqualTo(guest.id)
+		assertThat(jdbcTemplate.queryForList(SELECT_GUEST_MEMBER, Long::class.java, guest.id, otherGuest.id)).containsExactly(member.id, null)
+	}
+
+	@Test
+	fun `로그인하지 않고 예약하면 401 UNAUTHORIZED로 응답하고 저장하지 않는다`() {
+		reserve(body(TODAY, TODAY.plusDays(1)), null).andExpectError(CommonErrorCode.UNAUTHORIZED)
+
+		assertThat(stayRooms()).isEmpty()
+	}
+
+	@Test
+	fun `같은 전화번호의 이용객이 이미 다른 회원과 연결되어 있으면 409 GUEST_LINKED_TO_OTHER_MEMBER로 응답하고 예약하지 않는다`() {
+		jdbcTemplate.update(UPDATE_GUEST_MEMBER, newMember.id, guest.id)
+
+		reserve(body(TODAY, TODAY.plusDays(1))).andExpectError(GuestErrorCode.GUEST_LINKED_TO_OTHER_MEMBER)
+
+		assertThat(stayRooms()).isEmpty()
+		assertThat(jdbcTemplate.queryForList(SELECT_GUEST_MEMBER, Long::class.java, guest.id, guest.id)).containsExactly(newMember.id)
+	}
+
+	@Test
+	fun `내 이용 목록은 회원과 연결된 모든 호텔 이용객의 이용을 취소 포함 체크인 늦은 순(같으면 id 내림차순)으로 주고 로그인하지 않으면 401이다`() {
+		jdbcTemplate.update(UPDATE_GUEST_MEMBER, member.id, guest.id)
+		jdbcTemplate.update(UPDATE_GUEST_MEMBER, member.id, otherGuest.id)
+		val stranger = guestRepository.save(Guest(hotel, "다른 사람", "010-3333-4444", EMAIL))
+		val first = saveStay(room, TODAY.plusDays(1), TODAY.plusDays(3))
+		val canceled = saveStay(otherRoom, TODAY.plusDays(1), TODAY.plusDays(2)).also(::cancelStay)
+		val other = saveStay(saveRoom(otherHotel, "501", "디럭스"), TODAY.plusDays(5), TODAY.plusDays(6), otherGuest)
+		saveStay(otherRoom, TODAY.plusDays(10), TODAY.plusDays(11), stranger)
+
+		val data = myStays(member).andReturn().andExpectSuccess(HttpStatus.OK)
+
+		assertThat(data["totalElements"].longValue()).isEqualTo(3)
+		assertThat(data["items"].values().map { it["id"].longValue() }).containsExactly(other.id, canceled.id, first.id)
+		assertThat(data["items"][0]).isEqualTo(
+			json(
+				jsonMapper.writeValueAsString(
+					linkedMapOf(
+						"id" to other.id,
+						"hotel" to linkedMapOf("id" to otherHotel.id, "name" to otherHotel.name),
+						"roomType" to linkedMapOf("id" to roomType(otherHotel, "디럭스").id, "name" to "디럭스"),
+						"checkInDate" to TODAY.plusDays(5).toString(),
+						"checkOutDate" to TODAY.plusDays(6).toString(),
+						"guestCount" to 2,
+						"roomRate" to ROOM_RATE,
+						"nights" to 1,
+						"baseAmount" to ROOM_RATE,
+						"discountAmount" to 0,
+						"totalAmount" to ROOM_RATE,
+						"canceledAt" to null,
+					),
+				),
+			),
+		)
+		assertThat(data["items"].values().map { it["canceledAt"].isNull }).containsExactly(true, false, true)
+		assertThat(myStays(newMember).andReturn().andExpectSuccess(HttpStatus.OK)["items"].isEmpty).isTrue()
+		myStays(null).andExpectError(CommonErrorCode.UNAUTHORIZED)
 	}
 
 	@ParameterizedTest
@@ -257,24 +328,19 @@ class StayAppControllerTest {
 	) {
 		val expected = listOfNotNull(checkInKey?.let { "checkInDate" to message(it) }, checkOutKey?.let { "checkOutDate" to message(it, "max" to "30") })
 
-		reserve(body(TODAY.plusDays(checkIn), TODAY.plusDays(checkOut), guest = NEW_GUEST)).andExpectError(CommonErrorCode.INVALID_INPUT, *expected.toTypedArray())
+		reserve(body(TODAY.plusDays(checkIn), TODAY.plusDays(checkOut)), newMember).andExpectError(CommonErrorCode.INVALID_INPUT, *expected.toTypedArray())
 
 		assertThat(stayRooms()).isEmpty()
 		assertThat(guests(hotel)).hasSize(1)
 	}
 
 	@Test
-	fun `인원이 1보다 적으면 guestCount로, 유형·호텔·이용객 항목이 빠졌거나 틀리면 그 경로로 400 응답하고 저장하지 않는다`() {
+	fun `인원이 1보다 적으면 guestCount로, 유형·호텔 항목이 빠졌거나 틀리면 그 경로로, 없앤 이용객 항목을 보내면 알 수 없는 항목으로 400 응답하고 저장하지 않는다`() {
 		reserve(body(TODAY, TODAY.plusDays(1), guestCount = 0)).andExpectError(CommonErrorCode.INVALID_INPUT, "guestCount" to message(MIN, "value" to "1"))
 		reserve(body(TODAY, TODAY.plusDays(1)) - "roomTypeId").andExpectError(CommonErrorCode.INVALID_INPUT, "roomTypeId" to message("validation.required"))
 		reserve(body(TODAY, TODAY.plusDays(1)) - "hotelId").andExpectError(CommonErrorCode.INVALID_INPUT, "hotelId" to message("validation.required"))
-		reserve(body(TODAY, TODAY.plusDays(1), guest = mapOf("name" to " ", "phone" to "1234567", "email" to "guest"))).andExpectError(
-			CommonErrorCode.INVALID_INPUT,
-			"guest.name" to message("validation.required"),
-			"guest.phone" to message("validation.phone"),
-			"guest.email" to message("validation.email"),
-		)
-		reserve(body(TODAY, TODAY.plusDays(1)) - "guest").andExpectError(CommonErrorCode.INVALID_INPUT, "guest" to message("validation.required"))
+		reserve(body(TODAY, TODAY.plusDays(1)) + ("guest" to mapOf("name" to "홍길동", "phone" to PHONE, "email" to EMAIL)))
+			.andExpectError(CommonErrorCode.INVALID_INPUT, "guest" to message("validation.unknown-field"))
 
 		assertThat(stayRooms()).isEmpty()
 		assertThat(guests(hotel)).hasSize(1)
@@ -289,10 +355,10 @@ class StayAppControllerTest {
 
 		reserve(body(TODAY.plusDays(4), TODAY.plusDays(6), guestCount = 3)).andReturn().andExpectSuccess(HttpStatus.CREATED)
 		reserve(body(TODAY.plusDays(5), TODAY.plusDays(7), guestCount = CAPACITY)).andReturn().andExpectSuccess(HttpStatus.CREATED)
-		reserve(body(TODAY.plusDays(5), TODAY.plusDays(6), guestCount = 1, guest = NEW_GUEST)).andExpectError(RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
+		reserve(body(TODAY.plusDays(5), TODAY.plusDays(6), guestCount = 1), newMember).andExpectError(RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
 		reserve(body(TODAY.plusDays(7), TODAY.plusDays(9))).andReturn().andExpectSuccess(HttpStatus.CREATED)
-		reserve(body(TODAY.plusDays(20), TODAY.plusDays(21), guestCount = CAPACITY + 1, guest = NEW_GUEST)).andExpectError(RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
-		reserve(body(TODAY.plusDays(20), TODAY.plusDays(21), roomTypeId = emptyType.id, guest = NEW_GUEST)).andExpectError(RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
+		reserve(body(TODAY.plusDays(20), TODAY.plusDays(21), guestCount = CAPACITY + 1), newMember).andExpectError(RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
+		reserve(body(TODAY.plusDays(20), TODAY.plusDays(21), roomTypeId = emptyType.id), newMember).andExpectError(RoomErrorCode.ROOM_TYPE_UNAVAILABLE)
 
 		assertThat(stayRooms()).containsExactly("101", "102", "102", "103", "101")
 		assertThat(guests(hotel)).hasSize(1)
@@ -303,7 +369,7 @@ class StayAppControllerTest {
 		saveRoom(otherHotel, "301", "디럭스")
 
 		listOf(hotel.id to MISSING_ID, hotel.id to roomType(otherHotel, "디럭스").id, MISSING_ID to roomType(hotel).id).forEach { (hotelId, roomTypeId) ->
-			reserve(body(TODAY, TODAY.plusDays(1), roomTypeId = roomTypeId, guest = NEW_GUEST) + ("hotelId" to hotelId)).andExpectError(RoomErrorCode.ROOM_TYPE_NOT_FOUND)
+			reserve(body(TODAY, TODAY.plusDays(1), roomTypeId = roomTypeId) + ("hotelId" to hotelId), newMember).andExpectError(RoomErrorCode.ROOM_TYPE_NOT_FOUND)
 		}
 
 		assertThat(stayRooms()).isEmpty()
@@ -323,37 +389,49 @@ class StayAppControllerTest {
 	}
 
 	@Test
-	fun `예약 API 문서는 게스트 앱 그룹의 stay 태그에 객실 유형·이용 에러 예시와 요청 규칙을 보여준다`() {
+	fun `예약과 내 이용 API 문서는 게스트 앱 그룹의 stay 태그에 로그인 필요(401)와 에러 예시, 이용객 없는 요청을 보여준다`() {
 		val docs = json(mockMvc.get(APP_DOCS).andExpect { status { isOk() } }.andReturn().response.getContentAsString(StandardCharsets.UTF_8))
 		val create = docs["paths"][STAYS]["post"]
+		val myStays = docs["paths"][MY_STAYS]["get"]
 		val schemas = docs["components"]["schemas"]
-		val guestProperties = schemas["StayGuestCreateAppRequest"]["properties"]
 
 		assertThat(create["operationId"].stringValue()).isEqualTo("createStay")
 		assertThat(create["tags"].values().map { it.stringValue() }).containsExactly("stay")
-		assertThat(create["responses"].propertyNames()).containsExactlyInAnyOrder("201", "400", "404", "409", "500")
+		assertThat(create["responses"].propertyNames()).containsExactlyInAnyOrder("201", "400", "401", "404", "409", "500")
+		assertThat(errorCodes(create, HttpStatus.UNAUTHORIZED)).containsExactly(CommonErrorCode.UNAUTHORIZED.code)
 		assertThat(errorCodes(create, HttpStatus.NOT_FOUND)).containsExactly(RoomErrorCode.ROOM_TYPE_NOT_FOUND.code)
-		assertThat(errorCodes(create, HttpStatus.CONFLICT))
-			.containsExactlyInAnyOrder(RoomErrorCode.ROOM_TYPE_UNAVAILABLE.code, StayErrorCode.STAY_PERIOD_OVERLAPPED.code)
-		assertThat(required(schemas["StayCreateAppRequest"]))
-			.containsExactlyInAnyOrder("hotelId", "roomTypeId", "checkInDate", "checkOutDate", "guestCount", "guest")
-		assertThat(required(schemas["StayGuestCreateAppRequest"])).containsExactlyInAnyOrder("name", "phone", "email")
-		assertThat(listOf("name", "phone", "email").map { field -> listOf("maxLength", "pattern").map { guestProperties[field][it]?.asString() } })
-			.containsExactly(
-				listOf(Guest.NAME_MAX_LENGTH.toString(), null),
-				listOf(Guest.PHONE_MAX_LENGTH.toString(), Hotel.PHONE_PATTERN),
-				listOf(Guest.EMAIL_MAX_LENGTH.toString(), LoginId.PATTERN),
-			)
+		assertThat(errorCodes(create, HttpStatus.CONFLICT)).containsExactlyInAnyOrder(
+			RoomErrorCode.ROOM_TYPE_UNAVAILABLE.code,
+			GuestErrorCode.GUEST_LINKED_TO_OTHER_MEMBER.code,
+			StayErrorCode.STAY_PERIOD_OVERLAPPED.code,
+		)
+		assertThat(required(schemas["StayCreateAppRequest"])).containsExactlyInAnyOrder("hotelId", "roomTypeId", "checkInDate", "checkOutDate", "guestCount")
+		assertThat(schemas.propertyNames()).doesNotContain("StayGuestCreateAppRequest")
 		assertThat(schemas["StayAppResponse"]["properties"].propertyNames()).containsExactly(
 			"id", "hotel", "roomType", "checkInDate", "checkOutDate", "guestCount", "roomRate", "nights", "baseAmount", "discountAmount", "totalAmount", "guest",
 		)
+
+		assertThat(myStays["operationId"].stringValue()).isEqualTo("getMyStays")
+		assertThat(myStays["tags"].values().map { it.stringValue() }).containsExactly("stay")
+		assertThat(myStays["responses"].propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "500")
+		assertThat(myStays["parameters"].values().map { it["name"].stringValue() }).containsExactly("page", "size")
+		assertThat(schemas["StayMyAppResponse"]["properties"].propertyNames()).containsExactly(
+			"id", "hotel", "roomType", "checkInDate", "checkOutDate", "guestCount", "roomRate", "nights", "baseAmount", "discountAmount", "totalAmount", "canceledAt",
+		)
 	}
 
-	private fun reserve(body: Map<String, Any?>): ResultActionsDsl =
+	private fun reserve(body: Map<String, Any?>, member: Member? = this.member): ResultActionsDsl =
 		mockMvc.post(STAYS) {
+			member?.let { with(user(MemberPrincipal.from(it))) }
 			contentType = MediaType.APPLICATION_JSON
 			content = jsonMapper.writeValueAsString(body)
 		}
+
+	private fun myStays(member: Member?): ResultActionsDsl =
+		mockMvc.get(MY_STAYS) { member?.let { with(user(MemberPrincipal.from(it))) } }
+
+	private fun saveMember(email: String, name: String, phone: String): Member =
+		memberRepository.save(Member(email, "password-hash", name, phone)).also { createdMemberIds += checkNotNull(it.id) }
 
 	private fun roomTypes(hotelId: Long, vararg params: Pair<String, String>): ResultActionsDsl =
 		mockMvc.get("${ApiPaths.APP}/hotels/$hotelId/room-types") { params.forEach { (name, value) -> param(name, value) } }
@@ -366,7 +444,6 @@ class StayAppControllerTest {
 		checkOut: LocalDate,
 		roomTypeId: Long? = roomType(hotel).id,
 		guestCount: Int = 2,
-		guest: Map<String, Any?> = mapOf("name" to "홍길동", "phone" to PHONE, "email" to EMAIL),
 	): Map<String, Any?> =
 		linkedMapOf(
 			"hotelId" to hotel.id,
@@ -374,7 +451,6 @@ class StayAppControllerTest {
 			"checkInDate" to checkIn.toString(),
 			"checkOutDate" to checkOut.toString(),
 			"guestCount" to guestCount,
-			"guest" to guest,
 		)
 
 	private fun saveHotel(name: String): Hotel =
@@ -387,7 +463,8 @@ class StayAppControllerTest {
 
 	private fun saveRoom(hotel: Hotel, name: String, type: String = STANDARD): Room = roomRepository.save(Room(hotel, name, roomType(hotel, type), null, null))
 
-	private fun saveStay(room: Room, checkIn: LocalDate, checkOut: LocalDate): Stay = stayRepository.save(Stay(room, guest, checkIn, checkOut, 2, ROOM_RATE))
+	private fun saveStay(room: Room, checkIn: LocalDate, checkOut: LocalDate, guest: Guest = this.guest): Stay =
+		stayRepository.save(Stay(room, guest, checkIn, checkOut, 2, ROOM_RATE))
 
 	private fun cancelStay(stay: Stay) {
 		jdbcTemplate.update(CANCEL_STAY, hotelAdmin.id, stay.id)
@@ -475,6 +552,7 @@ class StayAppControllerTest {
 
 	companion object {
 		private const val STAYS = ApiPaths.APP + "/stays"
+		private const val MY_STAYS = ApiPaths.APP + "/me/stays"
 		private const val APP_DOCS = "/v3/api-docs/app"
 		private const val HOTEL_PHONE = "02-1234-5678"
 		private const val PHONE = "010-1234-5678"
@@ -487,13 +565,14 @@ class StayAppControllerTest {
 		private const val JSON = "application/json"
 		private const val MIN = "validation.min"
 		private const val MISSING_ID = Long.MAX_VALUE
-		private val NEW_GUEST = mapOf("name" to "새 이용객", "phone" to "010-7777-6666", "email" to "new@example.com")
 		private const val SELECT_ROOM_STATUS = "select status from room where id = ?"
 		private const val SELECT_STAY_AMOUNTS = "select room_rate, nights, base_amount, discount_amount, total_amount from stay where id = ?"
 		private const val SELECT_STAY_ROOM_NAMES = "select r.name from stay s join room r on r.id = s.room_id where r.hotel_id = ? order by s.id"
 		private const val SELECT_GUESTS = "select name, phone, email from guest where hotel_id = ? order by id"
 		private const val SELECT_GUEST_ID_OF_STAY = "select guest_id from stay where id = ?"
-		private const val SELECT_GUEST_NAME_OF_STAY = "select g.name from stay s join guest g on g.id = s.guest_id where s.id = ?"
+		private const val SELECT_GUEST_MEMBER_OF_STAY = "select g.member_id from stay s join guest g on g.id = s.guest_id where s.id = ?"
+		private const val SELECT_GUEST_MEMBER = "select member_id from guest where id in (?, ?) order by id"
+		private const val UPDATE_GUEST_MEMBER = "update guest set member_id = ? where id = ?"
 		private const val SELECT_GUEST_CREATED_AT = "select g.created_at from stay s join guest g on g.id = s.guest_id where s.id = ?"
 		private const val UPDATE_ROOM_STATUS = "update room set status = ? where id = ?"
 		private const val CANCEL_STAY = "update stay set canceled_at = now(), canceled_by_id = ?, canceled_by_name = '계정' where id = ?"

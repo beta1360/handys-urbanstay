@@ -258,10 +258,13 @@ class OpenApiDocsTest {
 	}
 
 	@Test
-	fun `게스트 그룹 operation에는 401·403 에러 응답이 붙지 않는다`() {
-		val statuses = operations(apiDocs(DocGroup.APP)).flatMap { it.node["responses"].propertyNames() }
+	fun `게스트 그룹은 회원 로그인이 필요한 operation에만 자동 401이 붙고 403은 붙지 않는다`() {
+		val (memberOnly, open) = operations(apiDocs(DocGroup.APP)).partition { SecurityConfig.isMemberApi(it.method.uppercase(), it.path) }
 
-		assertThat(statuses).isNotEmpty().doesNotContain("401", "403")
+		assertThat(memberOnly.map { it.name }).containsExactlyInAnyOrderElementsOf(SecurityConfig.MEMBER_APIS.map { "${it.method.name().lowercase()} ${it.path}" })
+		memberOnly.forEach { assertThat(errorMediaType(it, HttpStatus.UNAUTHORIZED)["example"]).describedAs(it.name).isEqualTo(expectedExample(CommonErrorCode.UNAUTHORIZED)) }
+		assertThat((memberOnly + open).flatMap { it.node["responses"].propertyNames() }).doesNotContain("403")
+		assertThat(open.filter { "401" in it.node["responses"].propertyNames() }.map { it.operationId }).containsExactly("login")
 	}
 
 	@ParameterizedTest

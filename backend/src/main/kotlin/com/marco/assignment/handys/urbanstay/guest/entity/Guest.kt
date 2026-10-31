@@ -2,8 +2,10 @@ package com.marco.assignment.handys.urbanstay.guest.entity
 
 import com.marco.assignment.handys.urbanstay.common.entity.BaseEntity
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
+import com.marco.assignment.handys.urbanstay.member.entity.Member
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
+import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Version
 
@@ -26,6 +28,11 @@ class Guest(
 		protected set
 
 	var email: String = normalize(email)
+		protected set
+
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(updatable = false)
+	var member: Member? = null
 		protected set
 
 	@Version

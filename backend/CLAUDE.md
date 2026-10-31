@@ -96,8 +96,8 @@ urbanstay/
 
 ## 보안
 
-- 경로별 접근 규칙은 `common/config/SecurityConfig`에 둔다. 필터 체인은 어드민 경로용과 그 밖의 경로용 두 개다.
-  - `ApiPaths.APP`: 로그인 없이 쓴다.
+- 경로별 접근 규칙은 `common/config/SecurityConfig`에 둔다. 필터 체인은 어드민 경로용, 게스트 경로용(`ApiPaths.APP`), 그 밖의 경로용 세 개다.
+  - `ApiPaths.APP`: 로그인 없이 쓴다. 회원 로그인이 필요한 API만 `SecurityConfig.MEMBER_APIS`(HTTP 메서드 + 경로)에 적어 `Role.MEMBER`로 막는다(로그인하지 않으면 401 `UNAUTHORIZED`). 지금은 내 정보 조회, 로그아웃, 예약, 내 이용 목록이다. 접근 규칙과 API 문서(app 그룹의 401 자동 에러)가 이 목록 하나를 함께 쓴다.
   - `ApiPaths.APP_ADMIN`: `Role.APP_ADMIN`만, `ApiPaths.HOTEL_ADMIN`: `Role.HOTEL_ADMIN`만 쓴다.
   - 호텔 계정은 모두 `Role.HOTEL_ADMIN`을 받고, 마스터는 `Role.HOTEL_MASTER`도 받는다. 마스터만 쓰는 API는 `Role.HOTEL_MASTER`로 막는다.
     - 경로 규칙(`HOTEL_MASTER_PATTERN`)으로 막는다. 지금은 운영자 관리(`ApiPaths.HOTEL_ADMIN + ApiPaths.OPERATORS` 아래 전부)다. `HOTEL_ADMIN_PATTERN` 규칙보다 먼저 둔다(먼저 맞는 규칙을 쓴다). `/operators/**`는 `/operators`도 포함한다.
@@ -107,20 +107,22 @@ urbanstay/
   - Swagger UI와 API 문서(`/swagger-ui.html`, `/swagger-ui/**`, `/v3/api-docs/**`): 로그인 없이 연다.
   - 그 밖의 경로(actuator 포함)는 막는다. 에러 디스패치는 원래 상태 코드를 유지하도록 연다.
   - 기본 폼 로그인, HTTP Basic, 기본 로그아웃은 끈다.
-- CSRF는 어드민 API에만 SPA 모드(`csrf.spa()`)로 건다. 쿠키 없이 들어온 어드민 API 요청의 응답(401 포함)에 `XSRF-TOKEN` 쿠키(스크립트에서 읽을 수 있음)가 발급되고, 상태를 바꾸는 요청은 같은 값을 `X-XSRF-TOKEN` 헤더로 보낸다. 게스트 API에는 CSRF 필터가 없다.
+- CSRF는 어드민 API에만 SPA 모드(`csrf.spa()`)로 건다. 쿠키 없이 들어온 어드민 API 요청의 응답(401 포함)에 `XSRF-TOKEN` 쿠키(스크립트에서 읽을 수 있음)가 발급되고, 상태를 바꾸는 요청은 같은 값을 `X-XSRF-TOKEN` 헤더로 보낸다. 게스트 API에는 CSRF 필터가 없다. 회원 세션 쿠키가 `SameSite=Lax`라 다른 사이트에서 온 변경 요청에는 세션 쿠키가 실리지 않는다.
 - 보안 에러는 `SecurityErrorHandler`가 공통 형식으로 응답한다.
   - 로그인 안 함: 401 `UNAUTHORIZED`
   - 권한 없음: 403 `FORBIDDEN`
   - CSRF 토큰 없음·불일치: 403 `INVALID_CSRF_TOKEN`. CSRF 검사가 인가보다 먼저라서 로그인하지 않고 토큰 없이 보낸 상태 변경 요청도 이 코드다.
 - 컨트롤러에서 발생한 `AccessDeniedException`, `AuthenticationException`은 `GlobalExceptionHandler`가 다시 던져 Spring Security가 401·403으로 응답한다.
-- 세션은 서버 메모리에 두고 8시간 유지한다. 세션 쿠키는 HttpOnly, SameSite=Lax다(`application.properties`). 게스트 API는 세션을 만들지 않는다.
+- 세션은 서버 메모리에 두고 8시간 유지한다. 세션 쿠키는 HttpOnly, SameSite=Lax다(`application.properties`). 게스트 API는 회원가입·로그인 말고는 세션을 만들지 않는다.
+- 게스트 체인의 SecurityContext는 세션 속성 `URBANSTAY_MEMBER_SECURITY_CONTEXT`(어드민은 기본 키)에 따로 둔다. 같은 세션에 어드민 인증이 있어도 게스트 API에서는 로그인하지 않은 것이고, 회원 세션으로 어드민 API를 부르면 401 `UNAUTHORIZED`다. 회원 세션은 요청마다 다시 확인하지 않는다(회원을 바꾸는 API가 없다).
 - 로그인한 세션은 요청마다 계정을 다시 확인한다. 어드민 필터 체인의 SecurityContext 저장소를 `VerifyingSecurityContextRepository`(`common/security`)로 감싼다.
   - 세션에서 SecurityContext를 처음 꺼낼 때(인가 전) `SessionAuthenticationVerifier` 빈이 모두 통과시켜야 그 인증을 쓴다. 하나라도 거절하면 세션을 무효화하고 로그인하지 않은 요청으로 처리해 401 `UNAUTHORIZED`로 응답한다. CSRF 검사는 그보다 먼저다.
   - 도메인은 자기 계정의 확인 규칙을 `SessionAuthenticationVerifier` 빈으로 둔다. 자기 principal이 아니면 통과시킨다.
   - 호텔 계정은 `HotelAdminSessionVerifier`가 DB에서 다시 읽어, 없거나 비활성이거나 `credential_version`이 세션 값과 다르면 거절한다. 이름 변경은 세션을 끊지 않는다.
   - 전체 어드민 세션은 확인하지 않는다(어드민 계정을 바꾸는 API가 아직 없다).
 - 테스트
-  - 로그인 사용자는 `with(user("tester").roles(Role.APP_ADMIN.name))`로 만든다. 호텔 계정 principal이 필요한 API(세션의 호텔로 범위를 정하는 API)는 저장한 계정으로 만든 principal을 넣는다. 예: `with(user(HotelAdminPrincipal.from(master)))`
+  - 로그인 사용자는 `with(user("tester").roles(Role.APP_ADMIN.name))`로 만든다. 호텔 계정 principal이 필요한 API(세션의 호텔로 범위를 정하는 API)는 저장한 계정으로 만든 principal을 넣는다. 예: `with(user(HotelAdminPrincipal.from(master)))`. 회원 API도 같다. 예: `with(user(MemberPrincipal.from(member)))`
+  - `user(...)`는 SecurityContext를 직접 넣으므로 세션 속성 키 분리(어드민·회원)는 확인하지 못한다. 키 분리와 회원 세션은 `RANDOM_PORT` 서버에서 실제로 가입·로그인해 확인한다(`MemberAppControllerTest`).
   - `user(...)`로 넣은 인증은 테스트가 넣은 SecurityContext를 그대로 써서, principal이 `HotelAdminPrincipal`이어도 요청마다 하는 계정 확인을 거치지 않는다(DB에서 비활성으로 바꿔도 통과한다). 호텔 계정의 세션 동작은 실제 로그인으로 확인한다.
   - CSRF 토큰은 어드민 API 응답의 `XSRF-TOKEN` 쿠키를 받아 `cookie(xsrf)`와 `header("X-XSRF-TOKEN", xsrf.value)`로 보낸다. `csrf()` post-processor는 쓰지 않는다. 캐시된 컨텍스트의 CsrfFilter 저장소를 세션 저장소로 바꿔 다른 테스트에 영향을 준다.
   - `@WebMvcTest`는 `SecurityConfig`, `JacksonConfig`를 읽지 않으므로 `SecurityConfig`, `JacksonConfig`, `SecurityErrorHandler`, `ErrorResponseFactory`를 `@Import`한다. 테스트용 컨트롤러는 열린 경로나 검증할 앱 경로 아래에 둔다.
@@ -130,15 +132,16 @@ urbanstay/
 ## 인증
 
 - 로그인·로그아웃·내 정보 경로는 `{앱 경로}/auth/login`, `/auth/logout`, `/auth/me`다(`ApiPaths.AUTH`, `ApiPaths.LOGIN`).
-- 인증은 앱마다 따로 만든다. 앱의 인증 서비스(`AppAdminAuthService`, `HotelAdminAuthService`)가 그 앱의 `UserDetailsService`와 `PasswordEncoder`로 `DaoAuthenticationProvider`를 만들어 자기 `ProviderManager`에 넣는다. 다른 앱의 계정으로는 인증되지 않는다.
+- 인증은 앱마다 따로 만든다. 앱의 인증 서비스(`AppAdminAuthService`, `HotelAdminAuthService`, 게스트 앱 회원은 `MemberAuthService`)가 그 앱의 `UserDetailsService`와 `PasswordEncoder`로 `DaoAuthenticationProvider`를 만들어 자기 `ProviderManager`에 넣는다. 다른 앱의 계정으로는 인증되지 않는다.
   - Spring Boot의 전역 `AuthenticationManager`는 쓰지 않는다. 앱별 매니저를 `AuthenticationManager` 타입 빈으로 만들지 않는다. 그런 빈이 둘 이상이고 `UserDetailsService` 빈도 둘 이상이면 전역 매니저를 만들다가 시작에 실패한다.
   - 없는 아이디와 틀린 비밀번호는 `DaoAuthenticationProvider`가 같은 예외로, 처리 시간 차이를 줄여 처리한다. 서비스는 이를 도메인 에러(`INVALID_CREDENTIALS`, 401)로 바꾼다. 계정 조회 중 오류는 로그인 실패가 아니라 500으로 응답한다.
   - 로그인할 수 없는 계정(예: 비활성 호텔 계정)은 `UserDetailsService`가 찾지 못한 것으로(`UsernameNotFoundException`) 처리해 없는 아이디와 같은 응답, 같은 처리 시간 균등화를 탄다.
   - `ProviderManager`는 인증 뒤 입력한 비밀번호와 principal의 비밀번호 해시를 지운다(`CredentialsContainer`). 그래서 세션에 비밀번호가 남지 않는다. 직접 만든 principal(`HotelAdminPrincipal`)도 `CredentialsContainer`를 구현한다.
   - 호텔 계정의 principal(`HotelAdminPrincipal`)은 계정 id, 호텔 id, `credential_version`을 담는다. 응답에 쓰는 이름 같은 값은 세션이 아니라 DB에서 읽는다.
   - 로그인한 호텔 계정의 호텔로 범위를 정하는 API는 컨트롤러에서 `@AuthenticationPrincipal HotelAdminPrincipal`을 받아 `hotelId`를 서비스에 넘긴다. 경로나 본문으로 호텔 id를 받지 않는다. springdoc은 이 파라미터를 문서에 넣지 않는다.
-  - `UserDetailsService` 빈이 둘이라 시작할 때 Spring Security가 전역 매니저에 쓰지 않는다는 WARN 로그(`Found 2 UserDetailsService beans`)를 남긴다. 전역 매니저를 쓰지 않으므로 정상이다.
-- 세션 처리는 `common/security/LoginSessionHandler`가 Spring Security 구현체로 한다. `SecurityConfig`가 어드민 필터 체인과 같은 CSRF 토큰 저장소·SecurityContext 저장소를 넘겨 만든다.
+  - `UserDetailsService` 빈이 셋이라 시작할 때 Spring Security가 전역 매니저에 쓰지 않는다는 WARN 로그(`Found 3 UserDetailsService beans`)를 남긴다. 전역 매니저를 쓰지 않으므로 정상이다.
+- 세션 처리는 `common/security/LoginSessionHandler`가 Spring Security 구현체로 한다. `SecurityConfig`가 필터 체인과 같은 CSRF 토큰 저장소·SecurityContext 저장소를 넘겨 앱별로 만든다.
+  - 어드민용 빈(`loginSessionHandler`, `@Primary`)은 어드민 CSRF 토큰 저장소를 받는다. 회원용 빈(`SecurityConfig.MEMBER_LOGIN_SESSION_HANDLER`)은 CSRF 토큰 저장소 없이(null) 회원 SecurityContext 저장소를 받고, 컨트롤러가 `@Qualifier`로 고른다. CSRF 저장소가 없으면 아래의 CSRF 처리(새 토큰 발급, CSRF 쿠키 삭제)를 건너뛴다.
   - 로그인: 세션이 이미 있으면 세션 ID를 바꾸고(`ChangeSessionIdAuthenticationStrategy`), CSRF 토큰을 새로 만들어 응답에 새 `XSRF-TOKEN` 쿠키를 싣고(`CsrfAuthenticationStrategy`), SecurityContext를 세션에 저장한다.
   - 로그아웃: CSRF 쿠키를 지우고(`CsrfLogoutHandler`), 세션 쿠키를 만료시키고(`CookieClearingLogoutHandler`, 이름은 `server.servlet.session.cookie.name`), 세션을 무효화하고 SecurityContext를 비운다(`SecurityContextLogoutHandler`).
   - CSRF 토큰 저장소는 쿠키다. 서버는 토큰을 기억하지 않으므로, 로그인 후 이전 토큰이 거절되는 것은 쿠키가 새 값으로 바뀌어 이전 헤더 값과 맞지 않기 때문이다.
@@ -189,6 +192,21 @@ urbanstay/
   - 호텔 계정이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔의 `hotel_admin`을 먼저 지운다.
   - 세션 확인 규칙만 따로 볼 때의 비활성화와 `credential_version` 변경은 테스트에서 DB를 직접 바꿔 재현한다(`AccountHotelAdminControllerTest`). 그 밖의 테스트에서 비활성 계정이 필요하면 API나 `HotelAdmin.changeActive`로 만든다.
   - 마스터의 아이디 변경·비밀번호 재설정이 세션을 끊는지는 전체 어드민과 마스터가 각자 실제로 로그인한 `RANDOM_PORT` 서버에서 확인한다(`AccountHotelMasterAppAdminSessionTest`). 운영자의 아이디 변경·비밀번호 재설정·비활성화도 마스터와 운영자가 각자 실제로 로그인해 확인하고, 마스터 자신의 세션이 유지되는지도 함께 본다(`AccountHotelOperatorHotelAdminSessionTest`).
+
+## 회원
+
+- 회원(게스트 앱 계정)은 `member` 도메인의 `member` 테이블(`Member`, `V13__create_member.sql`)에 저장한다. 이메일(로그인 아이디), 비밀번호 해시, 이름, 전화번호를 가진다. 수정·탈퇴가 없어 `version`을 두지 않는다.
+  - 이메일은 계정과 같은 규칙이다(`LoginId.PATTERN`, 254자, `LoginId.normalize`로 소문자 저장). 모든 회원을 통틀어 유일하고(`member_email_key`, `Member.EMAIL_UNIQUE_CONSTRAINT`), 사전 확인(`existsByEmail`)과 함께 이 제약 위반도 409 `MemberErrorCode.MEMBER_EMAIL_DUPLICATED`로 바꾼다. 계정 테이블과 따로라 어드민·호텔 계정과 같은 이메일을 써도 된다.
+  - 비밀번호는 계정의 비밀번호 규칙(`@Password`)과 `PasswordEncoder` 해시, 이름은 앞뒤 공백을 지운 1~50자, 전화번호는 이용객과 같은 규칙(`Hotel.PHONE_PATTERN`, 20자, 입력 모양 그대로)이다. DB도 CHECK로 막는다.
+- 게스트 앱 인증(`ApiPaths.APP + ApiPaths.AUTH`, `MemberAppController`): `POST /signup`, `POST /login`, `POST /logout`, `GET /me`. 로그인·로그아웃의 흐름과 문구(`success.auth.login`, `success.auth.logout`)는 어드민과 같고 CSRF만 없다(인증 절).
+  - 가입(`MemberService.signup`)은 저장한 뒤 바로 로그인 세션을 만든다(201, `success.member.signed-up`). 비밀번호를 다시 검사하지 않고 저장한 회원으로 인증 객체를 만든다(`MemberAuthService.authenticated`, 비밀번호 해시를 지운 principal).
+  - 로그인 실패는 계정과 같은 401 `AccountErrorCode.INVALID_CREDENTIALS`다. principal(`MemberPrincipal`)은 회원 id와 이메일을 담고 `Role.MEMBER`를 받는다. 회원으로 범위를 정하는 API는 `@AuthenticationPrincipal MemberPrincipal`의 id를 서비스에 넘긴다.
+  - 로그아웃은 세션을 무효화하고 세션 쿠키를 지운다(API 규약).
+- 전체 어드민의 회원 조회(`ApiPaths.APP_ADMIN + "/members"`의 목록·조회, `MemberAppAdminController`)는 조회만 한다.
+  - 목록은 최근 가입 순(id 내림차순)이다. `keyword`(선택, 100자)는 이름·이메일(대소문자 구분 없이)이나 하이픈을 뺀 전화번호에 들어 있으면 찾는다(`MemberSpecifications.search`, 이스케이프는 목록 조회 절). 하이픈만 있는 검색어는 이름·이메일에서만 찾는다.
+  - 없는 회원은 404 `MEMBER_NOT_FOUND`다.
+  - 회원의 호텔 이용 기록(`/members/{memberId}/stays`)은 이용 절에 있다.
+- 테스트: 가입·로그인·로그아웃과 세션은 `RANDOM_PORT` 서버에 실제 쿠키를 주고받으며 확인한다(`MemberAppControllerTest`). 회원이 연결된 이용객이 있으면 외래 키 때문에 이용객(호텔 id로)을 지운 뒤 회원을 지운다.
 
 ## 객실
 
@@ -260,7 +278,11 @@ urbanstay/
 
 - 이용객은 `guest` 도메인의 `guest` 테이블(`Guest`, `V8__create_guest.sql`)에 저장한다. 한 호텔에 속하고(`hotel_id`, `Hotel`과 JPA 연관관계) 이름, 전화번호, 이메일, 낙관적 잠금 버전(`version`)을 가진다.
   - 이용객은 게스트 앱 예약에서 등록된다(게스트 앱 API 절). hotel-admin에는 등록 API가 없다.
-  - 이용객 삭제는 없다. 게스트 앱 계정과 연결하는 컬럼은 아직 두지 않는다.
+  - 이용객 삭제는 없다.
+- 이용객은 회원과 연결될 수 있다(`member_id`, nullable 외래 키, `V14__add_guest_member_id.sql`). 회원 기능 전에 만든 이용객은 연결되지 않았다.
+  - 연결은 예약의 이용객 찾기·만들기만 한다(게스트 앱 API 절). 새 이용객은 INSERT에서 함께 넣고, 연결되지 않은 기존 이용객은 조건부 UPDATE(`GuestRepository.linkMember`, `where member_id is null or member_id = 회원`)로 연결한다. 0행이면 다른 회원과 연결된 이용객이라 409 `GuestErrorCode.GUEST_LINKED_TO_OTHER_MEMBER`다. 다른 회원의 이용이 내 이용에 섞이지 않게 하려는 가장 단순한 규칙이다.
+  - `Guest.member`는 `@JoinColumn(updatable = false)`라 hotel-admin의 이용객 수정(JPA UPDATE)이 연결을 바꾸지 않는다. 연결은 version을 올리지 않는다.
+  - 회원별 조회에 `guest_member_id_idx`를 쓴다.
 - 값의 규칙
   - 이름은 앞뒤 공백을 지운 뒤 1~50자다. 같은 호텔에서도 겹쳐도 된다.
   - 전화번호는 호텔 대표 전화번호와 같은 규칙과 검증 방식이다(`Hotel.PHONE_PATTERN`, 20자, `@PatternThenMaxLength`). 앞뒤 공백만 지우고 입력한 모양 그대로 저장한다.
@@ -278,7 +300,7 @@ urbanstay/
   - 목록은 같은 호텔의 이용객을 최근 등록 순(id 내림차순)으로 준다. `keyword`(선택, 100자)는 이름 또는 전화번호에서 찾는다(`GuestSpecifications.search`, 이스케이프는 목록 조회 절). 이름은 대소문자 구분 없이, 전화번호는 저장값과 검색어 양쪽의 하이픈을 빼고 부분 일치로 찾는다(`01012345678`로 `010-1234-5678`을 찾는다).
   - 하이픈만 있는 검색어는 하이픈을 빼면 비어 모든 전화번호에 맞으므로 이름에서만 찾는다.
 - 테스트
-  - 수정이 사전 확인을 통과한 뒤 유일 인덱스(하이픈 모양만 다른 번호)와 JPA 버전 검사가 막는 경로는 순서를 고정해 확인한다(`GuestServiceTest`). 테스트 이용객은 `GuestService.getOrCreate`나 저장소로 만든다.
+  - 수정이 사전 확인을 통과한 뒤 유일 인덱스(하이픈 모양만 다른 번호)와 JPA 버전 검사가 막는 경로는 순서를 고정해 확인한다(`GuestServiceTest`). 테스트 이용객은 저장소로 만든다(`GuestService.getOrCreate`는 회원이 필요하다).
   - 이용객이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔의 `guest`를 먼저 지운다.
 
 ## 이용
@@ -301,6 +323,7 @@ urbanstay/
   - 배제 제약은 `V10__add_stay_cancellation.sql`이 같은 이름으로 다시 만들어 취소하지 않은 이용에만 건다.
   - 배제 제약의 gist 인덱스는 취소하지 않은 이용만 담아 취소를 포함한 목록에 쓰이지 않는다. 객실별 조회는 `stay_room_id_check_in_date_id_idx`, 이용객별 조회는 `stay_guest_id_check_in_date_id_idx`를 쓴다.
 - 이용 등록은 게스트 앱 예약(`StayService.reserve`)만 한다(게스트 앱 API 절). 객실 상태와 관계없고 상태를 바꾸지 않는다.
+- 회원의 이용은 회원과 연결된 이용객(모든 호텔)의 이용이다(`StayService.getMemberStays`, 없는 회원은 404 `MEMBER_NOT_FOUND`). 게스트 앱 내 이용과 전체 어드민의 회원 이용 기록(`ApiPaths.APP_ADMIN + "/members/{memberId}/stays"`, `StayAppAdminController`)이 함께 쓴다. 전체 어드민 응답은 호텔 `{ id, name }`, 객실 `{ id, name }`, 유형 `{ id, name }`(조회 시점의 값), 기간, 인원, 금액(예약할 때 저장한 값), `canceledAt`을 담는다(`StayAppAdminResponse`).
 - 이용 관리(`ApiPaths.HOTEL_ADMIN + "/stays"`의 목록·조회와 `/{stayId}/cancel` 취소, `StayHotelAdminController`)는 `StayService`가 한다. 호텔 계정 모두(마스터·운영자)가 쓰고, 전체 어드민 계정은 403 `FORBIDDEN`이다. 등록과 수정은 없다.
   - 조회할 이용은 객실의 호텔로 찾는다(`findByIdAndRoomHotelId`). 없는 id와 다른 호텔의 이용 id는 모두 404 `STAY_NOT_FOUND`다.
   - 목록은 같은 호텔의 이용을 취소한 이용까지 체크인 날짜 내림차순, 같으면 id 내림차순으로 준다. `roomId`·`guestId`·`canceled`(선택)로 거르고 함께 보내면 AND다. 조합이 여덟 가지라 파생 쿼리 대신 `StaySpecifications.search`로 거른다(목록 조회 절). 없거나 다른 호텔의 id로 거르면 빈 목록이다.
@@ -313,34 +336,35 @@ urbanstay/
   - 객실이 예약됨(`RESERVED`)이면 같은 트랜잭션에서 공실(`VACANT`)로 바꾸고 취소한 계정으로 상태 이력을 남긴다(`RoomService.releaseReservation`, `RESERVED → VACANT` 조건부 UPDATE). 이용중·정비중·공실이거나 그사이 상태가 바뀌어 0행이면 그대로 두고 취소는 성공한다.
   - DB도 CHECK로 취소 시각·계정·이름이 함께 있거나 함께 없고, 사유는 취소한 이용에만 있으며(`stay_cancellation_check`), 이름(50자)·사유(200자)는 비지 않고 앞뒤 공백이 없는 값만 받는다. 처리한 계정은 외래 키로 가리킨다.
 - 테스트
-  - 순서를 고정해 확인하는 경로(`StayServiceTest`): 같은 유형의 먼저 온 예약이 커밋되기 전에 다음 예약이 객실 잠금(`for no key update`)을 기다렸다가 다음 이름순 객실을 배정받는 경로와 빈 객실이 없어 `ROOM_TYPE_UNAVAILABLE`이 되는 경로(새 이용객도 남지 않는다), 잠금을 거치지 않고 넣은 겹치는 이용이 커밋되기 전이라 빈 객실로 보고 배정한 예약이 배제 제약에 막히는 경로(`STAY_PERIOD_OVERLAPPED`, 새 이용객도 남지 않는다), 다른 유형으로 온 같은 새 이용객의 예약이 이용객 INSERT에서 먼저 온 예약의 커밋을 기다렸다가 그 이용객으로 예약되는 경로(이용객은 하나, 이름은 먼저 온 값), 먼저 온 취소 때문에 늦은 취소의 조건부 UPDATE가 0행이 되는 경로. 앞의 둘은 `@Lock`을 빼면 잠금을 기다리지 않아 실패하고, 이용객 경로는 `on conflict do nothing`을 빼면 유일 인덱스 위반으로 실패한다.
+  - 순서를 고정해 확인하는 경로(`StayServiceTest`): 같은 유형의 먼저 온 예약이 커밋되기 전에 다음 예약이 객실 잠금(`for no key update`)을 기다렸다가 다음 이름순 객실을 배정받는 경로와 빈 객실이 없어 `ROOM_TYPE_UNAVAILABLE`이 되는 경로(새 이용객도 남지 않는다), 잠금을 거치지 않고 넣은 겹치는 이용이 커밋되기 전이라 빈 객실로 보고 배정한 예약이 배제 제약에 막히는 경로(`STAY_PERIOD_OVERLAPPED`, 새 이용객도 남지 않는다), 같은 회원이 다른 유형으로 동시에 한 예약이 이용객 INSERT에서 먼저 온 예약의 커밋을 기다렸다가 그 이용객으로 예약되는 경로(이용객은 하나), 먼저 온 취소 때문에 늦은 취소의 조건부 UPDATE가 0행이 되는 경로. 앞의 둘은 `@Lock`을 빼면 잠금을 기다리지 않아 실패하고, 이용객 경로는 `on conflict do nothing`을 빼면 유일 인덱스 위반으로 실패한다.
   - 오늘 규칙은 UTC로는 전날인 한국 시각으로 고정한 Clock(`FixedClockConfiguration`)으로 확인한다. 오늘 체크아웃하는 이용은 끝난 이용이다.
   - 이용이 있는 호텔은 외래 키 때문에 지우기 전에 그 호텔 객실의 `stay`를 먼저 지운다. 취소가 객실 상태 이력을 남기므로 `room_status_history`도 객실과 호텔 계정보다 먼저 지운다. 예약은 이용객을 새로 만들 수 있으므로 `guest`는 호텔 id로 지운다.
 
 ## 게스트 앱 API
 
-- 게스트 앱 API(`ApiPaths.APP`)는 로그인 없이 쓰고 CSRF와 세션이 없다(보안 절). 컨트롤러는 도메인마다 `controller/app`(`HotelAppController`, `StayAppController`), DTO는 `dto/app`에 둔다. 문서는 `app` 그룹이고 401·403 자동 에러가 붙지 않는다.
-- 예약 흐름은 호텔 → 날짜·인원 → 객실 유형 → 이용객 정보 → 예약이고 게스트는 객실(호수)을 고르지 않는다. 객실 유형은 마스터가 만든 그 호텔의 유형(객실 유형 절)이다. 게스트 앱의 객실 목록·예약된 기간 API는 없앴다.
+- 게스트 앱 API(`ApiPaths.APP`)는 CSRF가 없고, 호텔·객실 유형 조회는 로그인과 세션 없이 쓴다. 예약·내 이용·내 정보·로그아웃은 회원 로그인이 필요하다(`SecurityConfig.MEMBER_APIS`, 보안 절, 회원 절). 컨트롤러는 도메인마다 `controller/app`(`HotelAppController`, `StayAppController`, `MemberAppController`), DTO는 `dto/app`에 둔다. 문서는 `app` 그룹이고 `MEMBER_APIS`의 operation에만 401 자동 에러가 붙는다(403은 없다).
+- 예약 흐름은 호텔 → 날짜·인원 → 객실 유형 → 예약(로그인한 회원)이고 이용객 정보는 입력하지 않는다. 게스트는 객실(호수)을 고르지 않는다. 객실 유형은 마스터가 만든 그 호텔의 유형(객실 유형 절)이다. 게스트 앱의 객실 목록·예약된 기간 API는 없앴다.
 - 예약할 수 있는 객실은 그 유형이고, 유형의 최대 인원이 인원 이상이고, 그 기간에 취소하지 않은 이용과 겹치지 않는 객실이다(객실 상태 무관). 유형 목록과 예약이 같은 계산(`StayService.availableRooms`)을 쓴다. 겹치는 객실은 `StayRepository.findOverlappedRoomIds`(후보 객실 id 안에서 취소하지 않았고 `check_in_date < 체크아웃 and check_out_date > 체크인`인 이용의 객실 id)로 한 번에 찾는다.
 - 호텔 목록(`GET ApiPaths.APP + "/hotels"`, `HotelService.getHotelsByName`)은 모든 호텔의 `{ id, name, address }`를 이름 오름차순, 같으면 id 오름차순으로 준다. 검색은 없다.
   - `hotel.name`은 `natural_sort`가 아니라 DB 기본 collation으로 정렬한다. 이름 속 숫자는 글자 순서로 비교해(`1001`이 `101`보다 앞) 객실 목록의 이름순과 다를 수 있고, operation 설명에 적는다. collation을 바꾸는 마이그레이션은 유일 제약·전체 어드민 검색까지 바뀌어 게스트 앱 정렬 하나로는 과하다고 보고 하지 않았다.
 - 객실 유형 목록(`GET ApiPaths.APP + "/hotels/{hotelId}/room-types?checkInDate=&checkOutDate=&guestCount="`, `StayService.getRoomTypes`)은 그 호텔 유형마다 `{ id, name, capacity, roomRate, checkInTime, checkOutTime, roomCount, availableCount }`를 유형 이름순(같으면 id, 목록 조회 절)으로 준다. 객실이 없는 유형도 `roomCount` 0, `availableCount` 0으로 나온다. `availableCount`는 그 기간·인원으로 예약할 수 있는 객실 수이고 0이면 화면이 '예약불가'로 보여준다. 페이지 없이 전부 준다(목록 조회 절).
   - 판단 순서는 파라미터(400: 세 파라미터 필수, 날짜 형식(응답과 예외 절), 인원 `@Min(1)`) → 기간(400, 이용 절의 날짜 규칙, `checkInDate`·`checkOutDate`를 모아 한 번에) → 호텔(`RoomTypeService.getRoomTypes`가 `HotelService.getHotel`로 확인, 404 `HOTEL_NOT_FOUND`)이다. 유형이 없는 호텔은 빈 목록이다.
   - 그 호텔 유형을 한 번, 객실을 유형과 함께 한 번 읽고(`findAllByHotelId`, `@EntityGraph`) 겹치는 객실 id를 한 번 찾아(`findOverlappedRoomIds`) 서비스가 유형 id별로 묶는다. 이용 겹침이 필요해 `stay` 도메인(`StayService → RoomService`)에 둔다.
-- 예약(`POST ApiPaths.APP + "/stays"`, 본문 `{ hotelId, roomTypeId, checkInDate, checkOutDate, guestCount, guest: { name, phone, email } }`, `StayService.reserve`)은 서버가 객실을 배정하고 201과 `success.stay.reserved`로 응답한다.
+- 예약(`POST ApiPaths.APP + "/stays"`, 본문 `{ hotelId, roomTypeId, checkInDate, checkOutDate, guestCount }`, `StayService.reserve(memberId, ...)`)은 로그인한 회원만 하고(401 `UNAUTHORIZED`), 서버가 객실을 배정하고 201과 `success.stay.reserved`로 응답한다. 본문에 `guest`를 보내면 400 `validation.unknown-field`다.
   - `roomTypeId`는 유형 목록의 `id`다. 그 호텔의 유형이어야 한다.
-  - 판단 순서는 요청 검증(400, 이용객 칸은 중첩 `@Valid`로 `guest.name` 같은 경로) → 기간(400, 이용 절의 날짜 규칙) → 유형 확인(`RoomTypeService.getRoomType(hotelId, roomTypeId)`, 없거나 다른 호텔의 유형이면 404 `RoomErrorCode.ROOM_TYPE_NOT_FOUND`) → 그 유형 객실 잠금(`RoomService.lockRoomsByType`) → 예약할 수 있는 객실 중 이름순(`natural_sort`, 같으면 id) 첫 객실(없으면 409 `RoomErrorCode.ROOM_TYPE_UNAVAILABLE`) → 이용객 찾기·만들기 → 이용 `saveAndFlush`(배제 제약 위반 409 `STAY_PERIOD_OVERLAPPED`)다. 한 트랜잭션이라 이용 저장이 실패하면 새로 만든 이용객도 남지 않는다.
+  - 판단 순서는 로그인(401) → 요청 검증(400) → 기간(400, 이용 절의 날짜 규칙) → 유형 확인(`RoomTypeService.getRoomType(hotelId, roomTypeId)`, 없거나 다른 호텔의 유형이면 404 `RoomErrorCode.ROOM_TYPE_NOT_FOUND`) → 그 유형 객실 잠금(`RoomService.lockRoomsByType`) → 예약할 수 있는 객실 중 이름순(`natural_sort`, 같으면 id) 첫 객실(없으면 409 `RoomErrorCode.ROOM_TYPE_UNAVAILABLE`) → 이용객 찾기·만들기와 회원 연결(다른 회원과 연결된 이용객이면 409 `GUEST_LINKED_TO_OTHER_MEMBER`) → 이용 `saveAndFlush`(배제 제약 위반 409 `STAY_PERIOD_OVERLAPPED`)다. 한 트랜잭션이라 이용 저장이 실패하면 새로 만든 이용객과 연결도 남지 않는다.
   - 없는 호텔도 그 호텔에 그 유형이 없는 것이므로 `ROOM_TYPE_NOT_FOUND`로 묶는다(호텔을 따로 조회하지 않는다).
   - 인원이 유형의 최대 인원보다 크거나 유형에 객실이 없어도 예약할 수 있는 객실이 없는 것이므로 409 `ROOM_TYPE_UNAVAILABLE`이다. 유형 목록의 `availableCount`가 0인 경우와 같은 규칙이다.
   - 이용은 그 유형의 1박 요금으로 금액을 계산해 저장한다(이용 절).
   - 잠금: `RoomRepository.lockByRoomTypeId`(`@Lock(PESSIMISTIC_WRITE)`, Hibernate의 PostgreSQL 방언은 `for no key update`)이 그 유형 객실 행을 id 오름차순으로 잠근다. 같은 유형 예약끼리는 순서가 같아 교착 없이 줄을 서고, 다른 유형 예약은 서로 기다리지 않는다. 잠근 뒤 `findByIdIn(잠근 id, 이름순)`(`@EntityGraph`로 호텔·유형 함께)으로 다시 읽고, 겹침 조회는 그다음 문장이라 READ COMMITTED에서 먼저 커밋된 예약의 이용을 본다. 잠근 행만 후보로 써서 그사이 유형이 바뀌어 들어온 객실은 고르지 않는다.
     - `for no key update`는 자기끼리와 객실 UPDATE(상태 변경·수정)와는 충돌하지만 이용 INSERT의 외래 키 확인(`for key share`)과는 충돌하지 않는다. 그래서 잠금을 거치지 않은 이용 INSERT가 있으면 배제 제약이 마지막으로 막는다(테스트로 확인).
-  - 이용객 찾기·만들기(`GuestService.getOrCreate`): 그 호텔에서 숫자가 같은 전화번호의 이용객을 찾아(`GuestSpecifications.samePhone`) 있으면 그 이용객으로 예약하고 이름·이메일은 바꾸지 않는다. 없으면 `GuestRepository.insertIfPhoneAbsent`(`insert ... on conflict (hotel_id, (replace(phone, '-', ''))) do nothing`)로 넣은 뒤 다시 찾는다.
+  - 이용객 찾기·만들기(`GuestService.getOrCreate(hotelId, member)`, 회원은 `MemberService.getMember`로 읽는다): 그 호텔에서 회원 전화번호와 숫자가 같은 이용객을 찾아(`GuestSpecifications.samePhone`) 있으면 그 이용객으로 예약하고 이름·이메일은 바꾸지 않는다. 없으면 `GuestRepository.insertIfPhoneAbsent`(`insert ... on conflict (hotel_id, (replace(phone, '-', ''))) do nothing`)로 회원의 이름·전화번호·이메일과 `member_id`를 넣은 뒤 다시 찾는다. 찾은 이용객이 이 회원과 연결되어 있지 않으면 조건부 UPDATE로 연결한다(이용객 절).
     - 이유: 같은 새 이용객의 예약이 동시에 오면 둘 다 찾지 못한다. JPA 저장의 유일 인덱스 위반은 트랜잭션을 깨뜨려(PostgreSQL은 오류 뒤 같은 트랜잭션의 문장을 받지 않는다) 다시 찾거나 이용을 저장할 수 없다. `on conflict do nothing`은 늦은 쪽이 먼저 넣은 행의 커밋을 기다렸다가 아무것도 넣지 않고, READ COMMITTED라 다음 조회가 커밋된 행을 본다. 먼저 쪽이 롤백되면 늦은 쪽이 넣는다.
-    - 네이티브 INSERT는 JPA Auditing과 엔티티 정규화를 거치지 않으므로 서비스가 `Guest.normalize`한 값과 `Instant.now(clock)`을 넘기고 version은 0이다.
+    - 네이티브 INSERT는 JPA Auditing과 엔티티 정규화를 거치지 않으므로 서비스가 회원 엔티티의 값(이미 앞뒤 공백을 지운 값)과 `Instant.now(clock)`을 넘기고 version은 0이다.
     - 알려진 경합: 찾은 뒤 그 이용객의 전화번호가 hotel-admin 수정으로 바뀌어 커밋되면 다시 찾기가 비어 500이 된다. 드물어 다루지 않았다.
   - 응답은 `{ id, hotel: { id, name }, roomType: { id, name }, checkInDate, checkOutDate, guestCount, roomRate, nights, baseAmount, discountAmount, totalAmount, guest: { name } }`이다. 배정한 객실(호수)은 싣지 않는다. 객실은 `findByIdIn`이 호텔과 함께 읽어 트랜잭션 밖에서 응답을 만든다.
-- 테스트는 로그인·CSRF 토큰 없이 요청하고 세션·쿠키가 생기지 않는지 확인한다(`StayAppControllerTest`). 지운 두 API가 404 `NOT_FOUND`이고 문서에 없는 것도 확인한다. 호텔 목록은 다른 테스트의 호텔이 있을 수 있어 `size=100`으로 받아 자기 호텔만 골라 순서를 본다(`HotelAppControllerTest`).
+- 내 이용(`GET ApiPaths.APP + "/me/stays"`, `StayService.getMemberStays`)은 로그인한 회원과 연결된 이용객(모든 호텔)의 이용을 취소 포함 체크인 날짜 내림차순, 같으면 id 내림차순으로 준다(`StayRepository.findByGuestMemberId`, `@EntityGraph`로 객실의 호텔과 유형). 항목은 `{ id, hotel: { id, name }, roomType: { id, name }, checkInDate, checkOutDate, guestCount, roomRate, nights, baseAmount, discountAmount, totalAmount, canceledAt }`(`StayMyAppResponse`)이다. 유형 이름은 조회 시점의 값이고 금액은 예약할 때 저장한 값이다.
+- 테스트는 조회 API를 로그인·CSRF 토큰 없이 요청하고 세션·쿠키가 생기지 않는지 확인한다. 예약·내 이용은 `with(user(MemberPrincipal.from(member)))`로 요청한다(`StayAppControllerTest`). 지운 두 API가 404 `NOT_FOUND`이고 문서에 없는 것도 확인한다. 호텔 목록은 다른 테스트의 호텔이 있을 수 있어 `size=100`으로 받아 자기 호텔만 골라 순서를 본다(`HotelAppControllerTest`).
 
 ## 상수
 
@@ -431,7 +455,7 @@ urbanstay/
   - 오퍼레이션: `openapi.{group}.operation.{operationId}.summary` (필요하면 `.description`)
   - 요청 파라미터: `openapi.{group}.operation.{operationId}.parameter.{name}` (`@Parameter(description = ...)`)
   - 스키마 필드: `openapi.schema.{SchemaName}.{field}`
-- 400·500 공통 에러 응답은 모든 API에 자동으로 붙는다. 어드민 그룹에는 401·403도 붙고(`SecurityConfig.PUBLIC_ADMIN_APIS`의 열린 API는 빼고), 상태를 바꾸는 operation(POST·PUT·PATCH·DELETE)의 403에는 `INVALID_CSRF_TOKEN` 예시가 함께 붙는다. 에러 응답 스키마는 `ErrorApiResponse`이고 `data`와 `message`는 `null` 타입이다.
+- 400·500 공통 에러 응답은 모든 API에 자동으로 붙는다. 게스트 그룹은 회원 로그인이 필요한 operation(`SecurityConfig.MEMBER_APIS`)에만 401이 붙는다. 어드민 그룹에는 401·403도 붙고(`SecurityConfig.PUBLIC_ADMIN_APIS`의 열린 API는 빼고), 상태를 바꾸는 operation(POST·PUT·PATCH·DELETE)의 403에는 `INVALID_CSRF_TOKEN` 예시가 함께 붙는다. 에러 응답 스키마는 `ErrorApiResponse`이고 `data`와 `message`는 `null` 타입이다.
 - operation이 내는 도메인 에러는 도메인 어노테이션으로 적는다. 예: `@AccountApiErrors(AccountErrorCode.INVALID_CREDENTIALS)`. 자동 에러와 합쳐 상태 코드별로 예시가 붙는다.
   - 도메인마다 `{Domain}ErrorCode` 옆(`exception/`)에 `@ApiErrors`를 붙인 `annotation class {Domain}ApiErrors(vararg val value: {Domain}ErrorCode)`를 둔다(대상 FUNCTION, 유지 RUNTIME).
   - `CommonErrorResponseCustomizer`가 `@ApiErrors`가 붙은 어노테이션을 찾아 `value`를 읽는다. `value`가 ErrorCode enum 배열이 아니면 문서 생성이 실패한다.
