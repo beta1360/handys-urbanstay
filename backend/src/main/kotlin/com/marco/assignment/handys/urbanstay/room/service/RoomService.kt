@@ -156,6 +156,12 @@ class RoomService(
 			throw BusinessException(RoomErrorCode.ROOM_MODIFIED)
 		}
 
+	@Transactional(readOnly = true)
+	fun getHotelRoomPage(hotelId: Long, page: Int, size: Int): Page<Room> {
+		hotelService.getHotel(hotelId)
+		return roomRepository.findByHotelId(hotelId, PageRequest.of(page, size, NAME_ORDER))
+	}
+
 	companion object {
 		private val NAME_ORDER = Sort.by(Sort.Order.asc(Room::name.name), Sort.Order.asc(Room::id.name))
 		private val NEWEST_FIRST = Sort.by(Sort.Order.desc(RoomStatusHistory::createdAt.name), Sort.Order.desc(RoomStatusHistory::id.name))

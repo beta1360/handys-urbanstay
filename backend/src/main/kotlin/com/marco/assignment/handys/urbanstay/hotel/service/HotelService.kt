@@ -6,6 +6,7 @@ import com.marco.assignment.handys.urbanstay.common.exception.violates
 import com.marco.assignment.handys.urbanstay.hotel.entity.Hotel
 import com.marco.assignment.handys.urbanstay.hotel.exception.HotelErrorCode
 import com.marco.assignment.handys.urbanstay.hotel.repository.HotelRepository
+import com.marco.assignment.handys.urbanstay.hotel.repository.HotelSpecifications
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.OptimisticLockingFailureException
 import org.springframework.data.domain.Page
@@ -41,8 +42,8 @@ class HotelService(
 	@Transactional(readOnly = true)
 	fun getHotels(keyword: String?, page: Int, size: Int): Page<Hotel> {
 		val pageable = PageRequest.of(page, size, NEWEST_FIRST)
-		val nameKeyword = keyword?.trim()?.ifEmpty { null } ?: return hotelRepository.findAll(pageable)
-		return hotelRepository.findByNameContainingIgnoreCase(nameKeyword, pageable)
+		val searchKeyword = keyword?.trim()?.ifEmpty { null } ?: return hotelRepository.findAll(pageable)
+		return hotelRepository.findAll(HotelSpecifications.search(searchKeyword), pageable)
 	}
 
 	@Transactional(readOnly = true)
