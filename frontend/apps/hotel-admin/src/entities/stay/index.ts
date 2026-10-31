@@ -29,6 +29,7 @@ export {
   toApiPage,
 } from "./lib/stay-page";
 export {
+  isUnlistedStayRoom,
   STAY_ROOM_OPTIONS_PARAMS,
   toStayRoomOptions,
 } from "./lib/stay-room-options";

@@ -11,7 +11,11 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { STAY_CANCELED_LABELS, STAY_FIELD_LABELS } from "@/entities/stay";
+import {
+  STAY_CANCELED_LABELS,
+  STAY_FIELD_LABELS,
+  STAY_ROOM_OPTION_MESSAGES,
+} from "@/entities/stay";
 import { STAY_SEARCH_FORM_MESSAGES } from "@/features/stay-search";
 import type { GuestDetail, Room, Stay, StayPage } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
@@ -78,6 +82,8 @@ const ROOMS: Room[] = [
     version: 0,
   },
 ];
+
+const UNLISTED_ROOM_ID = "99";
 
 const GUEST: GuestDetail = {
   id: 3,
@@ -313,9 +319,8 @@ describe("StayListPage 목록", () => {
 
   it("URL의 객실·이용객·취소 여부·페이지로 처음 조회하고 거르기 선택에 보여준다", async () => {
     fetchStays.mockResolvedValue(createStayPage({ page: 1, totalPages: 3 }));
-    renderStayListPage(
-      staysPath({ roomId: "2", guestId: "3", canceled: "true", page: "2" }),
-    );
+    const search = { roomId: "2", guestId: "3", canceled: "true", page: "2" };
+    const { router } = renderStayListPage(staysPath(search));
 
     expect(
       await screen.findByText(COMMON_MESSAGES.pageStatus(2, 3)),
@@ -323,6 +328,7 @@ describe("StayListPage 목록", () => {
     await screen.findByRole("option", { name: ROOMS[0].name });
     expect(getRoomSelect()).toHaveValue("2");
     expect(getCanceledSelect()).toHaveValue("true");
+    expect(router.state.location.href).toBe(staysPath(search));
     expect(fetchStays).toHaveBeenCalledExactlyOnceWith({
       roomId: 2,
       guestId: 3,
@@ -541,5 +547,39 @@ describe("StayListPage 빈 상태와 URL 정리", () => {
     await screen.findByRole("table");
     expect(router.state.location.href).toBe(staysPath());
     expect(fetchStays).toHaveBeenCalledExactlyOnceWith({ page: 0 });
+  });
+
+  it("URL의 객실이 불러온 객실 목록에 없으면 방문 기록을 바꿔 URL에서 지우고 다른 거르기는 둔 채 다시 조회한다", async () => {
+    const { router } = renderStayListPage(
+      staysPath({ roomId: UNLISTED_ROOM_ID, canceled: "true" }),
+    );
+
+    await vi.waitFor(() => {
+      expect(router.state.location.href).toBe(staysPath({ canceled: "true" }));
+    });
+    expect(router.history.length).toBe(1);
+    expect(fetchStays).toHaveBeenLastCalledWith({ canceled: true, page: 0 });
+    expect(getRoomSelect()).toHaveValue("");
+  });
+
+  it("객실 목록을 불러오지 못하면 URL의 객실을 두고 객실 칸 아래에 불러오기 실패 문구를 보여준다", async () => {
+    fetchRooms.mockRejectedValue(new Error("network"));
+    const { router } = renderStayListPage(
+      staysPath({ roomId: UNLISTED_ROOM_ID }),
+    );
+
+    expect(
+      await screen.findByText(STAY_ROOM_OPTION_MESSAGES.loadFailed),
+    ).toBeInTheDocument();
+    expect(getRoomSelect()).toHaveAccessibleDescription(
+      STAY_ROOM_OPTION_MESSAGES.loadFailed,
+    );
+    expect(router.state.location.href).toBe(
+      staysPath({ roomId: UNLISTED_ROOM_ID }),
+    );
+    expect(fetchStays).toHaveBeenCalledExactlyOnceWith({
+      roomId: Number(UNLISTED_ROOM_ID),
+      page: 0,
+    });
   });
 });
