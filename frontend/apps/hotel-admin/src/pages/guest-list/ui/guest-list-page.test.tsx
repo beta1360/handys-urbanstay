@@ -17,6 +17,7 @@ import type { Guest, GuestPage } from "@/shared/api";
 import { COMMON_MESSAGES } from "@/shared/config";
 import { parseSearch, stringifySearch } from "@/shared/lib/search-params";
 import { GUEST_LIST_CONTENT_MESSAGES } from "@/widgets/guest-list";
+import { GUEST_LIST_MESSAGES } from "../config/messages";
 import {
   GUEST_LIST_DEFAULT_SEARCH,
   guestListSearchSchema,
@@ -92,6 +93,10 @@ function renderGuestListPage(initialPath = guestsPath()) {
         }),
         createRoute({
           getParentRoute: () => layoutRoute,
+          path: "guests/new",
+        }),
+        createRoute({
+          getParentRoute: () => layoutRoute,
           path: "guests/$guestId",
         }),
       ]),
@@ -152,12 +157,15 @@ describe("GuestListPage 목록", () => {
     expect(fetchGuests).toHaveBeenCalledExactlyOnceWith({ page: 0 });
   });
 
-  it("이름은 그 이용객의 상세 화면으로 가는 링크다", async () => {
-    renderGuestListPage();
+  it("이름은 그 이용객의 상세 화면으로, 이용객 등록 버튼은 등록 화면으로 가는 링크다", async () => {
+    renderGuestListPage(guestsPath({ keyword: KEYWORD }));
 
     expect(
       await screen.findByRole("link", { name: GUESTS[0].name }),
     ).toHaveAttribute("href", `/guests/${GUESTS[0].id}`);
+    expect(
+      screen.getByRole("link", { name: GUEST_LIST_MESSAGES.create }),
+    ).toHaveAttribute("href", "/guests/new");
   });
 
   it("URL의 검색어와 페이지로 조회하고 API에는 0부터 센 페이지를 보낸다", async () => {
