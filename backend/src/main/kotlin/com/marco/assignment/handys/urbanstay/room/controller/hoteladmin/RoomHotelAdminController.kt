@@ -12,10 +12,12 @@ import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomHotelAdminR
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomStatusHistoryHotelAdminResponse
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomStatusUpdateHotelAdminRequest
 import com.marco.assignment.handys.urbanstay.room.dto.hoteladmin.RoomUpdateHotelAdminRequest
+import com.marco.assignment.handys.urbanstay.room.entity.Room
 import com.marco.assignment.handys.urbanstay.room.entity.RoomStatus
 import com.marco.assignment.handys.urbanstay.room.exception.RoomApiErrors
 import com.marco.assignment.handys.urbanstay.room.exception.RoomErrorCode
 import com.marco.assignment.handys.urbanstay.room.service.RoomService
+import com.marco.assignment.handys.urbanstay.stay.service.StayService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -42,6 +44,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping(ApiPaths.HOTEL_ADMIN + "/rooms")
 class RoomHotelAdminController(
 	private val roomService: RoomService,
+	private val stayService: StayService,
 ) {
 
 	@InitBinder
@@ -69,7 +72,7 @@ class RoomHotelAdminController(
 			checkInTime = request.checkInTime,
 			checkOutTime = request.checkOutTime,
 		)
-		return ApiResponse.success(RoomHotelAdminResponse.from(room))
+		return ApiResponse.success(RoomHotelAdminResponse.from(room, null))
 	}
 
 	@Operation(summary = "openapi.hotel-admin.operation.getRooms.summary", description = "openapi.hotel-admin.operation.getRooms.description")
@@ -93,8 +96,11 @@ class RoomHotelAdminController(
 		@Max(value = PageParams.MAX_SIZE, message = "{validation.max}")
 		@Parameter(description = "openapi.hotel-admin.operation.getRooms.parameter.size")
 		size: Int,
-	): ApiResponse<PageResponse<RoomHotelAdminResponse>> =
-		ApiResponse.success(PageResponse.from(roomService.getRooms(hotelAdmin.hotelId, keyword, status, page, size).map(RoomHotelAdminResponse::from)))
+	): ApiResponse<PageResponse<RoomHotelAdminResponse>> {
+		val rooms = roomService.getRooms(hotelAdmin.hotelId, keyword, status, page, size)
+		val currentStays = stayService.getCurrentStays(rooms.content.map { checkNotNull(it.id) })
+		return ApiResponse.success(PageResponse.from(rooms.map { RoomHotelAdminResponse.from(it, currentStays[it.id]) }))
+	}
 
 	@Operation(summary = "openapi.hotel-admin.operation.getRoom.summary", description = "openapi.hotel-admin.operation.getRoom.description")
 	@RoomApiErrors(RoomErrorCode.ROOM_NOT_FOUND)
@@ -103,7 +109,7 @@ class RoomHotelAdminController(
 		@AuthenticationPrincipal hotelAdmin: HotelAdminPrincipal,
 		@PathVariable roomId: Long,
 	): ApiResponse<RoomHotelAdminResponse> =
-		ApiResponse.success(RoomHotelAdminResponse.from(roomService.getRoom(hotelAdmin.hotelId, roomId)))
+		ApiResponse.success(withCurrentStay(roomService.getRoom(hotelAdmin.hotelId, roomId)))
 
 	@Operation(summary = "openapi.hotel-admin.operation.updateRoom.summary", description = "openapi.hotel-admin.operation.updateRoom.description")
 	@RoomApiErrors(RoomErrorCode.ROOM_NOT_FOUND, RoomErrorCode.ROOM_DUPLICATED, RoomErrorCode.ROOM_MODIFIED)
@@ -126,7 +132,7 @@ class RoomHotelAdminController(
 			checkInTime = request.checkInTime,
 			checkOutTime = request.checkOutTime,
 		)
-		return ApiResponse.success(RoomHotelAdminResponse.from(room))
+		return ApiResponse.success(withCurrentStay(room))
 	}
 
 	@Operation(summary = "openapi.hotel-admin.operation.updateRoomStatus.summary", description = "openapi.hotel-admin.operation.updateRoomStatus.description")
@@ -145,7 +151,7 @@ class RoomHotelAdminController(
 			from = request.from,
 			to = request.to,
 		)
-		return ApiResponse.success(RoomHotelAdminResponse.from(room))
+		return ApiResponse.success(withCurrentStay(room))
 	}
 
 	@Operation(
@@ -171,6 +177,11 @@ class RoomHotelAdminController(
 		ApiResponse.success(
 			PageResponse.from(roomService.getStatusHistories(hotelAdmin.hotelId, roomId, page, size).map(RoomStatusHistoryHotelAdminResponse::from)),
 		)
+
+	private fun withCurrentStay(room: Room): RoomHotelAdminResponse {
+		val roomId = checkNotNull(room.id)
+		return RoomHotelAdminResponse.from(room, stayService.getCurrentStays(listOf(roomId))[roomId])
+	}
 
 	companion object {
 		const val KEYWORD_MAX_LENGTH = 100
